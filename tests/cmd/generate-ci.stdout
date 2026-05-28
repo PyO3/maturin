@@ -28,7 +28,8 @@ Options:
           [default: -]
 
       --platform <platform>...
-          Platform support [deprecated: use [tool.maturin.generate-ci.github] in pyproject.toml]
+          Platform support [deprecated: use [tool.maturin.generate-ci.github."PLATFORM NAME"] in
+          pyproject.toml]
 
           Possible values:
           - all:        All

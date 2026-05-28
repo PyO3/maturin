@@ -747,14 +747,8 @@ fn regenerate_cargo_lock(
     writer: &mut VirtualWriter<SDistWriter>,
     ctx: &SdistContext<'_>,
 ) -> Result<()> {
-    let logical_manifest_dir = ctx
-        .project
-        .manifest_path
-        .parent()
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| ctx.abs_manifest_dir.clone());
-    let is_in_workspace = ctx.workspace_root.as_std_path() != logical_manifest_dir;
-    if !is_in_workspace {
+    let has_stripped_members = ctx.project.cargo_metadata.workspace_members.len() > 1;
+    if !has_stripped_members {
         return Ok(());
     }
 
@@ -786,7 +780,7 @@ fn regenerate_cargo_lock(
 
     let regenerated = fs_err::read(sdist_dir.join("Cargo.lock"))
         .context("Failed to read regenerated Cargo.lock")?;
-    writer.replace_bytes(&cargo_lock_target, regenerated);
+    writer.replace_bytes(&cargo_lock_target, regenerated)?;
 
     Ok(())
 }

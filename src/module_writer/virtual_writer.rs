@@ -583,7 +583,13 @@ impl VirtualWriter<SDistWriter> {
     }
 
     /// Replace an existing tracker entry with new in-memory bytes.
-    pub(crate) fn replace_bytes(&mut self, target: &Path, data: Vec<u8>) {
+    pub(crate) fn replace_bytes(&mut self, target: &Path, data: Vec<u8>) -> Result<()> {
+        if !self.tracker.contains_key(target) {
+            anyhow::bail!(
+                "cannot replace non-existent tracker entry: {}",
+                target.display()
+            );
+        }
         self.tracker.insert(
             target.to_path_buf(),
             ArchiveSource::Generated(GeneratedSourceData {
@@ -592,6 +598,7 @@ impl VirtualWriter<SDistWriter> {
                 executable: false,
             }),
         );
+        Ok(())
     }
 }
 

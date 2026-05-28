@@ -1,6 +1,6 @@
 use super::{
-    InterpreterKind, MAXIMUM_PYPY_MINOR, MAXIMUM_PYTHON_MINOR, MINIMUM_PYPY_MINOR,
-    MINIMUM_PYTHON_MINOR,
+    FREE_THREADED_MINIMUM_PYTHON_MINOR, InterpreterKind, MAXIMUM_PYPY_MINOR, MAXIMUM_PYTHON_MINOR,
+    MINIMUM_PYPY_MINOR, MINIMUM_PYTHON_MINOR,
 };
 use crate::Target;
 use crate::target::{Arch, Os};
@@ -309,7 +309,7 @@ impl InterpreterConfig {
                     configs.push(config);
                 }
             }
-            for minor in 13..=max_minor_ver {
+            for minor in FREE_THREADED_MINIMUM_PYTHON_MINOR..=max_minor_ver {
                 if let Some(config) = Self::lookup_one(target, python_impl, (3, minor), "t") {
                     configs.push(config);
                 }

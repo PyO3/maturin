@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+* `--find-interpreter` now discovers free-threaded CPython interpreters (`python3.14t` and newer). The experimental 3.13t is no longer built by default; build it explicitly with `-i python3.13t`.
+
 ## 1.13.3
 
 * Fix: disable abi3 in pyo3 config for version-specific fallback builds ([#3180](https://github.com/pyo3/maturin/pull/3180))

@@ -578,6 +578,12 @@ impl VirtualWriter<SDistWriter> {
                     fs_err::copy(&f.path, &dest)?;
                 }
             }
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mode = super::default_permission(source.executable());
+                fs_err::set_permissions(&dest, std::fs::Permissions::from_mode(mode))?;
+            }
         }
         Ok(())
     }

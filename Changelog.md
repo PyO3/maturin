@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-* `--find-interpreter` now discovers free-threaded CPython interpreters (`python3.14t` and newer). The experimental 3.13t is no longer built by default; build it explicitly with `-i python3.13t`.
+* `--find-interpreter` now discovers free-threaded CPython interpreters (`python3.14t` and newer) on all platforms. The experimental 3.13t is no longer built by default; build it explicitly with `-i python3.13t`.
 
 ## 1.13.3
 

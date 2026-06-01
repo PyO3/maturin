@@ -1,10 +1,10 @@
 use super::{
-    InterpreterKind, MAXIMUM_PYPY_MINOR, MAXIMUM_PYTHON_MINOR, MINIMUM_PYPY_MINOR,
-    MINIMUM_PYTHON_MINOR,
+    InterpreterKind, FREE_THREADED_MINIMUM_PYTHON_MINOR, MAXIMUM_PYPY_MINOR, MAXIMUM_PYTHON_MINOR,
+    MINIMUM_PYPY_MINOR, MINIMUM_PYTHON_MINOR,
 };
-use crate::Target;
 use crate::target::{Arch, Os};
-use anyhow::{Context, Result, format_err};
+use crate::Target;
+use anyhow::{format_err, Context, Result};
 use fs_err as fs;
 use serde::Deserialize;
 use std::fmt::Write as _;
@@ -309,7 +309,7 @@ impl InterpreterConfig {
                     configs.push(config);
                 }
             }
-            for minor in 14..=max_minor_ver {
+            for minor in FREE_THREADED_MINIMUM_PYTHON_MINOR..=max_minor_ver {
                 if let Some(config) = Self::lookup_one(target, python_impl, (3, minor), "t") {
                     configs.push(config);
                 }

@@ -360,7 +360,7 @@ pub fn test_integration_conda(
     // Create environments to build against, prepended with "A" to ensure that integration
     // tests are executed with these environments
     let mut interpreters = Vec::new();
-    for minor in 9..=12 {
+    for minor in 10..=14 {
         let (_, venv_python) = create_conda_env(&format!("maturin-{case_id}-3{minor}"), 3, minor)?;
         interpreters.push(venv_python);
     }

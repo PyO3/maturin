@@ -6,7 +6,8 @@
 
 use super::abiflags::fun_with_abiflags;
 use super::{
-    InterpreterConfig, InterpreterKind, MINIMUM_PYPY_MINOR, MINIMUM_PYTHON_MINOR, PythonInterpreter,
+    FREE_THREADED_MINIMUM_PYTHON_MINOR, InterpreterConfig, InterpreterKind, MINIMUM_PYPY_MINOR,
+    MINIMUM_PYTHON_MINOR, PythonInterpreter,
 };
 use crate::target::Arch;
 use crate::{BridgeModel, Target};
@@ -257,6 +258,25 @@ fn find_all_windows(
         }
     }
 
+    // Fallback to python3.{minor}t.exe for free-threaded Microsoft Store / PATH
+    // installs (3.14+). The py launcher path above can also surface these once
+    // installed; this matches the Unix `python3.{minor}t` discovery.
+    if bridge.supports_free_threaded() {
+        let min_free_threaded = finder
+            .min_python_minor
+            .max(FREE_THREADED_MINIMUM_PYTHON_MINOR);
+        for minor in min_free_threaded..=bridge.maximum_python_minor_version() {
+            let key = (3, minor, true);
+            if !finder.versions_found.contains(&key) {
+                let executable = format!("python3.{minor}t.exe");
+                let executable_path = Path::new(&executable);
+                if !finder.mark_seen(executable_path) {
+                    finder.try_add(executable_path)?;
+                }
+            }
+        }
+    }
+
     let interpreters = finder.into_interpreters();
     if interpreters.is_empty() {
         bail!(
@@ -429,6 +449,38 @@ pub(super) fn lookup_target(
         .collect()
 }
 
+/// CPython executable names to probe for `--find-interpreter`.
+///
+/// Besides the regular `python3.{minor}` names, this also returns free-threaded
+/// `python3.{minor}t` names for the officially-supported free-threaded versions
+/// (3.14+, PEP 779) when the bindings support free-threading (PyO3 >= 0.23). The
+/// experimental 3.13t is intentionally not auto-discovered; build it explicitly
+/// with `-i python3.13t` if needed.
+fn cpython_candidate_names(
+    bridge: &BridgeModel,
+    requires_python: Option<&VersionSpecifiers>,
+) -> Vec<String> {
+    let allowed = |minor: usize| {
+        requires_python
+            .map(|requires_python| requires_python.contains(&Version::new([3, minor as u64])))
+            .unwrap_or(true)
+    };
+    let mut names: Vec<String> = (bridge.minimal_python_minor_version()
+        ..=bridge.maximum_python_minor_version())
+        .filter(|minor| allowed(*minor))
+        .map(|minor| format!("python3.{minor}"))
+        .collect();
+    if bridge.supports_free_threaded() {
+        names.extend(
+            (FREE_THREADED_MINIMUM_PYTHON_MINOR.max(bridge.minimal_python_minor_version())
+                ..=bridge.maximum_python_minor_version())
+                .filter(|minor| allowed(*minor))
+                .map(|minor| format!("python3.{minor}t")),
+        );
+    }
+    names
+}
+
 /// Tries to find all installed python versions using the heuristic for the
 /// given platform.
 ///
@@ -445,15 +497,7 @@ pub(super) fn find_all(
         return find_all_windows(target, bridge, requires_python);
     };
 
-    let mut executables: Vec<String> = (bridge.minimal_python_minor_version()
-        ..=bridge.maximum_python_minor_version())
-        .filter(|minor| {
-            requires_python
-                .map(|requires_python| requires_python.contains(&Version::new([3, *minor as u64])))
-                .unwrap_or(true)
-        })
-        .map(|minor| format!("python3.{minor}"))
-        .collect();
+    let mut executables: Vec<String> = cpython_candidate_names(bridge, requires_python);
 
     // Also try to find PyPy for cffi and pyo3 bindings
     if *bridge == BridgeModel::Cffi || bridge.is_pyo3() {
@@ -672,7 +716,7 @@ mod tests {
         "#]];
         expected.assert_debug_eq(&pythons);
 
-        // pyo3 0.23+ should find CPython 3.13t
+        // pyo3 0.23+ should find free-threaded CPython
         let pythons = lookup_target(
             &target,
             None,
@@ -696,7 +740,6 @@ mod tests {
                 "CPython 3.12",
                 "CPython 3.13",
                 "CPython 3.14",
-                "CPython 3.13t",
                 "CPython 3.14t",
                 "PyPy 3.9",
                 "PyPy 3.10",
@@ -774,7 +817,6 @@ mod tests {
                 "CPython 3.12",
                 "CPython 3.13",
                 "CPython 3.14",
-                "CPython 3.13t",
                 "CPython 3.14t",
                 "PyPy 3.9",
                 "PyPy 3.10",
@@ -782,6 +824,40 @@ mod tests {
             ]
         "#]];
         expected.assert_debug_eq(&pythons);
+    }
+
+    #[test]
+    fn test_cpython_candidate_names_free_threaded() {
+        let pyo3_023 = BridgeModel::PyO3(PyO3 {
+            crate_name: PyO3Crate::PyO3,
+            version: semver::Version::new(0, 23, 0),
+            stable_abi: None,
+            metadata: None,
+        });
+        let names = cpython_candidate_names(&pyo3_023, None);
+        // Free-threading is discovered for the officially-supported versions (3.14+) ...
+        assert!(names.contains(&"python3.14t".to_string()));
+        // ... but the experimental 3.13t is never auto-discovered.
+        assert!(!names.contains(&"python3.13t".to_string()));
+        // Regular interpreters are still present.
+        assert!(names.contains(&"python3.14".to_string()));
+
+        // pyo3 < 0.23 does not support free-threading: no `t` names at all.
+        let pyo3_022 = BridgeModel::PyO3(PyO3 {
+            crate_name: PyO3Crate::PyO3,
+            version: semver::Version::new(0, 22, 0),
+            stable_abi: None,
+            metadata: None,
+        });
+        let names = cpython_candidate_names(&pyo3_022, None);
+        assert!(!names.iter().any(|name| name.ends_with('t')));
+
+        // A requires-python that excludes 3.14 also excludes 3.14t.
+        let names = cpython_candidate_names(
+            &pyo3_023,
+            Some(&VersionSpecifiers::from_str(">=3.15").unwrap()),
+        );
+        assert!(!names.contains(&"python3.14t".to_string()));
     }
 
     #[test]

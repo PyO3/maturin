@@ -545,7 +545,10 @@ impl<'a> InterpreterResolver<'a> {
     ///
     /// When building abi3 wheels, we prefer interpreters that support the stable API.
     /// Non-abi3-capable interpreters (PyPy, free-threaded CPython) are only included
-    /// if explicitly requested by the user via `-i`.
+    /// if explicitly requested by the user via `-i`. Note that `--find-interpreter`
+    /// leaves `user_interpreters` empty, so a free-threaded interpreter discovered that
+    /// way is dropped here for abi3 builds; producing an abi3 + free-threaded 3.14t
+    /// wheel requires an explicit `-i python3.14t`.
     ///
     /// This fixes:
     /// - #2772: free-threaded interpreter chosen over non-free-threaded for abi3

@@ -1,10 +1,10 @@
 use super::{
-    InterpreterKind, FREE_THREADED_MINIMUM_PYTHON_MINOR, MAXIMUM_PYPY_MINOR, MAXIMUM_PYTHON_MINOR,
+    FREE_THREADED_MINIMUM_PYTHON_MINOR, InterpreterKind, MAXIMUM_PYPY_MINOR, MAXIMUM_PYTHON_MINOR,
     MINIMUM_PYPY_MINOR, MINIMUM_PYTHON_MINOR,
 };
-use crate::target::{Arch, Os};
 use crate::Target;
-use anyhow::{format_err, Context, Result};
+use crate::target::{Arch, Os};
+use anyhow::{Context, Result, format_err};
 use fs_err as fs;
 use serde::Deserialize;
 use std::fmt::Write as _;

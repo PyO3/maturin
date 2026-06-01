@@ -6,12 +6,12 @@
 
 use super::abiflags::fun_with_abiflags;
 use super::{
-    InterpreterConfig, InterpreterKind, PythonInterpreter, FREE_THREADED_MINIMUM_PYTHON_MINOR,
-    MINIMUM_PYPY_MINOR, MINIMUM_PYTHON_MINOR,
+    FREE_THREADED_MINIMUM_PYTHON_MINOR, InterpreterConfig, InterpreterKind, MINIMUM_PYPY_MINOR,
+    MINIMUM_PYTHON_MINOR, PythonInterpreter,
 };
 use crate::target::Arch;
 use crate::{BridgeModel, Target};
-use anyhow::{bail, format_err, Context, Result};
+use anyhow::{Context, Result, bail, format_err};
 use once_cell::sync::Lazy;
 use pep440_rs::{Version, VersionSpecifiers};
 use regex::Regex;

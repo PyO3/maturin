@@ -66,6 +66,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       RUST_BACKTRACE: "1"
+      PIP_NO_CACHE_DIR: "1"
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: "sccache"
     steps:

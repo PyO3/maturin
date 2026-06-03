@@ -10,7 +10,7 @@ classifiers = [
     "Programming Language :: Rust"
 ]
 requires-python = ">=3.7"
-dependencies = ["cffi"]
+dependencies = ["cffi; platform_python_implementation != 'PyPy'"]
 dynamic = ["version"]
 
 [tool.maturin]

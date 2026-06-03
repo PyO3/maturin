@@ -9,7 +9,7 @@ classifiers = [
     "Programming Language :: Rust"
 ]
 requires-python = ">=3.6"
-dependencies = ["cffi"]
+dependencies = ["cffi; platform_python_implementation != 'PyPy'"]
 dynamic = ["version", "description"]  # Allow description from Cargo.toml to be used
 
 [tool.maturin]

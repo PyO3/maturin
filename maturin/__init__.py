@@ -163,7 +163,7 @@ def build_sdist(sdist_directory: str, config_settings: Optional[Mapping[str, Any
 
 # noinspection PyUnusedLocal
 def get_requires_for_build_wheel(config_settings: Optional[Mapping[str, Any]] = None) -> List[str]:
-    if get_config().get("bindings") == "cffi":
+    if get_config().get("bindings") == "cffi" and platform.python_implementation() != "PyPy":
         requirements = ["cffi"]
     else:
         requirements = []

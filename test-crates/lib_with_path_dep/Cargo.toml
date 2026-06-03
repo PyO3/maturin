@@ -8,5 +8,5 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { git = "https://github.com/ngoldbaum/pyo3", branch = "opaque-pyobject" }
+pyo3 = { git = "https://github.com/pyo3/pyo3" }
 some_path_dep = { path = "../some_path_dep" }

@@ -7,7 +7,7 @@ readme = "README.md"
 edition = "2021"
 
 [dependencies]
-pyo3 = { git = "https://github.com/ngoldbaum/pyo3", branch = "opaque-pyobject" }
+pyo3 = { git = "https://github.com/pyo3/pyo3" }
 
 [lib]
 name = "pyo3_mixed_py_subdir"

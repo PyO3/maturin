@@ -6,7 +6,7 @@ description = "Free-threaded stable ABI (abi3t) test crate for maturin"
 license = "MIT"
 
 [dependencies]
-pyo3 = { git = "https://github.com/ngoldbaum/pyo3", branch = "opaque-pyobject", features = [
+pyo3 = { git = "https://github.com/pyo3/pyo3", features = [
     "abi3t-py315",
     "generate-import-lib",
 ] }

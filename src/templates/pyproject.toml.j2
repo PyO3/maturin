@@ -11,7 +11,7 @@ classifiers = [
     "Programming Language :: Python :: Implementation :: PyPy",
 ]
 {% if bindings == "cffi" -%}
-dependencies = ["cffi"]
+dependencies = ["cffi; platform_python_implementation != 'PyPy'"]
 {% endif -%}
 dynamic = ["version"]
 {% if mixed_non_src -%}

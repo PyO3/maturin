@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "cffi-pure"
-dependencies = ["cffi"]
+#dependencies = ["cffi; platform_python_implementation != 'PyPy'"]
 dynamic = ["version"]
 
 [tool.maturin]

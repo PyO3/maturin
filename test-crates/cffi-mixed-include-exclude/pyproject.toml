@@ -7,7 +7,7 @@ name = "cffi-mixed-include-exclude"
 readme = "README.md"
 classifiers = ["Programming Language :: Python", "Programming Language :: Rust"]
 requires-python = ">=3.7"
-dependencies = ["cffi"]
+dependencies = ["cffi; platform_python_implementation != 'PyPy'"]
 dynamic = ["version"]
 
 [tool.maturin]

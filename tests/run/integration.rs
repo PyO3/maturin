@@ -71,14 +71,22 @@ fn integration_pyo3_bin() {
     "integration-workspace-inverted-order",
     "test-crates/workspace-inverted-order/path-dep-with-root",
 ))]
-#[case::pyo3_stub_generation(IntegrationCase::new(
-    "integration-pyo3-stub-generation",
-    "test-crates/pyo3-stub-generation",
+#[case::pyo3_stub_generation_pure(IntegrationCase::new(
+    "integration-pyo3-stub-generation-pure",
+    "test-crates/pyo3-stub-generation-pure",
 ).generate_stubs())]
-#[cfg_attr(unix, case::pyo3_stub_generation_zig(IntegrationCase::new(
-    "integration-pyo3-stub-generation-zig",
-    "test-crates/pyo3-stub-generation",
+#[cfg_attr(unix, case::pyo3_stub_generation_pure_zig(IntegrationCase::new(
+    "integration-pyo3-stub-generation-pure-zig",
+    "test-crates/pyo3-stub-generation-pure",
 ).generate_stubs().zig()))]
+#[case::pyo3_stub_generation_mixed(IntegrationCase::new(
+    "integration-pyo3-stub-generation-mixed",
+    "test-crates/pyo3-stub-generation-mixed",
+).generate_stubs())]
+#[case::pyo3_stub_generation_mixed_py_subdir(IntegrationCase::new(
+    "integration-pyo3-stub-generation-mixed-py-subdir",
+    "test-crates/pyo3-stub-generation-mixed-py-subdir",
+).generate_stubs())]
 #[test]
 fn integration_cases(#[case] case: IntegrationCase<'_>) {
     handle_result(integration::test_integration(&case));
@@ -190,11 +198,11 @@ fn abi3_python_interpreter_args() {
 #[test]
 fn abi3_generate_stubs() {
     handle_result(other::generate_stubs(
-        "test-crates/pyo3-stub-generation",
-        "integration-pyo3-stub-generation-generate-stubs",
+        "test-crates/pyo3-stub-generation-pure",
+        "integration-pyo3-stub-generation-pure-generate-stubs",
         &[
-            "pyo3_stub_generation/__init__.pyi",
-            "pyo3_stub_generation/submodule.pyi",
+            "pyo3_stub_generation_pure/__init__.pyi",
+            "pyo3_stub_generation_pure/submodule.pyi",
         ],
     ));
 }

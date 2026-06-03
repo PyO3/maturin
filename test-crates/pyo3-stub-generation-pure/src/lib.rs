@@ -1,7 +1,7 @@
 use pyo3::prelude::*;
 
 #[pymodule]
-mod pyo3_stub_generation {
+mod pyo3_stub_generation_pure {
     use super::*;
 
     #[pyclass]

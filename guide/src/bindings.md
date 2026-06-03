@@ -14,18 +14,30 @@ maturin automatically detects pyo3 bindings when it's added as a dependency in `
 
 ### `Py_LIMITED_API`/abi3
 
-pyo3 bindings has `Py_LIMITED_API`/abi3 support, enable the `abi3` feature of the `pyo3` crate to use it:
+The pyo3 bindings supports the Python stable ABI (`Py_LIMITED_API`/abi3/abi3t).
+You can use it by enabling `"abi3"` and/or `"abi3t"` features. We suggest
+picking a minimum supported Python version for both features:
 
 ```toml
-pyo3 = { version = "0.28.3", features = ["abi3"] }
+pyo3 = { version = "0.28.3", features = ["abi3-py310", "abi3t-py315"] }
 ```
 
-You may additionally specify a minimum Python version by using the `abi3-pyXX`
-format for the pyo3 features, where `XX` is corresponds to a Python version.
-For example `abi3-py37` will indicate a minimum Python version of 3.7.
+When selecting a specific interpreter to build against, this will produce an
+`abi3-py310` wheel for Python 3.14 and older and an `abi3.abi3t-py315` wheel on
+Python 3.15 and newer. If you build with `--find-interpreters`, maturin will
+produce an `abi3-py310`, `cp314t-cp314` and an `abi3.abi3t-py315` wheel. These
+three wheels cover all non-EOL and non-experimental builds of CPython. Other
+python implementations like RustPython may also target the abi3t ABI in the
+future.
 
-> **Note**: Read more about abi3 support in [pyo3's
-> documentation](https://pyo3.rs/latest/building-and-distribution#py_limited_apiabi3).
+An `abi3-py310` wheel supports all GIL-enabled Python
+versions from Python 3.10 to Python 3.14 and the `abi3.abi3t` wheel supports
+Python 3.15 and all newer versions of CPython.
+
+> **Note**: Read more about stable ABI support in [pyo3's
+>     documentation](https://pyo3.rs/latest/building-and-distribution#py_limited_apiabi3abi3t). You
+>     can read more about using abi3 and abi3t wheels simultaneously in the
+>     HOWTO guide on migrating to abi3t: https://docs.python.org/3.16/howto/abi3t-migration.html#why-do-this.
 
 ### Cross Compiling
 

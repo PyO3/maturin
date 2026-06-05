@@ -172,7 +172,7 @@ if hasattr({ext_name}, "__all__"):
         Ok(GeneratorOutput {
             artifact_target,
             artifact_source_override,
-            additional_files: Some(additional_files),
+            additional_files,
         })
     }
 }

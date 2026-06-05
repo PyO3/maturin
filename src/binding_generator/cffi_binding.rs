@@ -89,7 +89,7 @@ impl<'a> BindingGenerator for CffiBindingGenerator<'a> {
         Ok(GeneratorOutput {
             artifact_target,
             artifact_source_override: None,
-            additional_files: Some(additional_files),
+            additional_files,
         })
     }
 }

@@ -90,7 +90,7 @@ pub(crate) struct GeneratorOutput {
 
     /// Additional files to be installed (e.g. __init__.py)
     /// The provided PathBuf should be relative to the archive root
-    additional_files: Option<HashMap<PathBuf, ArchiveSource>>,
+    additional_files: HashMap<PathBuf, ArchiveSource>,
 }
 
 /// Every binding generator ultimately has to install the following:
@@ -200,25 +200,23 @@ where
                 }
 
                 // 3a. Install additional files
-                if let Some(additional_files) = additional_files {
-                    for (target, source) in additional_files {
-                        let target = base_path.join(target);
-                        fs::create_dir_all(target.parent().unwrap())?;
-                        debug!("Generating file {}", target.display());
-                        let mut options = File::options();
-                        options.write(true).create(true).truncate(true);
-                        #[cfg(unix)]
-                        {
-                            options.mode(default_permission(source.executable()));
-                        }
+                for (target, source) in additional_files {
+                    let target = base_path.join(target);
+                    fs::create_dir_all(target.parent().unwrap())?;
+                    debug!("Generating file {}", target.display());
+                    let mut options = File::options();
+                    options.write(true).create(true).truncate(true);
+                    #[cfg(unix)]
+                    {
+                        options.mode(default_permission(source.executable()));
+                    }
 
-                        let mut file = options.open(&target)?;
-                        match source {
-                            ArchiveSource::Generated(source) => file.write_all(&source.data)?,
-                            ArchiveSource::File(source) => {
-                                let mut source = File::options().read(true).open(source.path)?;
-                                io::copy(&mut source, &mut file)?;
-                            }
+                    let mut file = options.open(&target)?;
+                    match source {
+                        ArchiveSource::Generated(source) => file.write_all(&source.data)?,
+                        ArchiveSource::File(source) => {
+                            let mut source = File::options().read(true).open(source.path)?;
+                            io::copy(&mut source, &mut file)?;
                         }
                     }
                 }
@@ -252,12 +250,10 @@ where
                 writer.add_file_force(artifact_target.path(), source, true)?;
 
                 // 3b. Install additional files
-                if let Some(additional_files) = additional_files {
-                    for (target, source) in additional_files {
-                        debug!("Generating archive entry {}", target.display());
-                        // Use add_entry_force to bypass exclusion checks for generated binding files
-                        writer.add_entry_force(target, source)?;
-                    }
+                for (target, source) in additional_files {
+                    debug!("Generating archive entry {}", target.display());
+                    // Use add_entry_force to bypass exclusion checks for generated binding files
+                    writer.add_entry_force(target, source)?;
                 }
 
                 // 4b. Install import library on Windows

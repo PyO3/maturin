@@ -54,7 +54,7 @@ impl<'m> BindingGenerator for BinBindingGenerator<'m> {
 
         let scripts_dir = self.metadata.get_data_dir().join("scripts");
 
-        let mut additional_files = None;
+        let mut additional_files = HashMap::new();
 
         let artifact_target = if self.use_shim {
             // The real binary goes into platlib at {dist}.scripts/{bin_name}
@@ -71,8 +71,7 @@ impl<'m> BindingGenerator for BinBindingGenerator<'m> {
             // the shim entry in .data/scripts/.
             let shim_name = bin_name.strip_suffix(".exe").unwrap_or(&bin_name);
 
-            let mut files = HashMap::new();
-            files.insert(
+            additional_files.insert(
                 scripts_dir.join(shim_name),
                 ArchiveSource::Generated(GeneratedSourceData {
                     data: generate_script_shim(&shim_path_str, &libs_dir_name).into(),
@@ -80,7 +79,6 @@ impl<'m> BindingGenerator for BinBindingGenerator<'m> {
                     executable: true,
                 }),
             );
-            additional_files = Some(files);
             ArtifactTarget::Binary(real_bin_dir.join(&bin_name))
         } else {
             ArtifactTarget::Binary(scripts_dir.join(&bin_name))
@@ -90,8 +88,7 @@ impl<'m> BindingGenerator for BinBindingGenerator<'m> {
             update_entry_points(self.metadata, &bin_name)?;
 
             let dist_name = self.metadata.get_distribution_escaped();
-            let files = additional_files.get_or_insert_with(HashMap::new);
-            files.insert(
+            additional_files.insert(
                 Path::new(&dist_name)
                     .join(bin_name.replace('-', "_"))
                     .with_extension("py"),

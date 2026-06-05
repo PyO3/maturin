@@ -460,7 +460,7 @@ fn resolve_platform_tags(
     user_tags: Vec<PlatformTag>,
     target: &Target,
     bridge: &BridgeModel,
-    pyproject: Option<&crate::pyproject_toml::PyProjectToml>,
+    pyproject: Option<&PyProjectToml>,
     pyproject_options: &mut Vec<&str>,
     #[cfg(feature = "zig")] use_zig: bool,
 ) -> Result<Vec<PlatformTag>> {
@@ -492,11 +492,6 @@ fn resolve_platform_tags(
         } else {
             Vec::new()
         }
-    } else if let [PlatformTag::Pypi] = &user_tags[..] {
-        if !is_arch_supported_by_pypi(target) {
-            bail!("Rust target {target} is not supported by PyPI");
-        }
-        Vec::new()
     } else {
         if user_tags.iter().any(|tag| tag.is_pypi()) && !is_arch_supported_by_pypi(target) {
             bail!("Rust target {target} is not supported by PyPI");

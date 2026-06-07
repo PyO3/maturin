@@ -24,6 +24,10 @@ metadata = {
     # Pyston has sys.implementation.name == "pyston" while platform.python_implementation() == cpython
     "implementation_name": sys.implementation.name,
     "executable": sys.executable or None,
+    # The base interpreter path when running inside a venv (PEP 405). Used to
+    # set `PYO3_BASE_PYTHON` to a stable path so that ephemeral virtualenv
+    # paths don't invalidate cargo's build cache.
+    "base_executable": getattr(sys, "_base_executable", None) or None,
     "major": sys.version_info.major,
     "minor": sys.version_info.minor,
     "abiflags": sysconfig.get_config_var("ABIFLAGS"),

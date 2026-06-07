@@ -32,6 +32,10 @@ const GET_INTERPRETER_METADATA: &str = include_str!("get_interpreter_metadata.py
 pub(super) struct InterpreterMetadataMessage {
     pub implementation_name: String,
     pub executable: Option<String>,
+    // `sys._base_executable`: the base interpreter path when running inside a
+    // venv, otherwise (usually) the same as `executable`. Absent on
+    // interpreters that don't define `sys._base_executable`.
+    pub base_executable: Option<String>,
     pub major: usize,
     pub minor: usize,
     pub abiflags: Option<String>,
@@ -623,6 +627,7 @@ fn from_metadata_message(
         .executable
         .map(PathBuf::from)
         .unwrap_or_else(|| executable.as_ref().to_path_buf());
+    let base_executable = message.base_executable.map(PathBuf::from);
 
     if target.is_windows() {
         'windows_arch_check: {
@@ -676,6 +681,7 @@ fn from_metadata_message(
             gil_disabled: message.gil_disabled,
         },
         executable,
+        base_executable,
         platform,
         runnable: true,
         implementation_name: message.implementation_name,
@@ -883,6 +889,7 @@ mod tests {
             ext_suffix: Some(".pyd".to_string()),
             platform: platform.to_string(),
             executable: None,
+            base_executable: None,
             soabi: None,
             gil_disabled: false,
             system: "windows".to_string(),
@@ -935,6 +942,7 @@ mod tests {
                         gil_disabled: false,
                     },
                     executable: PathBuf::from("python3.10"),
+                    base_executable: None,
                     platform: Some(platform.replace("-", "_")),
                     runnable: true,
                     implementation_name: "CPython".to_string(),
@@ -980,6 +988,7 @@ mod tests {
                     gil_disabled: false,
                 },
                 executable: PathBuf::from("python3.10"),
+                base_executable: None,
                 platform: Some("unknown_platform".to_string()),
                 runnable: true,
                 implementation_name: "CPython".to_string(),
@@ -1010,6 +1019,7 @@ mod tests {
             ext_suffix: Some(".cp314-win_amd64.pyd".to_string()),
             platform: "win-amd64".to_string(),
             executable: None,
+            base_executable: None,
             soabi: None,
             gil_disabled: false,
             system: "windows".to_string(),
@@ -1031,6 +1041,7 @@ mod tests {
             ext_suffix: Some(".cp314t-win_amd64.pyd".to_string()),
             platform: "win-amd64".to_string(),
             executable: None,
+            base_executable: None,
             soabi: None,
             gil_disabled: true,
             system: "windows".to_string(),

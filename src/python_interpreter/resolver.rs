@@ -330,6 +330,7 @@ impl<'a> InterpreterResolver<'a> {
             let interp = PythonInterpreter {
                 config,
                 executable: PathBuf::new(),
+                base_executable: None,
                 platform: None,
                 runnable: false,
                 implementation_name,
@@ -858,6 +859,7 @@ impl<'a> InterpreterResolver<'a> {
                 gil_disabled,
             },
             executable: PathBuf::new(),
+            base_executable: None,
             platform: None,
             runnable: false,
             implementation_name: interpreter_kind.to_string().to_ascii_lowercase(),

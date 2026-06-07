@@ -88,6 +88,14 @@ pub struct PythonInterpreter {
     ///
     /// Just the name of the binary in PATH does also work, e.g. `python3.5`
     pub executable: PathBuf,
+    /// Comes from `sys._base_executable`: the base interpreter path when
+    /// `executable` is inside a venv (PEP 405), otherwise usually the same as
+    /// `executable`.
+    ///
+    /// Used to set `PYO3_BASE_PYTHON` to a stable interpreter path so that
+    /// ephemeral virtualenv paths (as created by PEP 517 build frontends with
+    /// build isolation) don't invalidate cargo's build cache.
+    pub base_executable: Option<PathBuf>,
     /// Comes from `sysconfig.get_platform()`
     ///
     /// Note that this can be `None` when cross compiling
@@ -244,6 +252,7 @@ impl PythonInterpreter {
         PythonInterpreter {
             config,
             executable: PathBuf::new(),
+            base_executable: None,
             platform: None,
             runnable: false,
             implementation_name,
@@ -272,6 +281,7 @@ impl PythonInterpreter {
                 gil_disabled: false,
             },
             executable: PathBuf::new(),
+            base_executable: None,
             platform: None,
             runnable: false,
             implementation_name: "cpython".to_string(),

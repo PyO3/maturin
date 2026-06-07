@@ -892,6 +892,22 @@ fn configure_pyo3_env(
                         "PYO3_ENVIRONMENT_SIGNATURE",
                         interpreter.environment_signature(),
                     );
+
+                // Also point pyo3 at the stable base interpreter path (PEP 405
+                // `sys._base_executable`). pyo3 versions that support it prefer
+                // `PYO3_BASE_PYTHON` over `PYO3_PYTHON` and don't trigger rebuilds
+                // when only `PYO3_PYTHON` changes, which keeps cargo's build cache
+                // warm across PEP 517 builds in ephemeral (randomly-named)
+                // virtualenvs. Older pyo3 versions simply ignore the variable.
+                // See https://github.com/PyO3/pyo3/issues/6113
+                if let Some(base_executable) = interpreter
+                    .base_executable
+                    .as_deref()
+                    .filter(|base| base.is_file())
+                {
+                    debug!("Setting PYO3_BASE_PYTHON to {}", base_executable.display());
+                    build_command.env("PYO3_BASE_PYTHON", base_executable);
+                }
             }
 
             // and legacy pyo3 versions

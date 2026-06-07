@@ -4,6 +4,7 @@
 
 * `--find-interpreter` now discovers free-threaded CPython interpreters (`python3.14t` and newer) on all platforms. The experimental 3.13t is no longer built by default; build it explicitly with `-i python3.13t`.
 * `cffi` is no longer automatically added as a build dependency of maturin on PyPy, which has `cffi` pre-installed as part of the PyPy distribution
+* Set `PYO3_BASE_PYTHON` to the stable base interpreter path (`sys._base_executable`) alongside `PYO3_PYTHON`. With pyo3 versions that support it, this keeps cargo's build cache warm across PEP 517 builds in ephemeral virtualenvs ([pyo3#6113](https://github.com/PyO3/pyo3/issues/6113))
 
 ## 1.13.3
 

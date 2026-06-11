@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-pyo3-ffi = { git = "https://github.com/pyo3/pyo3", features = ["abi3t-py315"] }
+pyo3-ffi = { version = "0.29.0", features = ["abi3t-py315"] }
 
 [lib]
 name = "pyo3_ffi_abi3t_py315"

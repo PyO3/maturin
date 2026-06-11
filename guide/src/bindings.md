@@ -19,7 +19,7 @@ You can use it by enabling `"abi3"` and/or `"abi3t"` features. We suggest
 picking a minimum supported Python version for both features:
 
 ```toml
-pyo3 = { version = "0.28.3", features = ["abi3-py310", "abi3t-py315"] }
+pyo3 = { version = "0.29.0", features = ["abi3-py310", "abi3t-py315"] }
 ```
 
 When selecting a specific interpreter to build against, this will produce an

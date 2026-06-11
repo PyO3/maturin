@@ -21,8 +21,7 @@ const PYO3_ABI3_NO_PYTHON_VERSION: (u64, u64, u64) = (0, 16, 4);
 
 /// The first version of pyo3 that has a target_abi parameter in build
 /// configuration files
-// TODO: should be 0.29.0 but can't be until that version increment happens
-const PYO3_TARGET_ABI_PARAMETER_VERSION: (u64, u64, u64) = (0, 28, 3);
+const PYO3_TARGET_ABI_PARAMETER_VERSION: (u64, u64, u64) = (0, 29, 0);
 
 /// crate types excluding `bin`, `cdylib` and `proc-macro`
 pub(crate) const LIB_CRATE_TYPES: [CrateType; 4] = [

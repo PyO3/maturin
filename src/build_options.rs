@@ -155,7 +155,7 @@ impl BuildOptions {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bridge::{PyO3, PyO3Crate, StableAbi, StableAbiKind, find_bridge};
+    use crate::bridge::{find_bridge, PyO3, PyO3Crate, StableAbi, StableAbiKind};
     use crate::python_interpreter::InterpreterResolver;
     use crate::test_utils::test_crate_path;
     use crate::{BridgeModel, Target};
@@ -191,7 +191,7 @@ mod tests {
 
         let bridge = BridgeModel::PyO3(PyO3 {
             crate_name: PyO3Crate::PyO3,
-            version: semver::Version::new(0, 28, 3),
+            version: semver::Version::new(0, 29, 0),
             stable_abi: Some(StableAbi::from_abi3_version(3, 9)),
             metadata: Some(PyO3Metadata {
                 cpython: PyO3VersionMetadata {

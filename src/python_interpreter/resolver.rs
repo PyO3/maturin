@@ -18,7 +18,7 @@ use super::{InterpreterConfig, InterpreterKind, PythonInterpreter};
 use crate::cross_compile::{
     find_build_details, find_sysconfigdata, parse_build_details_json_file, parse_sysconfigdata,
 };
-use crate::{BridgeModel, Target};
+use crate::{BridgeModel, StableAbiKind, Target};
 use anyhow::{Context, Result, bail, format_err};
 use pep440_rs::VersionSpecifiers;
 use std::env;
@@ -154,8 +154,8 @@ impl InterpreterSpec {
             format!("Invalid python interpreter minor version '{minor_str}', expect a digit")
         })?;
 
-        if (major, minor) < (3, 13) && abiflags == "t" {
-            bail!("Free-threaded Python interpreter is only supported on 3.13 and later.");
+        if (major, minor) < (3, 14) && abiflags == "t" {
+            bail!("Free-threaded Python interpreter is only supported on 3.14 and later.");
         }
 
         Ok(Some(InterpreterSpec {
@@ -564,7 +564,7 @@ impl<'a> InterpreterResolver<'a> {
 
         let (abi3_capable, non_abi3): (Vec<_>, Vec<_>) = candidates
             .into_iter()
-            .partition(|c| c.interpreter.has_stable_api());
+            .partition(|c| c.interpreter.has_stable_api(StableAbiKind::Abi3));
 
         let mut result = abi3_capable;
 
@@ -637,7 +637,7 @@ impl<'a> InterpreterResolver<'a> {
             // compatible interpreter on PATH (e.g. manylinux containers where
             // the system Python is older than the abi3 minimum).
             let has_compatible = candidates.iter().any(|c| {
-                c.interpreter.has_stable_api()
+                c.interpreter.has_stable_api(StableAbiKind::Abi3)
                     && (c.interpreter.major as u8, c.interpreter.minor as u8) >= (major, minor)
             });
             if has_compatible || !self.user_interpreters.is_empty() {
@@ -969,10 +969,10 @@ mod tests {
         assert_eq!(spec.minor, 14);
         assert_eq!(spec.abiflags, "t");
 
-        let spec = InterpreterSpec::parse("3.13t").unwrap().unwrap();
+        let spec = InterpreterSpec::parse("3.14t").unwrap().unwrap();
         assert_eq!(spec.kind, InterpreterKind::CPython);
         assert_eq!(spec.major, 3);
-        assert_eq!(spec.minor, 13);
+        assert_eq!(spec.minor, 14);
         assert_eq!(spec.abiflags, "t");
     }
 
@@ -980,7 +980,7 @@ mod tests {
     fn test_interpreter_spec_free_threaded_too_old() {
         let err = InterpreterSpec::parse("python3.12t").unwrap_err();
         assert!(
-            err.to_string().contains("3.13"),
+            err.to_string().contains("3.14"),
             "expected version constraint in error: {err}"
         );
     }

@@ -46,8 +46,8 @@ jobs:
           - windows-11-arm
         python-version:
           - "3.9"
-          - "3.14"
-          - "3.14t"
+          - "3.15-dev"
+          - "3.15t-dev"
           - "pypy3.11"
         exclude:
           # TODO: Tests are getting stuck
@@ -66,6 +66,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       RUST_BACKTRACE: "1"
+      PIP_NO_CACHE_DIR: "1"
       SCCACHE_GHA_ENABLED: "true"
       RUSTC_WRAPPER: "sccache"
     steps:
@@ -425,6 +426,7 @@ jobs:
       - name: Build wheels
         run: |
           set -ex
+
           # Use bundled sysconfig
           bin/maturin build -i ${{ matrix.platform.python }} --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml ${{ matrix.platform.extra-args }}
 

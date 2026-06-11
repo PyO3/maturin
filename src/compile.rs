@@ -19,6 +19,10 @@ use tracing::{debug, instrument, trace};
 /// without `PYO3_NO_PYTHON` environment variable
 const PYO3_ABI3_NO_PYTHON_VERSION: (u64, u64, u64) = (0, 16, 4);
 
+/// The first version of pyo3 that has a target_abi parameter in build
+/// configuration files
+const PYO3_TARGET_ABI_PARAMETER_VERSION: (u64, u64, u64) = (0, 29, 0);
+
 /// crate types excluding `bin`, `cdylib` and `proc-macro`
 pub(crate) const LIB_CRATE_TYPES: [CrateType; 4] = [
     CrateType::Lib,
@@ -620,10 +624,18 @@ fn configure_macos_pyo3_linker_args(
     }
 
     // install_name is specific to the top-level output, so keep it in cargo_rustc.args
-    let use_abi3_suffix =
-        python_interpreter.is_some_and(|i| bridge_model.is_abi3_for_interpreter(i));
-    let so_filename = if use_abi3_suffix {
-        format!("{module_name}.abi3.so")
+    let stable_abi_suffix = python_interpreter.and_then(|i| {
+        if bridge_model.is_stable_abi_for_interpreter(i) {
+            bridge_model
+                .pyo3()
+                .and_then(|pyo3| pyo3.stable_abi.map(|stable_abi| format!("{}", stable_abi)))
+        } else {
+            None
+        }
+    });
+
+    let so_filename = if let Some(suffix) = stable_abi_suffix {
+        format!("{module_name}.{suffix}.so")
     } else {
         python_interpreter
             .expect("missing python interpreter for non-abi3 wheel build")
@@ -854,10 +866,11 @@ fn configure_pyo3_env(
     target: &Target,
     target_triple: &str,
 ) -> Result<()> {
-    // Only set PYO3_NO_PYTHON for true abi3 builds where the interpreter meets
-    // the abi3 minimum version.  Version-specific fallback builds (e.g. Python
-    // 3.10 when abi3 targets ≥ 3.11) must not set PYO3_NO_PYTHON.
-    if python_interpreter.is_some_and(|i| bridge_model.is_abi3_for_interpreter(i)) {
+    // Only set PYO3_NO_PYTHON for stable ABI builds where the interpreter meets
+    // the minimum version supported for stable ABI builds.  Version-specific
+    // fallback builds (e.g. Python 3.10 when abi3 targets ≥ 3.11) must not set
+    // PYO3_NO_PYTHON.
+    if python_interpreter.is_some_and(|i| bridge_model.is_stable_abi_for_interpreter(i)) {
         let is_pypy_or_graalpy = python_interpreter
             .map(|p| p.interpreter_kind.is_pypy() || p.interpreter_kind.is_graalpy())
             .unwrap_or(false);
@@ -897,8 +910,14 @@ fn configure_pyo3_env(
             // and legacy pyo3 versions
             build_command.env("PYTHON_SYS_EXECUTABLE", &interpreter.executable);
         } else if bridge_model.is_pyo3() && env::var_os("PYO3_CONFIG_FILE").is_none() {
-            let use_abi3 = bridge_model.is_abi3_for_interpreter(interpreter);
-            let pyo3_config = interpreter.pyo3_config_file(target, use_abi3);
+            let pyo3_ver = pyo3_version(&context.project.cargo_metadata)
+                .context("Failed to get pyo3 version from cargo metadata")?;
+            let use_stable_abi = bridge_model.is_stable_abi_for_interpreter(interpreter);
+            let pyo3_config = interpreter.pyo3_config_file(
+                target,
+                use_stable_abi,
+                pyo3_ver > PYO3_TARGET_ABI_PARAMETER_VERSION,
+            );
             let maturin_target_dir = ensure_target_maturin_dir(&context.project.target_dir);
             let config_file = maturin_target_dir.join(format!(
                 "pyo3-config-{}-{}.{}.txt",
@@ -1133,6 +1152,7 @@ fn compile_target(
 #[instrument(skip_all)]
 pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
     let py_init = format!("PyInit_{module_name}");
+    let py_modexport = format!("PyModExport_{module_name}");
     let fd = File::open(artifact)?;
     // SAFETY: The caller stages (moves or copies) the artifact into a
     // private directory before invoking this function, so no concurrent
@@ -1158,11 +1178,19 @@ pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
                             found = true;
                             break;
                         }
+                        if py_modexport == sym_name.strip_prefix('_').unwrap_or(&sym_name) {
+                            found = true;
+                            break;
+                        }
                     }
                     if !found {
                         for sym in macho.symbols() {
                             let (sym_name, _) = sym?;
                             if py_init == sym_name.strip_prefix('_').unwrap_or(sym_name) {
+                                found = true;
+                                break;
+                            }
+                            if py_modexport == sym_name.strip_prefix('_').unwrap_or(sym_name) {
                                 found = true;
                                 break;
                             }
@@ -1179,7 +1207,7 @@ pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
         goblin::Object::PE(pe) => {
             for sym in &pe.exports {
                 if let Some(sym_name) = sym.name
-                    && py_init == sym_name
+                    && (py_init == sym_name || py_modexport == sym_name)
                 {
                     found = true;
                     break;
@@ -1194,7 +1222,7 @@ pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
 
     if !found {
         eprintln!(
-            "⚠️  Warning: Couldn't find the symbol `{py_init}` in the native library. \
+            "⚠️  Warning: Couldn't find the symbol `{py_init}` or `{py_modexport}` in the native library. \
              Python will fail to import this module. \
              If you're using pyo3, check that `#[pymodule]` uses `{module_name}` as module name"
         )

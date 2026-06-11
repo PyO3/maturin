@@ -1,5 +1,7 @@
 use crate::auditwheel::{AuditWheelMode, PlatformTag};
-use crate::bridge::{find_bridge, has_windows_import_lib_support, upgrade_bridge_abi3};
+use crate::bridge::{
+    StableAbiVersion, find_bridge, has_windows_import_lib_support, upgrade_bridge_stable_abi,
+};
 use crate::build_options::{BuildOptions, TargetTriple};
 use crate::compile::filter_cargo_targets;
 use crate::metadata::Metadata24;
@@ -129,7 +131,7 @@ impl BuildContextBuilder {
             });
 
         // Detect bridge without conditional pyo3 features — those are
-        // evaluated after interpreter resolution via upgrade_bridge_abi3.
+        // evaluated after interpreter resolution via upgrade_bridge_stable_abi.
         let bridge = find_bridge(&cargo_metadata, bindings)?;
 
         if !bridge.is_bin() && project_layout.extension_name.contains('-') {
@@ -163,16 +165,26 @@ impl BuildContextBuilder {
         // (e.g. abi3-py311 gated on python-version>=3.11) match any
         // of the resolved interpreters.
         let bridge = if has_conditional_pyo3_features {
-            upgrade_bridge_abi3(bridge, &cargo_metadata, pyproject, &interpreter)?
+            upgrade_bridge_stable_abi(bridge, &cargo_metadata, pyproject, &interpreter)?
         } else {
             bridge
         };
         debug!("Resolved bridge model: {:?}", bridge);
         if let Some(stable_abi) = bridge.pyo3().and_then(|p| p.stable_abi.as_ref()) {
-            eprintln!(
-                "🔗 Found {bridge} bindings with {} support",
-                stable_abi.kind
-            );
+            match stable_abi.version {
+                StableAbiVersion::Version(major, minor) => {
+                    eprintln!(
+                        "🔗 Found {bridge} bindings with {}-py{}.{} support",
+                        stable_abi.kind, major, minor
+                    );
+                }
+                StableAbiVersion::CurrentPython => {
+                    eprintln!(
+                        "🔗 Found {bridge} bindings with {} support",
+                        stable_abi.kind
+                    );
+                }
+            }
         } else {
             eprintln!("🔗 Found {bridge} bindings");
         }

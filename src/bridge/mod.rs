@@ -1,6 +1,6 @@
 mod detection;
 
-pub use detection::{find_bridge, has_windows_import_lib_support, upgrade_bridge_abi3};
+pub use detection::{find_bridge, has_windows_import_lib_support, upgrade_bridge_stable_abi};
 
 use std::{fmt, str::FromStr};
 
@@ -132,6 +132,23 @@ impl StableAbi {
             version: StableAbiVersion::Version(major, minor),
         }
     }
+
+    /// Create a StableAbi instance from a known abi3t version
+    pub fn from_abi3t_version(major: u8, minor: u8) -> StableAbi {
+        StableAbi {
+            kind: StableAbiKind::Abi3t,
+            version: StableAbiVersion::Version(major, minor),
+        }
+    }
+}
+
+impl std::fmt::Display for StableAbi {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self.kind {
+            StableAbiKind::Abi3 => write!(f, "abi3"),
+            StableAbiKind::Abi3t => write!(f, "abi3t"),
+        }
+    }
 }
 
 /// Python version to use as the abi3/abi3t target.
@@ -146,7 +163,7 @@ pub enum StableAbiVersion {
 }
 
 impl StableAbiVersion {
-    /// Convert `StableAbiVersion` into an Option, where CurrentPython maps None
+    /// Convert `StableAbiVersion` into an Option, where CurrentPython maps to None
     pub fn min_version(&self) -> Option<(u8, u8)> {
         match self {
             StableAbiVersion::CurrentPython => None,
@@ -160,12 +177,15 @@ impl StableAbiVersion {
 pub enum StableAbiKind {
     /// The original stable ABI, supporting Python 3.2 and up
     Abi3,
+    /// The free-threaded stable ABI, supporting Python 3.15 and up
+    Abi3t,
 }
 
 impl fmt::Display for StableAbiKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             StableAbiKind::Abi3 => write!(f, "abi3"),
+            StableAbiKind::Abi3t => write!(f, "abi3t"),
         }
     }
 }
@@ -175,6 +195,7 @@ impl StableAbiKind {
     pub fn wheel_tag(&self) -> &str {
         match self {
             StableAbiKind::Abi3 => "abi3",
+            StableAbiKind::Abi3t => "abi3.abi3t",
         }
     }
 }
@@ -340,32 +361,36 @@ impl BridgeModel {
     ///
     /// This is a project-level check — it does not consider whether a particular
     /// interpreter meets the abi3 minimum version.  For per‑interpreter checks
-    /// use [`is_abi3_for_interpreter`](Self::is_abi3_for_interpreter).
+    /// use [`is_stable_abi_for_interpreter`](Self::is_stable_abi_for_interpreter).
     pub fn has_stable_abi(&self) -> bool {
         self.pyo3()
             .and_then(|pyo3| pyo3.stable_abi.as_ref())
             .is_some()
     }
 
-    /// Check whether abi3 should be enabled for a specific interpreter.
+    /// Check whether an abi3 or abi3t build should be enabled for a specific interpreter.
     ///
     /// Returns `true` only when the bridge model has stable abi support **and**
     /// the given interpreter supports the stable ABI **and** meets the abi3
     /// minimum version. Version‑specific fallback builds (e.g. Python 3.10 when
     /// abi3 targets ≥ 3.11) return `false` so that `Py_LIMITED_API` is not
     /// defined and interpreter‑specific linker names are used.
-    pub fn is_abi3_for_interpreter(&self, interpreter: &PythonInterpreter) -> bool {
-        if !interpreter.has_stable_api() {
-            return false;
-        }
-
+    pub fn is_stable_abi_for_interpreter(&self, interpreter: &PythonInterpreter) -> bool {
         self.pyo3()
             .and_then(|pyo3| pyo3.stable_abi.as_ref())
-            .is_some_and(|stable_abi| match stable_abi.version.min_version() {
-                Some((major, minor)) => {
-                    (interpreter.major as u8, interpreter.minor as u8) >= (major, minor)
+            .is_some_and(|stable_abi| {
+                if !interpreter.has_stable_api(stable_abi.kind) {
+                    return false;
                 }
-                None => true, // CurrentPython → compatible when stable ABI is supported
+                if matches!(stable_abi.kind, StableAbiKind::Abi3) && interpreter.gil_disabled {
+                    return false;
+                };
+                match stable_abi.version.min_version() {
+                    Some((major, minor)) => {
+                        (interpreter.major as u8, interpreter.minor as u8) >= (major, minor)
+                    }
+                    None => true, // CurrentPython → compatible when stable ABI is supported
+                }
             })
     }
 
@@ -390,5 +415,41 @@ impl fmt::Display for BridgeModel {
             BridgeModel::Cffi => write!(f, "cffi"),
             BridgeModel::UniFfi => write!(f, "uniffi"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stable_abi_kind_display() {
+        assert_eq!(StableAbiKind::Abi3.to_string(), "abi3");
+        assert_eq!(StableAbiKind::Abi3t.to_string(), "abi3t");
+    }
+
+    #[test]
+    fn stable_abi_kind_wheel_tag() {
+        assert_eq!(StableAbiKind::Abi3.wheel_tag(), "abi3");
+        // abi3t wheels are also importable on abi3-capable interpreters, so the
+        // wheel tag is the compressed form `abi3.abi3t`.
+        assert_eq!(StableAbiKind::Abi3t.wheel_tag(), "abi3.abi3t");
+    }
+
+    #[test]
+    fn stable_abi_display() {
+        assert_eq!(StableAbi::from_abi3_version(3, 7).to_string(), "abi3");
+        assert_eq!(StableAbi::from_abi3t_version(3, 15).to_string(), "abi3t");
+    }
+
+    #[test]
+    fn stable_abi_constructors() {
+        let abi3 = StableAbi::from_abi3_version(3, 9);
+        assert_eq!(abi3.kind, StableAbiKind::Abi3);
+        assert_eq!(abi3.version, StableAbiVersion::Version(3, 9));
+
+        let abi3t = StableAbi::from_abi3t_version(3, 15);
+        assert_eq!(abi3t.kind, StableAbiKind::Abi3t);
+        assert_eq!(abi3t.version, StableAbiVersion::Version(3, 15));
     }
 }

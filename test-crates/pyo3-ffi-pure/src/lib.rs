@@ -1,7 +1,9 @@
-use std::ptr;
+#[cfg(Py_3_15)]
+use std::ffi::c_void;
 
 use pyo3_ffi::*;
 
+#[cfg(not(Py_3_15))]
 static mut MODULE_DEF: PyModuleDef = PyModuleDef {
     m_base: PyModuleDef_HEAD_INIT,
     m_name: c"string_sum".as_ptr(),
@@ -27,9 +29,31 @@ static mut METHODS: [PyMethodDef; 2] = [
     PyMethodDef::zeroed(),
 ];
 
-const SLOTS_LEN: usize =
-    1 + if cfg!(Py_3_12) { 1 } else { 0 } + if cfg!(Py_GIL_DISABLED) { 1 } else { 0 };
+#[cfg(Py_3_15)]
+PyABIInfo_VAR!(ABI_INFO);
 
+const SLOTS_LEN: usize =
+    1 + cfg!(Py_3_12) as usize + cfg!(Py_GIL_DISABLED) as usize + 4 * (cfg!(Py_3_15) as usize);
+
+#[cfg(Py_3_15)]
+static mut SLOTS: [PySlot; SLOTS_LEN] = [
+    PySlot_STATIC_DATA(Py_mod_abi, (&raw mut ABI_INFO).cast()),
+    PySlot_STATIC_DATA(Py_mod_name, c"string_sum".as_ptr() as *mut c_void),
+    PySlot_STATIC_DATA(
+        Py_mod_doc,
+        c"A Python module written in Rust.".as_ptr() as *mut c_void,
+    ),
+    PySlot_STATIC_DATA(Py_mod_methods, (&raw mut METHODS).cast()),
+    PySlot_DATA(
+        Py_mod_multiple_interpreters,
+        Py_MOD_PER_INTERPRETER_GIL_SUPPORTED,
+    ),
+    #[cfg(Py_GIL_DISABLED)]
+    PySlot_DATA(Py_mod_gil, Py_MOD_GIL_NOT_USED),
+    PySlot_END(),
+];
+
+#[cfg(not(Py_3_15))]
 static mut SLOTS: [PyModuleDef_Slot; SLOTS_LEN] = [
     // NB: only include this slot if the module does not store any global state in `static` variables
     // or other data which could cross between subinterpreters
@@ -46,16 +70,24 @@ static mut SLOTS: [PyModuleDef_Slot; SLOTS_LEN] = [
     },
     PyModuleDef_Slot {
         slot: 0,
-        value: ptr::null_mut(),
+        value: std::ptr::null_mut(),
     },
 ];
 
-// The module initialization function, which must be named `PyInit_<your_module>`.
-#[allow(non_snake_case)]
+// The module initialization function
+#[cfg(not(Py_3_15))]
+#[allow(non_snake_case, reason = "must be named `PyInit_<your_module>`")]
 #[no_mangle]
 pub unsafe extern "C" fn PyInit_pyo3_ffi_pure() -> *mut PyObject {
-    PyModuleDef_Init(ptr::addr_of_mut!(MODULE_DEF))
+    PyModuleDef_Init(&raw mut MODULE_DEF)
 }
+
+#[cfg(Py_3_15)]
+#[allow(non_snake_case, reason = "must be named `PyModExport_<your_module>`")]
+#[no_mangle]
+pub unsafe extern "C" fn PyModExport_pyo3_ffi_pure() -> *mut PyModuleDef_Slot {
+    (&raw mut SLOTS).cast()
+} // The module initialization function, which must be named `PyInit_<your_module>`.
 
 #[no_mangle]
 pub unsafe extern "C" fn sum(

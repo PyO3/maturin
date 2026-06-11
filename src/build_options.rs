@@ -155,7 +155,7 @@ impl BuildOptions {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bridge::{PyO3, PyO3Crate, StableAbi, find_bridge};
+    use crate::bridge::{find_bridge, PyO3, PyO3Crate, StableAbi, StableAbiKind};
     use crate::python_interpreter::InterpreterResolver;
     use crate::test_utils::test_crate_path;
     use crate::{BridgeModel, Target};
@@ -191,11 +191,11 @@ mod tests {
 
         let bridge = BridgeModel::PyO3(PyO3 {
             crate_name: PyO3Crate::PyO3,
-            version: semver::Version::new(0, 28, 3),
-            stable_abi: Some(StableAbi::from_abi3_version(3, 7)),
+            version: semver::Version::new(0, 29, 0),
+            stable_abi: Some(StableAbi::from_abi3_version(3, 9)),
             metadata: Some(PyO3Metadata {
                 cpython: PyO3VersionMetadata {
-                    min_minor: 7,
+                    min_minor: 8,
                     max_minor: 15,
                 },
                 pypy: PyO3VersionMetadata {
@@ -206,6 +206,155 @@ mod tests {
         });
         assert_eq!(find_bridge(&pyo3_pure, None).unwrap(), bridge);
         assert_eq!(find_bridge(&pyo3_pure, Some("pyo3")).unwrap(), bridge);
+    }
+
+    #[test]
+    fn test_find_bridge_pyo3_abi3t() {
+        let pyo3_abi3t = MetadataCommand::new()
+            .manifest_path(test_crate_path("pyo3-abi3t").join("Cargo.toml"))
+            .exec()
+            .unwrap();
+
+        let bridge = find_bridge(&pyo3_abi3t, None).unwrap();
+        let pyo3 = match &bridge {
+            BridgeModel::PyO3(pyo3) => pyo3,
+            other => panic!("expected PyO3 bridge, got {other:?}"),
+        };
+        assert_eq!(
+            pyo3.stable_abi,
+            Some(StableAbi::from_abi3t_version(3, 15)),
+            "abi3t-py315 should produce a StableAbiKind::Abi3t with min version 3.15"
+        );
+        assert_eq!(pyo3.crate_name, PyO3Crate::PyO3);
+
+        let bridge_explicit = find_bridge(&pyo3_abi3t, Some("pyo3")).unwrap();
+        assert_eq!(bridge_explicit, bridge);
+    }
+
+    #[test]
+    fn test_find_bridge_pyo3_abi3t_without_version() {
+        use crate::bridge::StableAbiVersion;
+
+        let pyo3_abi3t_without_version = MetadataCommand::new()
+            .manifest_path(test_crate_path("pyo3-abi3t-without-version").join("Cargo.toml"))
+            .exec()
+            .unwrap();
+
+        let bridge = find_bridge(&pyo3_abi3t_without_version, None).unwrap();
+        let pyo3 = match &bridge {
+            BridgeModel::PyO3(pyo3) => pyo3,
+            other => panic!("expected PyO3 bridge, got {other:?}"),
+        };
+        // The `abi3t` feature alone (no `abi3t-py3XY`) should map to CurrentPython.
+        let stable_abi = pyo3.stable_abi.expect("expected abi3t stable_abi");
+        assert!(
+            matches!(stable_abi.kind, StableAbiKind::Abi3t),
+            "expected StableAbiKind::Abi3t, got {:?}",
+            stable_abi.kind
+        );
+        assert_eq!(stable_abi.version, StableAbiVersion::CurrentPython);
+    }
+
+    /// Mirrors `test_find_bridge_pyo3_abi3t` for a crate that depends on `pyo3-ffi`
+    /// directly (the FFI-only path, analogous to `pyo3-ffi-pure`). Verifies the
+    /// crate_name is `PyO3Ffi` and version detection works the same as via `pyo3`.
+    #[test]
+    fn test_find_bridge_pyo3_ffi_abi3t_py315() {
+        let pyo3_ffi_abi3t = MetadataCommand::new()
+            .manifest_path(test_crate_path("pyo3-ffi-abi3t-py315").join("Cargo.toml"))
+            .exec()
+            .unwrap();
+
+        let bridge = find_bridge(&pyo3_ffi_abi3t, None).unwrap();
+        let pyo3 = match &bridge {
+            BridgeModel::PyO3(pyo3) => pyo3,
+            other => panic!("expected PyO3 bridge, got {other:?}"),
+        };
+        assert_eq!(
+            pyo3.stable_abi,
+            Some(StableAbi::from_abi3t_version(3, 15)),
+            "abi3t-py315 on pyo3-ffi must produce a Version(3, 15) abi3t bridge"
+        );
+        assert_eq!(pyo3.crate_name, PyO3Crate::PyO3Ffi);
+    }
+
+    /// `is_abi3_for_interpreter` must distinguish between the abi3 and abi3t kinds:
+    /// only abi3 kinds may emit the `cp{ver}-abi3-{platform}` linker name. abi3t
+    /// builds need to fall through to `is_stable_abi_for_interpreter`, which is the
+    /// kind-agnostic check used to decide whether to define `Py_LIMITED_API`.
+    #[test]
+    fn test_stable_abi_for_interpreter_distinguishes_kinds() {
+        use crate::bridge::{PyO3Metadata, PyO3VersionMetadata};
+        use crate::python_interpreter::{InterpreterConfig, InterpreterKind};
+        use crate::{PythonInterpreter, Target};
+
+        let target = Target::from_resolved_target_triple("x86_64-unknown-linux-gnu").unwrap();
+
+        // GIL-enabled CPython 3.15 - supports abi3 and abi3t
+        let py315 = PythonInterpreter::from_config(
+            InterpreterConfig::lookup_one(&target, InterpreterKind::CPython, (3, 15), "").unwrap(),
+        );
+        // Free-threaded CPython 3.15 - supports abi3t and does NOT support abi3
+        let py315t = PythonInterpreter::from_config(
+            InterpreterConfig::lookup_one(&target, InterpreterKind::CPython, (3, 15), "t").unwrap(),
+        );
+        // Free-threaded CPython 3.14 — does NOT support abi3 or abi3t
+        let py314t = PythonInterpreter::from_config(
+            InterpreterConfig::lookup_one(&target, InterpreterKind::CPython, (3, 14), "t").unwrap(),
+        );
+        // GIL-enabled CPython 3.14 - supports abi3 and does NOT support abi3t
+        let py314 = PythonInterpreter::from_config(
+            InterpreterConfig::lookup_one(&target, InterpreterKind::CPython, (3, 14), "").unwrap(),
+        );
+
+        let metadata = PyO3Metadata {
+            cpython: PyO3VersionMetadata {
+                min_minor: 7,
+                max_minor: 15,
+            },
+            pypy: PyO3VersionMetadata {
+                min_minor: 11,
+                max_minor: 11,
+            },
+        };
+
+        let abi3_bridge = BridgeModel::PyO3(PyO3 {
+            crate_name: PyO3Crate::PyO3,
+            version: semver::Version::new(0, 28, 3),
+            stable_abi: Some(StableAbi::from_abi3_version(3, 9)),
+            metadata: Some(metadata.clone()),
+        });
+        let abi3t_bridge = BridgeModel::PyO3(PyO3 {
+            crate_name: PyO3Crate::PyO3,
+            version: semver::Version::new(0, 28, 3),
+            stable_abi: Some(StableAbi::from_abi3t_version(3, 15)),
+            metadata: Some(metadata),
+        });
+
+        assert!(matches!(
+            abi3t_bridge.pyo3().unwrap().stable_abi.unwrap().kind,
+            StableAbiKind::Abi3t
+        ));
+
+        assert!(matches!(
+            abi3_bridge.pyo3().unwrap().stable_abi.unwrap().kind,
+            StableAbiKind::Abi3
+        ));
+
+        assert!(abi3_bridge.is_stable_abi_for_interpreter(&py315));
+        assert!(abi3t_bridge.is_stable_abi_for_interpreter(&py315));
+        assert!(abi3t_bridge.is_stable_abi_for_interpreter(&py315t));
+
+        // abi3 isn't supported for free-threaded interpreters, should fail
+        assert!(!abi3_bridge.is_stable_abi_for_interpreter(&py315t));
+
+        // Free-threaded 3.14: no stable api support
+        assert!(!abi3t_bridge.is_stable_abi_for_interpreter(&py314t));
+        assert!(!abi3_bridge.is_stable_abi_for_interpreter(&py314t));
+
+        // GIL-enabled 3.14 supports abi3 but not abi3t
+        assert!(!abi3t_bridge.is_stable_abi_for_interpreter(&py314));
+        assert!(abi3_bridge.is_stable_abi_for_interpreter(&py314));
     }
 
     #[test]
@@ -279,7 +428,7 @@ mod tests {
 
     #[test]
     fn test_find_bridge_conditional_abi3_filtered_by_interpreter() {
-        use crate::bridge::upgrade_bridge_abi3;
+        use crate::bridge::upgrade_bridge_stable_abi;
         use crate::python_interpreter::InterpreterConfig;
 
         // A pyproject.toml with pyo3/abi3-py311 gated on python-version >= 3.11
@@ -321,7 +470,7 @@ mod tests {
             )
             .unwrap(),
         );
-        let bridge = upgrade_bridge_abi3(
+        let bridge = upgrade_bridge_stable_abi(
             bridge,
             &metadata,
             Some(&pyproject),
@@ -344,7 +493,7 @@ mod tests {
             .unwrap(),
         );
         let base_bridge = find_bridge(&metadata, None).unwrap();
-        let bridge = upgrade_bridge_abi3(
+        let bridge = upgrade_bridge_stable_abi(
             base_bridge,
             &metadata,
             Some(&pyproject),
@@ -359,7 +508,8 @@ mod tests {
         // 3.10 gets a version-specific wheel, 3.11+ gets the abi3 wheel.
         let base_bridge = find_bridge(&metadata, None).unwrap();
         let bridge =
-            upgrade_bridge_abi3(base_bridge, &metadata, Some(&pyproject), &[py310, py311]).unwrap();
+            upgrade_bridge_stable_abi(base_bridge, &metadata, Some(&pyproject), &[py310, py311])
+                .unwrap();
         assert!(
             bridge.has_stable_abi(),
             "should infer abi3 for mixed [3.10, 3.11] (build_stable_abi_wheels handles the split)"

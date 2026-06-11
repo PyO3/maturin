@@ -3,7 +3,7 @@ use crate::common::other;
 use crate::common::{
     CFFI_MIXED_IMPLICIT_COPY, CFFI_MIXED_INCLUDE_EXCLUDE_COPY, CFFI_MIXED_PY_SUBDIR_COPY,
     CFFI_MIXED_SRC_COPY, CFFI_MIXED_SUBMODULE_COPY, CFFI_MIXED_WITH_PATH_DEP_COPY, handle_result,
-    has_conda, has_uniffi_bindgen, is_ci, test_python_implementation,
+    has_conda, has_uniffi_bindgen, is_ci, test_python_implementation, test_python_supports_abi3t,
 };
 use std::path::Path;
 
@@ -166,6 +166,28 @@ fn integration_wasm_hello_world() {
 #[test]
 fn abi3_without_version() {
     handle_result(other::abi3_without_version())
+}
+
+#[test]
+fn abi3t_without_version() {
+    // abi3t requires CPython >= 3.15 (PEP 803). On older runners the build
+    // would reject the only available interpreter, so skip cleanly.
+    if !test_python_supports_abi3t() {
+        return;
+    }
+    handle_result(other::abi3t_without_version())
+}
+
+#[test]
+fn integration_pyo3_abi3t() {
+    // abi3t requires CPython >= 3.15 (PEP 803).
+    if !test_python_supports_abi3t() {
+        return;
+    }
+    handle_result(integration::test_integration(&IntegrationCase::new(
+        "integration-pyo3-abi3t",
+        "test-crates/pyo3-abi3t",
+    )));
 }
 
 #[test]

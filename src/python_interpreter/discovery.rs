@@ -716,7 +716,7 @@ mod tests {
         "#]];
         expected.assert_debug_eq(&pythons);
 
-        // pyo3 0.23+ should find free-threaded CPython
+        // pyo3 should find CPython 3.14t and newer (dropped support for 3.13t)
         let pythons = lookup_target(
             &target,
             None,

@@ -465,6 +465,7 @@ pub fn abi3_python_interpreter_args() -> Result<()> {
 }
 
 pub fn abi3_without_version() -> Result<()> {
+    let python = crate::common::test_python_path().unwrap_or_else(|| "python3".to_string());
     // The first argument is ignored by clap
     let cli = vec![
         "build",
@@ -472,9 +473,34 @@ pub fn abi3_without_version() -> Result<()> {
         "test-crates/pyo3-abi3-without-version/Cargo.toml",
         "--quiet",
         "--interpreter",
-        "python3",
+        python.as_str(),
         "--target-dir",
         "test-targets/wheels/abi3_without_version",
+    ];
+
+    let options = BuildOptions::try_parse_from(cli)?;
+    let result = options
+        .into_build_context()
+        .strip(Some(cfg!(feature = "faster-tests")))
+        .editable(false)
+        .build();
+    assert!(result.is_ok());
+
+    Ok(())
+}
+
+pub fn abi3t_without_version() -> Result<()> {
+    let python = crate::common::test_python_path().unwrap_or_else(|| "python3".to_string());
+    // The first argument is ignored by clap
+    let cli = vec![
+        "build",
+        "--manifest-path",
+        "test-crates/pyo3-abi3t-without-version/Cargo.toml",
+        "--quiet",
+        "--interpreter",
+        python.as_str(),
+        "--target-dir",
+        "test-targets/wheels/abi3t_without_version",
     ];
 
     let options = BuildOptions::try_parse_from(cli)?;

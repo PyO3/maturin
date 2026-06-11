@@ -215,6 +215,36 @@ pub fn test_python_implementation() -> Result<String> {
     get_python_implementation(&python)
 }
 
+/// Returns `(major, minor)` of the current tested Python interpreter.
+pub fn test_python_version() -> Result<(u32, u32)> {
+    let python = test_python_path().map(PathBuf::from).unwrap_or_else(|| {
+        let target = Target::from_target_triple(None).unwrap();
+        target.get_python()
+    });
+    let code = "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}', end='')";
+    let output = Command::new(&python).arg("-c").arg(code).output()?;
+    let version = str::from_utf8(&output.stdout)?.trim();
+    let (major, minor) = version
+        .split_once('.')
+        .with_context(|| format!("unexpected python version output: {version:?}"))?;
+    Ok((major.parse()?, minor.parse()?))
+}
+
+/// Returns true when the current tested Python supports the abi3t stable ABI
+/// (CPython >= 3.15). PyPy / GraalPy never support abi3t.
+pub fn test_python_supports_abi3t() -> bool {
+    if test_python_implementation()
+        .map(|impl_name| impl_name != "cpython")
+        .unwrap_or(true)
+    {
+        return false;
+    }
+    match test_python_version() {
+        Ok((major, minor)) => (major, minor) >= (3, 15),
+        Err(_) => false,
+    }
+}
+
 /// Create virtualenv
 pub fn create_virtualenv(name: &str, python_interp: Option<PathBuf>) -> Result<(PathBuf, PathBuf)> {
     let interp = python_interp.or_else(|| test_python_path().map(PathBuf::from));

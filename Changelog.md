@@ -1,9 +1,19 @@
 # Changelog
 
-## Unreleased
+## 1.14.0
 
-* `--find-interpreter` now discovers free-threaded CPython interpreters (`python3.14t` and newer) on all platforms. The experimental 3.13t is no longer built by default; build it explicitly with `-i python3.13t`.
-* `cffi` is no longer automatically added as a build dependency of maturin on PyPy, which has `cffi` pre-installed as part of the PyPy distribution
+* Support parent-relative pyproject metadata in sdists ([#3182](https://github.com/pyo3/maturin/pull/3182))
+* Update PyPI platform tag validation ([#3187](https://github.com/pyo3/maturin/pull/3187))
+* Maint: update setup emsdk action in generate-ci ([#3194](https://github.com/pyo3/maturin/pull/3194))
+* Fix: only shim bin wheels during auditwheel repair ([#3197](https://github.com/pyo3/maturin/pull/3197))
+* Fix: avoid editable ELF truncation from stale hardlinks ([#3199](https://github.com/pyo3/maturin/pull/3199))
+* Fix Pyodide Emscripten platform tags ([#3191](https://github.com/pyo3/maturin/pull/3191))
+* Use pax instead of GNU headers for tar ([#3203](https://github.com/pyo3/maturin/pull/3203))
+* Feat: add default exclude `__pycache__` and `*.pyc` files ([#3202](https://github.com/pyo3/maturin/pull/3202))
+* Add support for finding free-threaded interpreters for `--find-interpreters` ([#3206](https://github.com/pyo3/maturin/pull/3206))
+* Stubs: also generate them for mixed PyO3 projects ([#3211](https://github.com/pyo3/maturin/pull/3211))
+* Don't depend on CFFI on PyPy ([#3213](https://github.com/pyo3/maturin/pull/3213))
+* Support pyo3 abi3t features on Python3.15 and PyO3 0.29 ([#3113](https://github.com/pyo3/maturin/pull/3113))
 
 ## 1.13.3
 

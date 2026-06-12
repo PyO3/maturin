@@ -376,12 +376,16 @@ fn sdist_workspace_removed_members_cargo_lock() {
     fs_err::write(devtool_dir.join("src/main.rs"), "fn main() {}\n").unwrap();
 
     // Generate the workspace Cargo.lock that covers both members.
-    let status = Command::new("cargo")
+    let output = Command::new("cargo")
         .args(["generate-lockfile"])
         .current_dir(&workspace_dir)
-        .status()
+        .output()
         .unwrap();
-    assert!(status.success(), "failed to generate workspace Cargo.lock");
+    assert!(
+        output.status.success(),
+        "failed to generate workspace Cargo.lock\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stderr),
+    );
 
     // Build an sdist for python-pkg only — devtool will be stripped.
     let sdist_dir = temp_dir.path().join("dist");

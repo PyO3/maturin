@@ -6,8 +6,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use anyhow::Result;
-use anyhow::bail;
+use anyhow::{Context, Result, bail};
 use ignore::overrides::Override;
 #[cfg(test)]
 use indexmap::IndexMap;
@@ -588,20 +587,23 @@ impl VirtualWriter<SDistWriter> {
         Ok(())
     }
 
-    /// Replace an existing tracker entry with new in-memory bytes.
+    /// Replace an existing tracker entry with new in-memory bytes,
+    /// preserving the original entry's metadata.
     pub(crate) fn replace_bytes(&mut self, target: &Path, data: Vec<u8>) -> Result<()> {
-        if !self.tracker.contains_key(target) {
-            anyhow::bail!(
+        let old = self.tracker.get(target).with_context(|| {
+            format!(
                 "cannot replace non-existent tracker entry: {}",
                 target.display()
-            );
-        }
+            )
+        })?;
+        let path = old.path().map(Path::to_path_buf);
+        let executable = old.executable();
         self.tracker.insert(
             target.to_path_buf(),
             ArchiveSource::Generated(GeneratedSourceData {
                 data,
-                path: None,
-                executable: false,
+                path,
+                executable,
             }),
         );
         Ok(())

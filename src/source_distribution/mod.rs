@@ -770,11 +770,14 @@ fn regenerate_cargo_lock(
         .output()
         .context("Failed to run `cargo generate-lockfile`")?;
     if !output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
         bail!(
-            "`cargo generate-lockfile` failed (exit status: {}):\n{}",
+            "`cargo generate-lockfile` failed in `{}`(exit status: {}):\n{}\n{}",
+            sdist_dir.display(),
             output.status,
-            stderr
+            stderr,
+            stdout
         );
     }
 

@@ -650,7 +650,7 @@ fn emit_manylinux_pytest(
                 "!startsWith({MATRIX_TARGET}, 'x86') && {MATRIX_TARGET} != 'ppc64'"
             ))
         ))
-        .line("uses: uraimo/run-on-arch-action@v2")
+        .line("uses: uraimo/run-on-arch-action@v3")
         .line("with:")
         .indent();
     y.line(format!("arch: {}", gha_expr(MATRIX_TARGET)));
@@ -718,7 +718,7 @@ fn emit_musllinux_pytest(y: &mut Yaml, project_name: &str, chdir: &str) {
         .line("- name: pytest")
         .indent()
         .line(format!("if: {if_not_x86}"))
-        .line("uses: uraimo/run-on-arch-action@v2")
+        .line("uses: uraimo/run-on-arch-action@v3")
         .line("with:")
         .indent();
     y.line(format!("arch: {}", gha_expr(MATRIX_TARGET)));

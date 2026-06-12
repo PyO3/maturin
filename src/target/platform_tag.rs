@@ -171,6 +171,8 @@ pub fn get_platform_tag(
                 target.get_platform_arch()?,
             )
         }
+        // AIX
+        (Os::Aix, _) => aix_platform_tag(target)?,
         // osname_release_machine fallback for any POSIX system
         (_, _) => {
             let info = PlatformInfo::new()
@@ -508,11 +510,94 @@ fn find_android_api_level(target_triple: &str, manifest_path: &Path) -> Result<S
     );
 }
 
+/// Returns the AIX platform tag, matching CPython's `_aix_support.aix_platform()`.
+///
+/// The tag format is `aix_{ver:x}{rel}{tl:02}_{builddate:04}_{bitsize}`, e.g.
+/// `aix_7302_2419_64` for AIX 7.3 TL02 build-week 2419, 64-bit.
+///
+/// The version, technology level, and build date are read from
+/// `/usr/bin/lslpp -Lqc bos.rte`, just like CPython does in
+/// [`_aix_support.py`](https://github.com/python/cpython/blob/main/Lib/_aix_support.py).
+///
+/// The tag produced here matches what `sysconfig.get_platform()` returns on the
+/// same host, so wheels saved with this tag are accepted by pip.
+fn aix_platform_tag(target: &Target) -> Result<String> {
+    use std::process::Command;
+
+    // When cross-compiling for AIX from another host, /usr/bin/lslpp is not
+    // available. The caller must set _PYTHON_HOST_PLATFORM (checked before
+    // this branch is reached) to supply the correct tag manually.
+    if target.cross_compiling() {
+        bail!(
+            "Cannot determine the AIX platform tag when cross-compiling. \
+             Set the _PYTHON_HOST_PLATFORM environment variable to the target \
+             platform tag (e.g. `aix_7302_2419_64`)."
+        );
+    }
+
+    let output = Command::new("/usr/bin/lslpp")
+        .args(["-Lqc", "bos.rte"])
+        .output()
+        .context("Failed to run /usr/bin/lslpp")?;
+
+    if !output.status.success() {
+        bail!(
+            "lslpp -Lqc bos.rte failed (exit {}): {}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr).trim(),
+        );
+    }
+
+    let stdout = String::from_utf8(output.stdout).context("lslpp output is not valid UTF-8")?;
+    aix_tag_from_lslpp_output(&stdout)
+}
+
+/// Parse `lslpp -Lqc bos.rte` output and return the AIX platform tag.
+///
+/// Extracted from [`aix_platform_tag`] so it can be unit-tested without
+/// requiring a real AIX system.
+///
+/// Output format: `filesystem:name:level:state:type:description:...:builddate`
+/// where `level` (field 2) is a VRMF string like `"7.3.2.0"` and `builddate`
+/// (last field) is a 4-digit build-week number like `"2419"`.
+fn aix_tag_from_lslpp_output(stdout: &str) -> Result<String> {
+    let line = stdout.lines().next().unwrap_or("").trim();
+    let fields: Vec<&str> = line.split(':').collect();
+    if fields.len() < 3 {
+        bail!("Unexpected lslpp output: {line:?}");
+    }
+
+    let vrmf = fields[2]; // e.g. "7.3.2.0"
+    // builddate is the last colon-separated field, e.g. "2419".
+    // Matches CPython's `int(out[-1]) if out[-1] != '' else 9988`.
+    let builddate: u32 = fields
+        .last()
+        .and_then(|f| f.trim().parse().ok())
+        .unwrap_or(9988);
+
+    // Parse V.R.M from VRMF (V=version, R=release, M=technology level)
+    let parts: Vec<&str> = vrmf.splitn(4, '.').collect();
+    if parts.len() < 3 {
+        bail!("Unexpected VRMF format from lslpp: {vrmf:?}");
+    }
+    let ver: u32 = parts[0].parse().context("VRMF version is not a number")?;
+    let rel: u32 = parts[1].parse().context("VRMF release is not a number")?;
+    let tl: u32 = parts[2]
+        .parse()
+        .context("VRMF technology level is not a number")?;
+
+    let bitsize = 64u32; // only 64-bit is supported
+
+    // Format matching CPython's _aix_tag():
+    //   "aix-{v:1x}{r:1d}{tl:02d}-{bd:04d}-{sz}" with '-' replaced by '_'
+    Ok(format!("aix_{ver:x}{rel}{tl:02}_{builddate:04}_{bitsize}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        emscripten_platform_tag, extract_android_api_level, iphoneos_deployment_target,
-        macosx_deployment_target, pep783_emscripten_platform_tag,
+        aix_tag_from_lslpp_output, emscripten_platform_tag, extract_android_api_level,
+        iphoneos_deployment_target, macosx_deployment_target, pep783_emscripten_platform_tag,
     };
     use pretty_assertions::assert_eq;
     use std::env;
@@ -645,5 +730,83 @@ mod tests {
             Some("30".to_string())
         );
         assert_eq!(extract_android_api_level("clang"), None);
+    }
+
+    #[test]
+    fn test_aix_tag_from_lslpp_output_typical() {
+        // Typical lslpp -Lqc bos.rte output on AIX 7.3 TL02 SP01, build-week 2419.
+        // Format: filesystem:name:level:state:type:description:...:builddate
+        let output =
+            "/usr/lib/objrepos:bos.rte:7.3.2.1:COMMITTED:I:Base Operating System Runtime:2419\n";
+        assert_eq!(
+            aix_tag_from_lslpp_output(output).unwrap(),
+            "aix_7302_2419_64"
+        );
+    }
+
+    #[test]
+    fn test_aix_tag_from_lslpp_output_aix61() {
+        // AIX 6.1 TL07, build-week 1415, 64-bit — matches CPython docs example.
+        let output =
+            "/usr/lib/objrepos:bos.rte:6.1.7.2:COMMITTED:I:Base Operating System Runtime:1415\n";
+        assert_eq!(
+            aix_tag_from_lslpp_output(output).unwrap(),
+            "aix_6107_1415_64"
+        );
+    }
+
+    #[test]
+    fn test_aix_tag_from_lslpp_output_tl_zero_padded() {
+        // TL single digit must be zero-padded to two digits in the tag.
+        let output =
+            "/usr/lib/objrepos:bos.rte:7.3.1.0:COMMITTED:I:Base Operating System Runtime:2312\n";
+        assert_eq!(
+            aix_tag_from_lslpp_output(output).unwrap(),
+            "aix_7301_2312_64"
+        );
+    }
+
+    #[test]
+    fn test_aix_tag_from_lslpp_output_missing_builddate_falls_back() {
+        // When the builddate field is absent or non-numeric, CPython falls back to 9988.
+        let output =
+            "/usr/lib/objrepos:bos.rte:7.3.2.0:COMMITTED:I:Base Operating System Runtime:\n";
+        assert_eq!(
+            aix_tag_from_lslpp_output(output).unwrap(),
+            "aix_7302_9988_64"
+        );
+    }
+
+    #[test]
+    fn test_aix_tag_from_lslpp_output_extra_fields_before_builddate() {
+        // Additional colon-separated fields between description and builddate
+        // are fine; builddate is always the last field.
+        let output =
+            "/usr/lib/objrepos:bos.rte:7.3.2.0:COMMITTED:I:Base OS Runtime:extra:field:2419\n";
+        assert_eq!(
+            aix_tag_from_lslpp_output(output).unwrap(),
+            "aix_7302_2419_64"
+        );
+    }
+
+    #[test]
+    fn test_aix_tag_from_lslpp_output_too_few_fields_is_error() {
+        assert!(aix_tag_from_lslpp_output("bos.rte:7.3.2.0\n").is_err());
+        assert!(aix_tag_from_lslpp_output("").is_err());
+    }
+
+    #[test]
+    fn test_aix_tag_from_lslpp_output_bad_vrmf_is_error() {
+        // VRMF with fewer than three components.
+        let output =
+            "/usr/lib/objrepos:bos.rte:7.3:COMMITTED:I:Base Operating System Runtime:2419\n";
+        assert!(aix_tag_from_lslpp_output(output).is_err());
+    }
+
+    #[test]
+    fn test_aix_tag_from_lslpp_output_non_numeric_vrmf_is_error() {
+        let output =
+            "/usr/lib/objrepos:bos.rte:x.y.z.0:COMMITTED:I:Base Operating System Runtime:2419\n";
+        assert!(aix_tag_from_lslpp_output(output).is_err());
     }
 }

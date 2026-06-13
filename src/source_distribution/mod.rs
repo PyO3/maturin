@@ -742,6 +742,52 @@ fn add_cargo_lock(writer: &mut VirtualWriter<SDistWriter>, ctx: &SdistContext<'_
     Ok(())
 }
 
+/// Regenerate Cargo.lock when workspace members were removed from the sdist.
+fn regenerate_cargo_lock(
+    writer: &mut VirtualWriter<SDistWriter>,
+    ctx: &SdistContext<'_>,
+) -> Result<()> {
+    let has_stripped_members = ctx.project.cargo_metadata.workspace_members.len() > 1;
+    if !has_stripped_members {
+        return Ok(());
+    }
+
+    let cargo_lock_target = ctx.root_dir.join("Cargo.lock");
+    if !writer.contains_target(&cargo_lock_target) {
+        return Ok(());
+    }
+
+    debug!("Regenerating Cargo.lock for sdist to remove stale workspace member entries");
+
+    let tmp =
+        tempfile::tempdir().context("Failed to create temp dir for Cargo.lock regeneration")?;
+    writer.materialize_to(tmp.path())?;
+
+    let sdist_dir = tmp.path().join(ctx.root_dir);
+    let output = Command::new("cargo")
+        .args(["generate-lockfile"])
+        .current_dir(&sdist_dir)
+        .output()
+        .context("Failed to run `cargo generate-lockfile`")?;
+    if !output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        bail!(
+            "`cargo generate-lockfile` failed in `{}`(exit status: {}):\n{}\n{}",
+            sdist_dir.display(),
+            output.status,
+            stderr,
+            stdout
+        );
+    }
+
+    let regenerated = fs_err::read(sdist_dir.join("Cargo.lock"))
+        .context("Failed to read regenerated Cargo.lock")?;
+    writer.replace_bytes(&cargo_lock_target, regenerated)?;
+
+    Ok(())
+}
+
 /// Add the workspace Cargo.toml (when the crate is a workspace member).
 fn add_workspace_manifest(
     writer: &mut VirtualWriter<SDistWriter>,
@@ -863,6 +909,9 @@ fn add_cargo_package_files_to_sdist(
 
     // 4. Add workspace Cargo.toml (if applicable)
     add_workspace_manifest(writer, &ctx)?;
+
+    // 4.5 Regenerate Cargo.lock if workspace members were removed (#2609)
+    regenerate_cargo_lock(writer, &ctx)?;
 
     // 5. Add pyproject.toml metadata files and collect path rewrites.
     let metadata_rewrites =

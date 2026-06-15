@@ -1,7 +1,7 @@
 pub use self::config::InterpreterConfig;
 use crate::Target;
 use crate::auditwheel::PlatformTag;
-use crate::bridge::StableAbiKind;
+use crate::bridge::{ABI3T_MINIMUM_PYTHON_MINOR, StableAbiKind};
 use anyhow::{Result, bail};
 use std::fmt;
 use std::ops::Deref;
@@ -133,9 +133,9 @@ impl PythonInterpreter {
             false
         } else {
             match self.interpreter_kind {
-                // Free-threaded python does not have stable api support until 3.15
                 InterpreterKind::CPython => {
-                    !(self.config.gil_disabled && self.config.major == 3 && self.config.minor < 15)
+                    self.config.major == 3
+                        && self.config.minor >= ABI3T_MINIMUM_PYTHON_MINOR as usize
                 }
                 InterpreterKind::PyPy | InterpreterKind::GraalPy => false,
             }

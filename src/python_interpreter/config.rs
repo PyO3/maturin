@@ -2,8 +2,8 @@ use super::{
     FREE_THREADED_MINIMUM_PYTHON_MINOR, InterpreterKind, MAXIMUM_PYPY_MINOR, MAXIMUM_PYTHON_MINOR,
     MINIMUM_PYPY_MINOR, MINIMUM_PYTHON_MINOR,
 };
-use crate::Target;
 use crate::target::{Arch, Os};
+use crate::{StableAbi, StableAbiKind, Target};
 use anyhow::{Context, Result, format_err};
 use fs_err as fs;
 use serde::Deserialize;
@@ -460,7 +460,7 @@ impl InterpreterConfig {
     pub fn pyo3_config_file(
         &self,
         target: &Target,
-        use_stable_abi: bool,
+        stable_abi: Option<StableAbi>,
         use_target_abi: bool,
     ) -> String {
         let build_flags = if self.gil_disabled {
@@ -468,22 +468,31 @@ impl InterpreterConfig {
         } else {
             ""
         };
+        let stable_abi_min_version =
+            stable_abi.and_then(|stable_abi| stable_abi.version.min_version());
+        let (config_major, config_minor) =
+            stable_abi_min_version.unwrap_or((self.major as u8, self.minor as u8));
         let mut content = if use_target_abi {
-            let abi_kind = match (use_stable_abi, self.gil_disabled) {
-                (true, true) => "abi3t".to_string(),
-                (true, false) => "abi3".to_string(),
-                (false, true) => "free_threaded".to_string(),
-                (false, false) => "gil_enabled".to_string(),
+            let abi_kind = match stable_abi.map(|stable_abi| stable_abi.kind) {
+                Some(StableAbiKind::Abi3) => "abi3",
+                Some(StableAbiKind::Abi3t) => "abi3t",
+                None if self.gil_disabled => "free_threaded",
+                None => "gil_enabled",
             };
             let target_abi = format!(
                 "{}-{}-{}.{}",
-                self.interpreter_kind, abi_kind, self.major, self.minor
+                self.interpreter_kind, abi_kind, config_major, config_minor
             );
             format!(
-                r#"target_abi={target_abi}
+                r#"implementation={implementation}
+version={major}.{minor}
+target_abi={target_abi}
 shared=true
 build_flags={build_flags}
-suppress_build_script_link_lines=false"#
+suppress_build_script_link_lines=false"#,
+                implementation = self.interpreter_kind,
+                major = config_major,
+                minor = config_minor,
             )
         } else {
             format!(
@@ -494,8 +503,9 @@ abi3={use_stable_abi}
 build_flags={build_flags}
 suppress_build_script_link_lines=false"#,
                 implementation = self.interpreter_kind,
-                major = self.major,
-                minor = self.minor,
+                major = config_major,
+                minor = config_minor,
+                use_stable_abi = stable_abi.is_some(),
             )
         };
         // On Android, pyo3 forces linking libpython. When abi3 is enabled,
@@ -507,7 +517,7 @@ suppress_build_script_link_lines=false"#,
         // See https://github.com/PyO3/pyo3/issues/5960
         // See https://github.com/python/cpython/issues/148544
         if target.is_android() && self.interpreter_kind == InterpreterKind::CPython {
-            let lib_name = if use_stable_abi {
+            let lib_name = if stable_abi.is_some() {
                 format!("python{}", self.major)
             } else {
                 format!("python{}.{}{}", self.major, self.minor, self.abiflags)
@@ -912,7 +922,7 @@ mod tests {
         let target = Target::from_resolved_target_triple("x86_64-unknown-linux-gnu").unwrap();
         let sysconfig =
             InterpreterConfig::lookup_one(&target, InterpreterKind::CPython, (3, 10), "").unwrap();
-        let config_file = sysconfig.pyo3_config_file(&target, false, false);
+        let config_file = sysconfig.pyo3_config_file(&target, None, false);
         let expected = expect![[r#"
             implementation=CPython
             version=3.10
@@ -922,9 +932,37 @@ mod tests {
             suppress_build_script_link_lines=false
             pointer_width=64"#]];
         expected.assert_eq(&config_file);
-        let config_file = sysconfig.pyo3_config_file(&target, false, true);
+        let config_file = sysconfig.pyo3_config_file(&target, None, true);
         let expected = expect![[r#"
+            implementation=CPython
+            version=3.10
             target_abi=CPython-gil_enabled-3.10
+            shared=true
+            build_flags=
+            suppress_build_script_link_lines=false
+            pointer_width=64"#]];
+        expected.assert_eq(&config_file);
+
+        let sysconfig =
+            InterpreterConfig::lookup_one(&target, InterpreterKind::CPython, (3, 15), "").unwrap();
+        let config_file =
+            sysconfig.pyo3_config_file(&target, Some(StableAbi::from_abi3_version(3, 10)), true);
+        let expected = expect![[r#"
+            implementation=CPython
+            version=3.10
+            target_abi=CPython-abi3-3.10
+            shared=true
+            build_flags=
+            suppress_build_script_link_lines=false
+            pointer_width=64"#]];
+        expected.assert_eq(&config_file);
+
+        let config_file =
+            sysconfig.pyo3_config_file(&target, Some(StableAbi::from_abi3t_version(3, 15)), true);
+        let expected = expect![[r#"
+            implementation=CPython
+            version=3.15
+            target_abi=CPython-abi3t-3.15
             shared=true
             build_flags=
             suppress_build_script_link_lines=false
@@ -938,7 +976,7 @@ mod tests {
         let sysconfig =
             InterpreterConfig::lookup_one(&target, InterpreterKind::CPython, (3, 13), "t").unwrap();
         assert_eq!(sysconfig.ext_suffix, ".cpython-313t-x86_64-linux-gnu.so");
-        let config_file = sysconfig.pyo3_config_file(&target, false, false);
+        let config_file = sysconfig.pyo3_config_file(&target, None, false);
         let expected = expect![[r#"
             implementation=CPython
             version=3.13
@@ -948,8 +986,10 @@ mod tests {
             suppress_build_script_link_lines=false
             pointer_width=64"#]];
         expected.assert_eq(&config_file);
-        let config_file = sysconfig.pyo3_config_file(&target, false, true);
+        let config_file = sysconfig.pyo3_config_file(&target, None, true);
         let expected = expect![[r#"
+            implementation=CPython
+            version=3.13
             target_abi=CPython-free_threaded-3.13
             shared=true
             build_flags=Py_GIL_DISABLED
@@ -964,7 +1004,7 @@ mod tests {
         let sysconfig =
             InterpreterConfig::lookup_one(&target, InterpreterKind::CPython, (3, 11), "").unwrap();
         assert_eq!(sysconfig.ext_suffix, ".cpython-311-x86_64-linux-musl.so");
-        let config_file = sysconfig.pyo3_config_file(&target, false, false);
+        let config_file = sysconfig.pyo3_config_file(&target, None, false);
         let expected = expect![[r#"
             implementation=CPython
             version=3.11
@@ -974,8 +1014,10 @@ mod tests {
             suppress_build_script_link_lines=false
             pointer_width=64"#]];
         expected.assert_eq(&config_file);
-        let config_file = sysconfig.pyo3_config_file(&target, false, true);
+        let config_file = sysconfig.pyo3_config_file(&target, None, true);
         let expected = expect![[r#"
+            implementation=CPython
+            version=3.11
             target_abi=CPython-gil_enabled-3.11
             shared=true
             build_flags=
@@ -997,7 +1039,7 @@ mod tests {
             gil_disabled: false,
         };
         // Non-abi3: links against version-specific libpython3.14.so
-        let config_file = config.pyo3_config_file(&target, false, false);
+        let config_file = config.pyo3_config_file(&target, None, false);
         let expected = expect![[r#"
             implementation=CPython
             version=3.14
@@ -1008,8 +1050,10 @@ mod tests {
             lib_name=python3.14
             pointer_width=64"#]];
         expected.assert_eq(&config_file);
-        let config_file = config.pyo3_config_file(&target, false, true);
+        let config_file = config.pyo3_config_file(&target, None, true);
         let expected = expect![[r#"
+            implementation=CPython
+            version=3.14
             target_abi=CPython-gil_enabled-3.14
             shared=true
             build_flags=
@@ -1020,10 +1064,11 @@ mod tests {
 
         // Abi3: links against unversioned libpython3.so (stable ABI)
         // See https://github.com/python/cpython/issues/148544
-        let config_file = config.pyo3_config_file(&target, true, false);
+        let config_file =
+            config.pyo3_config_file(&target, Some(StableAbi::from_abi3_version(3, 10)), false);
         let expected = expect![[r#"
             implementation=CPython
-            version=3.14
+            version=3.10
             shared=true
             abi3=true
             build_flags=
@@ -1031,9 +1076,12 @@ mod tests {
             lib_name=python3
             pointer_width=64"#]];
         expected.assert_eq(&config_file);
-        let config_file = config.pyo3_config_file(&target, true, true);
+        let config_file =
+            config.pyo3_config_file(&target, Some(StableAbi::from_abi3_version(3, 10)), true);
         let expected = expect![[r#"
-            target_abi=CPython-abi3-3.14
+            implementation=CPython
+            version=3.10
+            target_abi=CPython-abi3-3.10
             shared=true
             build_flags=
             suppress_build_script_link_lines=false

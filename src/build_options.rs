@@ -155,11 +155,11 @@ impl BuildOptions {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bridge::{PyO3, PyO3Crate, StableAbi, StableAbiKind, find_bridge};
+    use crate::bridge::{PyO3, PyO3Crate, StableAbi, StableAbiKind, StableAbiVersion, find_bridge};
     use crate::python_interpreter::InterpreterResolver;
     use crate::test_utils::test_crate_path;
     use crate::{BridgeModel, Target};
-    use cargo_metadata::MetadataCommand;
+    use cargo_metadata::{CargoOpt, MetadataCommand};
     use insta::assert_snapshot;
     use pretty_assertions::assert_eq;
 
@@ -233,8 +233,6 @@ mod tests {
 
     #[test]
     fn test_find_bridge_pyo3_abi3t_without_version() {
-        use crate::bridge::StableAbiVersion;
-
         let pyo3_abi3t_without_version = MetadataCommand::new()
             .manifest_path(test_crate_path("pyo3-abi3t-without-version").join("Cargo.toml"))
             .exec()
@@ -253,6 +251,93 @@ mod tests {
             stable_abi.kind
         );
         assert_eq!(stable_abi.version, StableAbiVersion::CurrentPython);
+    }
+
+    #[test]
+    fn test_find_bridge_pyo3_combined_abi3_and_abi3t() {
+        let cases = [
+            (None, StableAbi::from_abi3_version(3, 8)),
+            (Some("current-abi3t"), StableAbi::from_abi3_version(3, 8)),
+        ];
+
+        for (feature, expected) in cases {
+            let mut command = MetadataCommand::new();
+            command.manifest_path(test_crate_path("pyo3-abi3-and-abi3t").join("Cargo.toml"));
+            if let Some(feature) = feature {
+                command.features(CargoOpt::NoDefaultFeatures);
+                command.features(CargoOpt::SomeFeatures(vec![feature.to_string()]));
+            }
+            let metadata = command.exec().unwrap();
+
+            let bridge = find_bridge(&metadata, None).unwrap();
+            let pyo3 = match &bridge {
+                BridgeModel::PyO3(pyo3) => pyo3,
+                other => panic!("expected PyO3 bridge, got {other:?}"),
+            };
+            assert_eq!(
+                pyo3.stable_abi,
+                Some(expected),
+                "unexpected stable ABI for feature {feature:?}",
+            );
+        }
+    }
+
+    #[test]
+    fn test_upgrade_bridge_pyo3_combined_abi3_and_abi3t_selects_single_abi() {
+        use crate::bridge::upgrade_bridge_stable_abi;
+        use crate::python_interpreter::{InterpreterConfig, InterpreterKind};
+
+        let metadata = MetadataCommand::new()
+            .manifest_path(test_crate_path("pyo3-abi3-and-abi3t").join("Cargo.toml"))
+            .exec()
+            .unwrap();
+        let bridge = find_bridge(&metadata, None).unwrap();
+        let target = Target::from_resolved_target_triple("x86_64-unknown-linux-gnu").unwrap();
+        let cpython = |minor, abiflags| {
+            crate::PythonInterpreter::from_config(
+                InterpreterConfig::lookup_one(
+                    &target,
+                    InterpreterKind::CPython,
+                    (3, minor),
+                    abiflags,
+                )
+                .unwrap(),
+            )
+        };
+        let cases = [
+            (
+                "only GIL-enabled 3.14",
+                vec![cpython(14, "")],
+                StableAbi::from_abi3_version(3, 8),
+            ),
+            (
+                "only free-threaded 3.14",
+                vec![cpython(14, "t")],
+                StableAbi::from_abi3_version(3, 8),
+            ),
+            (
+                "only free-threaded 3.15",
+                vec![cpython(15, "t")],
+                StableAbi::from_abi3t_version(3, 15),
+            ),
+            (
+                "only GIL-enabled 3.15",
+                vec![cpython(15, "")],
+                StableAbi::from_abi3t_version(3, 15),
+            ),
+            (
+                "GIL-enabled 3.14 and free-threaded 3.15",
+                vec![cpython(14, ""), cpython(15, "t")],
+                StableAbi::from_abi3t_version(3, 15),
+            ),
+        ];
+
+        for (name, interpreters, expected) in cases {
+            let bridge =
+                upgrade_bridge_stable_abi(bridge.clone(), &metadata, None, &interpreters).unwrap();
+            let stable_abi = bridge.pyo3().and_then(|pyo3| pyo3.stable_abi);
+            assert_eq!(stable_abi, Some(expected), "{name}");
+        }
     }
 
     /// Mirrors `test_find_bridge_pyo3_abi3t` for a crate that depends on `pyo3-ffi`
@@ -331,15 +416,14 @@ mod tests {
             metadata: Some(metadata),
         });
 
-        assert!(matches!(
+        assert_eq!(
             abi3t_bridge.pyo3().unwrap().stable_abi.unwrap().kind,
             StableAbiKind::Abi3t
-        ));
-
-        assert!(matches!(
+        );
+        assert_eq!(
             abi3_bridge.pyo3().unwrap().stable_abi.unwrap().kind,
             StableAbiKind::Abi3
-        ));
+        );
 
         assert!(abi3_bridge.is_stable_abi_for_interpreter(&py315));
         assert!(abi3t_bridge.is_stable_abi_for_interpreter(&py315));

@@ -1,0 +1,14 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[tool.maturin]
+bindings = "pyo3"
+editable-profile = "dev"
+
+[project]
+name = "pyo3_abi3_and_abi3t"
+version = "0.1.0"
+description = "Test crate combining abi3 and abi3t features"
+readme = "README.md"
+license = { text = "MIT" }

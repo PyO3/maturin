@@ -244,13 +244,13 @@ impl<'a> InterpreterResolver<'a> {
             return Ok((vec![PythonInterpreter::from_config(config)], None));
         }
 
-        let fixed_abi3 = match &pyo3.stable_abi {
-            Some(stable_abi) => match stable_abi.version {
+        let fixed_abi3 = pyo3
+            .stable_abi
+            .filter(|stable_abi| stable_abi.kind == StableAbiKind::Abi3)
+            .and_then(|stable_abi| match stable_abi.version {
                 StableAbiVersion::Version(major, minor) => Some((major, minor)),
-                _ => None,
-            },
-            _ => None,
-        };
+                StableAbiVersion::CurrentPython => None,
+            });
 
         // Step 2: Discover candidates (unified for native/cross)
         let (candidates, host_python_interp) = self.discover_candidates(fixed_abi3)?;

@@ -12,6 +12,9 @@ use crate::python_interpreter::{
     PythonInterpreter,
 };
 
+/// First CPython minor version that supports PEP 803 stable ABI wheels.
+pub const ABI3T_MINIMUM_PYTHON_MINOR: u8 = 15;
+
 /// pyo3 binding crate
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum PyO3Crate {
@@ -207,7 +210,7 @@ pub struct PyO3 {
     pub crate_name: PyO3Crate,
     /// pyo3 bindings crate version
     pub version: semver::Version,
-    /// abi3 support
+    /// Stable ABI support.
     pub stable_abi: Option<StableAbi>,
     /// pyo3 metadata
     pub metadata: Option<PyO3Metadata>,
@@ -376,22 +379,20 @@ impl BridgeModel {
     /// abi3 targets ≥ 3.11) return `false` so that `Py_LIMITED_API` is not
     /// defined and interpreter‑specific linker names are used.
     pub fn is_stable_abi_for_interpreter(&self, interpreter: &PythonInterpreter) -> bool {
-        self.pyo3()
-            .and_then(|pyo3| pyo3.stable_abi.as_ref())
-            .is_some_and(|stable_abi| {
-                if !interpreter.has_stable_api(stable_abi.kind) {
-                    return false;
-                }
-                if matches!(stable_abi.kind, StableAbiKind::Abi3) && interpreter.gil_disabled {
-                    return false;
-                };
-                match stable_abi.version.min_version() {
-                    Some((major, minor)) => {
+        self.stable_abi_for_interpreter(interpreter).is_some()
+    }
+
+    /// Return the stable ABI kind this bridge can use for a specific interpreter.
+    pub fn stable_abi_for_interpreter(&self, interpreter: &PythonInterpreter) -> Option<StableAbi> {
+        self.pyo3()?.stable_abi.filter(|stable_abi| {
+            interpreter.has_stable_api(stable_abi.kind)
+                && stable_abi
+                    .version
+                    .min_version()
+                    .is_none_or(|(major, minor)| {
                         (interpreter.major as u8, interpreter.minor as u8) >= (major, minor)
-                    }
-                    None => true, // CurrentPython → compatible when stable ABI is supported
-                }
-            })
+                    })
+        })
     }
 
     /// free-threaded Python support

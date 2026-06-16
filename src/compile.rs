@@ -870,7 +870,7 @@ fn configure_pyo3_env(
     };
     let stable_abi = python_interpreter.and_then(|i| bridge_model.stable_abi_for_interpreter(i));
     let use_target_abi = pyo3_ver >= PYO3_TARGET_ABI_PARAMETER_VERSION;
-    let force_target_abi = bridge_model.has_stable_abi() && use_target_abi;
+    let force_target_abi = stable_abi.is_some() && use_target_abi;
 
     // Only set PYO3_NO_PYTHON for stable ABI builds where the interpreter meets
     // the minimum version supported for stable ABI builds.  Version-specific

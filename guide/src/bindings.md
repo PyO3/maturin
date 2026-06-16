@@ -39,7 +39,7 @@ maturin build --no-default-features --features abi3t --interpreter python3.15t
 A GIL-enabled CPython 3.15 or newer interpreter can also build the `abi3t`
 wheel when using PyO3 0.29 or newer.
 
-An `abi3-py310` wheel supports all GIL-enabled Python
+An `abi3-py310` wheel supports all GIL-enabled CPython
 versions from Python 3.10 and newer, while the `abi3.abi3t` wheel supports
 Python 3.15 and all newer versions of CPython. Free-threaded CPython 3.14 does
 not support the `abi3t` stable ABI, so maturin builds a version-specific

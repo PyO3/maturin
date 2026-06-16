@@ -15,25 +15,20 @@ maturin automatically detects pyo3 bindings when it's added as a dependency in `
 ### `Py_LIMITED_API`/abi3
 
 The pyo3 bindings support the Python stable ABI (`Py_LIMITED_API`/abi3/abi3t).
-You can use it by enabling `"abi3"` or `"abi3t"` features. We suggest
-picking a minimum supported Python version and exposing separate Cargo features
-for the GIL-enabled and free-threaded stable ABI families:
+You can use it by enabling both `abi3` and `abi3t` features with a minimum
+supported Python version for each:
 
 ```toml
-pyo3 = { version = "0.29.0" }
-
-[features]
-abi3 = ["pyo3/abi3-py310"]
-abi3t = ["pyo3/abi3t-py315"]
+pyo3 = { version = "0.29.0", features = ["abi3-py310", "abi3t-py315"] }
 ```
 
 A single maturin build selects one stable ABI family. If you want to publish
-both a GIL-enabled `abi3` wheel and an `abi3t` wheel, run two wheel builds
-explicitly, with different Cargo features and compatible interpreters:
+both a GIL-enabled `abi3` wheel and an `abi3t` wheel, run separate wheel builds
+explicitly, with compatible interpreters:
 
 ```console
-maturin build --no-default-features --features abi3 --interpreter python3.10
-maturin build --no-default-features --features abi3t --interpreter python3.15t
+maturin build --interpreter python3.10
+maturin build --interpreter python3.15t
 ```
 
 A GIL-enabled CPython 3.15 or newer interpreter can also build the `abi3t`
@@ -45,10 +40,10 @@ Python 3.15 and all newer versions of CPython. Free-threaded CPython 3.14 does
 not support the `abi3t` stable ABI, so maturin builds a version-specific
 `cp314-cp314t` wheel for it instead.
 
-Do not rely on one build with both `abi3` and `abi3t` Cargo features to produce
-both stable ABI wheels. maturin will choose at most one stable ABI family for
-the build and emit version-specific fallback wheels for interpreters that
-cannot use that family.
+Do not rely on a single build with both `abi3` and `abi3t` Cargo features to
+produce both stable ABI wheels. maturin will choose at most one stable ABI
+family for the build and emit version-specific fallback wheels for interpreters
+that cannot use that family.
 
 > **Note**: Read more about stable ABI support in [pyo3's
 >     documentation](https://pyo3.rs/latest/building-and-distribution#py_limited_apiabi3abi3t). You

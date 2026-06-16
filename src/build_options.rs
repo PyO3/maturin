@@ -257,7 +257,10 @@ mod tests {
     fn test_find_bridge_pyo3_combined_abi3_and_abi3t() {
         let cases = [
             (None, StableAbi::from_abi3_version(3, 8)),
-            (Some("current-abi3t"), StableAbi::from_abi3_version(3, 8)),
+            (
+                Some("abi3-and-current-abi3t"),
+                StableAbi::from_abi3_version(3, 8),
+            ),
         ];
 
         for (feature, expected) in cases {

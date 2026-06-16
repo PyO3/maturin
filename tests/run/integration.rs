@@ -190,7 +190,7 @@ fn abi3_and_abi3t_wheel_selection() {
 fn abi3_and_current_abi3t_wheel_selection() {
     handle_result(other::combined_stable_abi_wheel_selection(
         "abi3-and-current-abi3t-wheel-selection",
-        &["current-abi3t"],
+        &["abi3-and-current-abi3t"],
     ));
 }
 

@@ -112,15 +112,9 @@ pub struct CargoOptions {
     #[arg(short = 'Z', value_name = "FLAG", action = clap::ArgAction::Append)]
     pub unstable_flags: Vec<String>,
 
-    /// Timing output formats (unstable) (comma separated): html, json
-    #[arg(
-        long,
-        value_name = "FMTS",
-        value_delimiter = ',',
-        require_equals = true,
-        help_heading = heading::COMPILATION_OPTIONS,
-    )]
-    pub timings: Option<Vec<String>>,
+    /// Output a build timing report at the end of the build
+    #[arg(long, help_heading = heading::COMPILATION_OPTIONS)]
+    pub timings: bool,
 
     /// Outputs a future incompatibility report at the end of the build (unstable)
     #[arg(long)]

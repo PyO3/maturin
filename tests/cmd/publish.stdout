@@ -183,8 +183,8 @@ Compilation Options:
       --target-dir <DIRECTORY>
           Directory for all generated artifacts
 
-      --timings=<FMTS>
-          Timing output formats (unstable) (comma separated): html, json
+      --timings
+          Output a build timing report at the end of the build
 
 Feature Selection:
   -F, --features <FEATURES>

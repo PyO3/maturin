@@ -238,8 +238,6 @@ jobs:
       # Used to sign the release's artifacts
       # and upload to PyPI using trusted publisher.
       id-token: write
-      # Used to upload release artifacts.
-      contents: write
     name: Publish to PyPI
     runs-on: ubuntu-latest
     environment:

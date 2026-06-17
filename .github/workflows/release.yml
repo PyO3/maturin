@@ -238,10 +238,6 @@ jobs:
       # Used to sign the release's artifacts
       # and upload to PyPI using trusted publisher.
       id-token: write
-      # Used to upload release artifacts.
-      contents: write
-      # Use to generate artifact attestation.
-      attestations: write
     name: Publish to PyPI
     runs-on: ubuntu-latest
     environment:
@@ -253,14 +249,14 @@ jobs:
         with:
           pattern: wheels-*
           merge-multiple: true
-      - name: Generate artifact attestation
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4
+      - uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7
+      - name: Generate PyPI publish attestations
+        uses: astral-sh/attest-action@f589a42a7efb6fe400b4f400de60b4bc90390027 # v0.0.6
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
         with:
-          subject-path: |
+          paths: |
             ./*.tar.gz
             ./*.whl
-      - uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7
       - name: Publish (dry run)
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         run: uv publish --dry-run '*'

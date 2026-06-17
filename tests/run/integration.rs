@@ -179,6 +179,22 @@ fn abi3t_without_version() {
 }
 
 #[test]
+fn abi3_and_abi3t_wheel_selection() {
+    handle_result(other::combined_stable_abi_wheel_selection(
+        "abi3-and-abi3t-wheel-selection",
+        &[],
+    ));
+}
+
+#[test]
+fn abi3_and_current_abi3t_wheel_selection() {
+    handle_result(other::combined_stable_abi_wheel_selection(
+        "abi3-and-current-abi3t-wheel-selection",
+        &["abi3-and-current-abi3t"],
+    ));
+}
+
+#[test]
 fn integration_pyo3_abi3t() {
     // abi3t requires CPython >= 3.15 (PEP 803).
     if !test_python_supports_abi3t() {

@@ -14,25 +14,36 @@ maturin automatically detects pyo3 bindings when it's added as a dependency in `
 
 ### `Py_LIMITED_API`/abi3
 
-The pyo3 bindings supports the Python stable ABI (`Py_LIMITED_API`/abi3/abi3t).
-You can use it by enabling `"abi3"` and/or `"abi3t"` features. We suggest
-picking a minimum supported Python version for both features:
+The pyo3 bindings support the Python stable ABI (`Py_LIMITED_API`/abi3/abi3t).
+You can use it by enabling both `abi3` and `abi3t` features with a minimum
+supported Python version for each:
 
 ```toml
 pyo3 = { version = "0.29.0", features = ["abi3-py310", "abi3t-py315"] }
 ```
 
-When selecting a specific interpreter to build against, this will produce an
-`abi3-py310` wheel for Python 3.14 and older and an `abi3.abi3t-py315` wheel on
-Python 3.15 and newer. If you build with `--find-interpreters`, maturin will
-produce an `abi3-py310`, `cp314t-cp314` and an `abi3.abi3t-py315` wheel. These
-three wheels cover all non-EOL and non-experimental builds of CPython. Other
-python implementations like RustPython may also target the abi3t ABI in the
-future.
+A single maturin build selects one stable ABI family. If you want to publish
+both a GIL-enabled `abi3` wheel and an `abi3t` wheel, run separate wheel builds
+explicitly, with compatible interpreters:
 
-An `abi3-py310` wheel supports all GIL-enabled Python
-versions from Python 3.10 to Python 3.14 and the `abi3.abi3t` wheel supports
-Python 3.15 and all newer versions of CPython.
+```console
+maturin build --interpreter python3.10
+maturin build --interpreter python3.15t
+```
+
+A GIL-enabled CPython 3.15 or newer interpreter can also build the `abi3t`
+wheel when using PyO3 0.29 or newer.
+
+An `abi3-py310` wheel supports all GIL-enabled CPython
+versions from Python 3.10 and newer, while the `abi3.abi3t` wheel supports
+Python 3.15 and all newer versions of CPython. Free-threaded CPython 3.14 does
+not support the `abi3t` stable ABI, so maturin builds a version-specific
+`cp314-cp314t` wheel for it instead.
+
+Do not rely on a single build with both `abi3` and `abi3t` Cargo features to
+produce both stable ABI wheels. maturin will choose at most one stable ABI
+family for the build and emit version-specific fallback wheels for interpreters
+that cannot use that family.
 
 > **Note**: Read more about stable ABI support in [pyo3's
 >     documentation](https://pyo3.rs/latest/building-and-distribution#py_limited_apiabi3abi3t). You

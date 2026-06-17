@@ -5,7 +5,8 @@
 //! whether abi3 is enabled, and whether `generate-import-lib` is active.
 
 use super::{
-    BridgeModel, PyO3, PyO3Crate, PyO3MetadataRaw, StableAbi, StableAbiKind, StableAbiVersion,
+    ABI3T_MINIMUM_PYTHON_MINOR, BridgeModel, PyO3, PyO3Crate, PyO3MetadataRaw, StableAbi,
+    StableAbiKind, StableAbiVersion,
 };
 use crate::PyProjectToml;
 use crate::pyproject_toml::{FeatureConditionEnv, FeatureSpec};
@@ -123,7 +124,7 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
                 }
             }
 
-            return if let Some(stable_abi) = has_stable_abi(&deps, &no_extra_features)? {
+            return if let Some(stable_abi) = has_stable_abi(&deps, &no_extra_features, &[])? {
                 let pyo3 = bridge.pyo3().expect("should be pyo3 bindings");
                 let bindings = PyO3 {
                     crate_name: lib,
@@ -141,33 +142,27 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
     Ok(bridge)
 }
 
-/// Upgrade a bridge model to abi3 if conditional pyo3/pyo3-ffi features
-/// from pyproject.toml match at least one of the given interpreters.
+/// Select the stable ABI for a bridge model after interpreter resolution.
 ///
 /// This is the second phase of bridge detection: [`find_bridge`] excludes
-/// conditional features, then after interpreter resolution this function
-/// re-checks whether any conditional abi3 feature applies.
+/// conditional features and picks a conservative default, then after
+/// interpreter resolution this function re-checks plain and conditional
+/// stable ABI features and chooses the single stable ABI family this build
+/// should attempt.
 pub fn upgrade_bridge_stable_abi(
     bridge: BridgeModel,
     cargo_metadata: &Metadata,
     pyproject: Option<&PyProjectToml>,
     interpreters: &[crate::PythonInterpreter],
 ) -> Result<BridgeModel> {
-    // Only relevant for pyo3 bridges without abi3 already set
+    // Only relevant for pyo3 bridges
     let Some(pyo3) = bridge.pyo3() else {
         return Ok(bridge);
     };
-    if pyo3.stable_abi.is_some() {
-        return Ok(bridge);
-    }
-
-    let extra_pyo3_features = pyo3_features_from_conditional(pyproject, interpreters);
-    if extra_pyo3_features.is_empty() {
-        return Ok(bridge);
-    }
 
     let deps = current_crate_dependencies(cargo_metadata)?;
-    if let Some(stable_abi) = has_stable_abi(&deps, &extra_pyo3_features)? {
+    let extra_pyo3_features = pyo3_features_from_conditional(pyproject, interpreters);
+    if let Some(stable_abi) = has_stable_abi(&deps, &extra_pyo3_features, interpreters)? {
         let upgraded = PyO3 {
             stable_abi: Some(stable_abi),
             ..pyo3.clone()
@@ -222,12 +217,27 @@ pub fn has_windows_import_lib_support(cargo_metadata: &Metadata) -> Result<bool>
 fn has_stable_abi(
     deps: &HashMap<&str, &Node>,
     extra_features: &HashMap<&str, Vec<String>>,
+    interpreters: &[crate::PythonInterpreter],
 ) -> Result<Option<StableAbi>> {
     let abi3t = has_stable_abi_from_kind(deps, extra_features, StableAbiKind::Abi3t)?;
-    if abi3t.is_some() {
-        return Ok(abi3t);
-    }
-    has_stable_abi_from_kind(deps, extra_features, StableAbiKind::Abi3)
+    let abi3 = has_stable_abi_from_kind(deps, extra_features, StableAbiKind::Abi3)?;
+
+    let selected = [abi3t, abi3].into_iter().flatten().find(|stable_abi| {
+        interpreters.iter().any(|interpreter| {
+            interpreter.has_stable_api(stable_abi.kind)
+                && stable_abi
+                    .version
+                    .min_version()
+                    .is_none_or(|(major, minor)| {
+                        (interpreter.major as u8, interpreter.minor as u8) >= (major, minor)
+                    })
+        })
+    });
+
+    // If no resolved interpreter can use either stable ABI, keep abi3 as the
+    // conservative project marker when available; the build will fall back to
+    // version-specific wheels for the non-matching interpreters.
+    Ok(selected.or(abi3).or(abi3t))
 }
 
 /// pyo3 supports building stable abi wheels if the unstable-api feature is not selected
@@ -270,6 +280,11 @@ fn has_stable_abi_from_kind(
                 .min();
             match min_stable_abi_version {
                 Some((major, minor)) => {
+                    let (major, minor) = if abi_kind == StableAbiKind::Abi3t {
+                        (major, minor).max((3, ABI3T_MINIMUM_PYTHON_MINOR))
+                    } else {
+                        (major, minor)
+                    };
                     return Ok(Some(StableAbi {
                         kind: abi_kind,
                         version: StableAbiVersion::Version(major, minor),

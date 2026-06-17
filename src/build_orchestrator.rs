@@ -13,7 +13,7 @@ use crate::target::validate_wheel_filename_for_pypi;
 use crate::util::zip_mtime;
 use crate::{
     BridgeModel, BuildArtifact, BuildContext, BuiltWheelMetadata, PythonInterpreter, StableAbi,
-    StableAbiKind, StableAbiVersion, VirtualWriter, compile, pyproject_toml::Format,
+    VirtualWriter, compile, pyproject_toml::Format,
 };
 use anyhow::{Context, Result, anyhow, bail};
 use cargo_metadata::CrateType;
@@ -278,7 +278,8 @@ impl<'a> BuildOrchestrator<'a> {
 
     /// Return the tags of the wheel that this build context builds.
     pub fn tags_from_bridge(&self) -> Result<Vec<String>> {
-        let tags = match self.context.project.bridge() {
+        let bridge = self.context.project.bridge();
+        let tags = match bridge {
             BridgeModel::PyO3(bindings) | BridgeModel::Bin(Some(bindings)) => {
                 let platform = self
                     .context
@@ -287,26 +288,38 @@ impl<'a> BuildOrchestrator<'a> {
                 let interp = &self.context.python.interpreter[0];
                 match bindings.stable_abi {
                     Some(stable_abi) => {
+                        let min_version = stable_abi.version.min_version();
+                        let (stable_abi_interps, version_specific_interps): (Vec<_>, Vec<_>) = self
+                            .context
+                            .python
+                            .interpreter
+                            .iter()
+                            .partition(|interp| bridge.is_stable_abi_for_interpreter(interp));
                         let abi_tag = stable_abi.kind.wheel_tag();
-
-                        match stable_abi.version {
-                            StableAbiVersion::Version(major, minor) => {
-                                vec![format!("cp{major}{minor}-{abi_tag}-{platform}")]
-                            }
-                            StableAbiVersion::CurrentPython => {
-                                vec![format!(
-                                    "cp{major}{minor}-{abi_tag}-{platform}",
-                                    major = interp.major,
-                                    minor = interp.minor
-                                )]
-                            }
+                        let stable_abi_tag = stable_abi_interps.first().map(|interp| {
+                            let (major, minor) =
+                                min_version.unwrap_or((interp.major as u8, interp.minor as u8));
+                            format!("cp{major}{minor}-{abi_tag}-{platform}")
+                        });
+                        // Some interpreters in this build may not support the selected stable ABI
+                        // family, e.g. 3.14t when abi3t was selected for 3.15.
+                        let version_specific_tags = version_specific_interps
+                            .iter()
+                            .map(|interpreter| {
+                                interpreter.get_tag(&self.context.project, &[PlatformTag::Linux])
+                            })
+                            .collect::<Result<Vec<_>>>()?;
+                        let tags = stable_abi_tag
+                            .into_iter()
+                            .chain(version_specific_tags)
+                            .collect::<Vec<_>>();
+                        if tags.is_empty() {
+                            bail!("No compatible Python interpreters found for stable ABI build");
                         }
+                        tags
                     }
                     None => {
-                        vec![
-                            self.context.python.interpreter[0]
-                                .get_tag(&self.context.project, &[PlatformTag::Linux])?,
-                        ]
+                        vec![interp.get_tag(&self.context.project, &[PlatformTag::Linux])?]
                     }
                 }
             }
@@ -378,9 +391,8 @@ impl<'a> BuildOrchestrator<'a> {
         }
     }
 
-    /// Split interpreters into stable-abi-capable and non-stable-abi groups,
-    /// build the appropriate wheel type for each group, and return all built
-    /// wheels.
+    /// Build at most one stable ABI wheel, with non-matching interpreters
+    /// falling back to version-specific wheels.
     #[instrument(skip_all)]
     pub(crate) fn build_stable_abi_wheels(
         &self,
@@ -388,30 +400,15 @@ impl<'a> BuildOrchestrator<'a> {
         sbom_data: &Option<SbomData>,
     ) -> Result<Vec<BuiltWheelMetadata>> {
         let min_version = stable_abi.version.min_version();
-        let stable_abi_interps: Vec<_> = self
+        // With mixed abi3 and abi3t features, selecting abi3t for a 3.15+
+        // interpreter intentionally sends older interpreters to version-specific wheels.
+        let bridge = self.context.project.bridge();
+        let (stable_abi_interps, version_specific_abi_interps): (Vec<_>, Vec<_>) = self
             .context
             .python
             .interpreter
             .iter()
-            .filter(|interp| {
-                interp.has_stable_api(stable_abi.kind)
-                    && min_version.is_none_or(|(major, minor)| {
-                        (interp.major as u8, interp.minor as u8) >= (major, minor)
-                    })
-            })
-            .collect();
-        let version_specific_abi_interps: Vec<_> = self
-            .context
-            .python
-            .interpreter
-            .iter()
-            .filter(|interp| {
-                !interp.has_stable_api(stable_abi.kind)
-                    || min_version.is_some_and(|(major, minor)| {
-                        (interp.major as u8, interp.minor as u8) < (major, minor)
-                    })
-            })
-            .collect();
+            .partition(|interp| bridge.is_stable_abi_for_interpreter(interp));
 
         if stable_abi_interps.is_empty() && version_specific_abi_interps.is_empty() {
             let interp_names: Vec<_> = self
@@ -426,7 +423,7 @@ impl<'a> BuildOrchestrator<'a> {
                     )
                 })
                 .collect();
-            if let Some((major, minor)) = min_version {
+            if let Some((major, minor)) = stable_abi.version.min_version() {
                 bail!(
                     "None of the found Python interpreters ({}) are compatible with the {} \
                      minimum version (>= {}.{}). Please install a compatible Python interpreter.",
@@ -450,7 +447,7 @@ impl<'a> BuildOrchestrator<'a> {
             let (major, minor) = min_version.unwrap_or((first.major as u8, first.minor as u8));
             built_wheels.extend(self.build_pyo3_wheel_stable_abi(
                 &stable_abi_interps,
-                stable_abi.kind,
+                *stable_abi,
                 major,
                 minor,
                 sbom_data,
@@ -541,7 +538,7 @@ impl<'a> BuildOrchestrator<'a> {
     pub(crate) fn build_pyo3_wheel_stable_abi(
         &self,
         interpreters: &[&PythonInterpreter],
-        stable_abi_kind: StableAbiKind,
+        stable_abi: StableAbi,
         major: u8,
         min_minor: u8,
         sbom_data: &Option<SbomData>,
@@ -560,7 +557,7 @@ impl<'a> BuildOrchestrator<'a> {
         let platform_tags = self.resolve_platform_tags(&audit_result.policy);
 
         let platform = self.context.project.get_platform_tag(&platform_tags)?;
-        let abi_tag = stable_abi_kind.wheel_tag();
+        let abi_tag = stable_abi.kind.wheel_tag();
         let tag = format!("cp{major}{min_minor}-{abi_tag}-{platform}");
 
         let mut audited = [AuditedArtifact {
@@ -573,7 +570,7 @@ impl<'a> BuildOrchestrator<'a> {
             &mut audited,
             |temp_dir| {
                 Ok(Box::new(
-                    Pyo3BindingGenerator::new(Some(stable_abi_kind), python_interpreter, temp_dir)
+                    Pyo3BindingGenerator::new(Some(stable_abi.kind), python_interpreter, temp_dir)
                         .context("Failed to initialize PyO3 binding generator")?,
                 ))
             },
@@ -582,7 +579,8 @@ impl<'a> BuildOrchestrator<'a> {
         )?;
 
         eprintln!(
-            "📦 Built wheel for {stable_abi_kind} Python ≥ {}.{} to {}",
+            "📦 Built wheel for {} Python ≥ {}.{} to {}",
+            stable_abi.kind,
             major,
             min_minor,
             wheel_path.display()

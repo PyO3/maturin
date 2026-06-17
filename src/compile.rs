@@ -625,13 +625,9 @@ fn configure_macos_pyo3_linker_args(
 
     // install_name is specific to the top-level output, so keep it in cargo_rustc.args
     let stable_abi_suffix = python_interpreter.and_then(|i| {
-        if bridge_model.is_stable_abi_for_interpreter(i) {
-            bridge_model
-                .pyo3()
-                .and_then(|pyo3| pyo3.stable_abi.map(|stable_abi| format!("{}", stable_abi)))
-        } else {
-            None
-        }
+        bridge_model
+            .stable_abi_for_interpreter(i)
+            .map(|stable_abi| format!("{}", stable_abi))
     });
 
     let so_filename = if let Some(suffix) = stable_abi_suffix {
@@ -866,22 +862,28 @@ fn configure_pyo3_env(
     target: &Target,
     target_triple: &str,
 ) -> Result<()> {
+    let pyo3_ver = if bridge_model.is_pyo3() {
+        pyo3_version(&context.project.cargo_metadata)
+            .context("Failed to get pyo3 version from cargo metadata")?
+    } else {
+        (0, 0, 0)
+    };
+    let stable_abi = python_interpreter.and_then(|i| bridge_model.stable_abi_for_interpreter(i));
+    let use_target_abi = pyo3_ver >= PYO3_TARGET_ABI_PARAMETER_VERSION;
+    let force_target_abi = stable_abi.is_some() && use_target_abi;
+
     // Only set PYO3_NO_PYTHON for stable ABI builds where the interpreter meets
     // the minimum version supported for stable ABI builds.  Version-specific
     // fallback builds (e.g. Python 3.10 when abi3 targets ≥ 3.11) must not set
     // PYO3_NO_PYTHON.
-    if python_interpreter.is_some_and(|i| bridge_model.is_stable_abi_for_interpreter(i)) {
+    if stable_abi.is_some() {
         let is_pypy_or_graalpy = python_interpreter
             .map(|p| p.interpreter_kind.is_pypy() || p.interpreter_kind.is_graalpy())
             .unwrap_or(false);
-        if !is_pypy_or_graalpy && !target.is_windows() {
-            let pyo3_ver = pyo3_version(&context.project.cargo_metadata)
-                .context("Failed to get pyo3 version from cargo metadata")?;
-            if pyo3_ver < PYO3_ABI3_NO_PYTHON_VERSION {
-                // This will make old pyo3's build script only set some predefined linker
-                // arguments without trying to read any python configuration
-                build_command.env("PYO3_NO_PYTHON", "1");
-            }
+        if !is_pypy_or_graalpy && !target.is_windows() && pyo3_ver < PYO3_ABI3_NO_PYTHON_VERSION {
+            // This will make old pyo3's build script only set some predefined linker
+            // arguments without trying to read any python configuration
+            build_command.env("PYO3_NO_PYTHON", "1");
         }
     }
 
@@ -893,7 +895,7 @@ fn configure_pyo3_env(
     // Setup `PYO3_CONFIG_FILE` if we are cross compiling for pyo3 bindings
     if let Some(interpreter) = python_interpreter {
         // Target python interpreter isn't runnable when cross compiling
-        if interpreter.runnable {
+        if interpreter.runnable && !force_target_abi {
             if bridge_model.is_pyo3() {
                 debug!(
                     "Setting PYO3_PYTHON to {}",
@@ -909,19 +911,22 @@ fn configure_pyo3_env(
 
             // and legacy pyo3 versions
             build_command.env("PYTHON_SYS_EXECUTABLE", &interpreter.executable);
-        } else if bridge_model.is_pyo3() && env::var_os("PYO3_CONFIG_FILE").is_none() {
-            let pyo3_ver = pyo3_version(&context.project.cargo_metadata)
-                .context("Failed to get pyo3 version from cargo metadata")?;
-            let use_stable_abi = bridge_model.is_stable_abi_for_interpreter(interpreter);
-            let pyo3_config = interpreter.pyo3_config_file(
-                target,
-                use_stable_abi,
-                pyo3_ver > PYO3_TARGET_ABI_PARAMETER_VERSION,
-            );
+        }
+
+        if bridge_model.is_pyo3()
+            && (force_target_abi || !interpreter.runnable)
+            && env::var_os("PYO3_CONFIG_FILE").is_none()
+        {
+            let pyo3_config = interpreter.pyo3_config_file(target, stable_abi, use_target_abi);
             let maturin_target_dir = ensure_target_maturin_dir(&context.project.target_dir);
             let config_file = maturin_target_dir.join(format!(
-                "pyo3-config-{}-{}.{}.txt",
-                target_triple, interpreter.major, interpreter.minor
+                "pyo3-config-{}-{}.{}{}.txt",
+                target_triple,
+                interpreter.major,
+                interpreter.minor,
+                stable_abi
+                    .map(|stable_abi| format!("-{}", stable_abi.kind))
+                    .unwrap_or_default()
             ));
             // We don't want to rewrite the file every time as that will make cargo
             // trigger a rebuild of the project every time

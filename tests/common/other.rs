@@ -6,7 +6,7 @@ use fs_err::File;
 use maturin::pyproject_toml::{SdistGenerator, ToolMaturin};
 use maturin::{
     BuildOptions, BuildOrchestrator, CargoOptions, OutputOptions, PlatformOptions, PlatformTag,
-    unpack_sdist,
+    PythonOptions, unpack_sdist,
 };
 use pretty_assertions::assert_eq;
 use std::collections::BTreeSet;
@@ -511,6 +511,91 @@ pub fn abi3t_without_version() -> Result<()> {
         .build();
     assert!(result.is_ok());
 
+    Ok(())
+}
+
+fn expected_combined_stable_abi_tags(
+    python_interpreter: &maturin::PythonInterpreter,
+) -> Option<&'static [&'static str]> {
+    if python_interpreter.implementation_name != "cpython" {
+        return None;
+    }
+    match (
+        python_interpreter.major,
+        python_interpreter.minor,
+        python_interpreter.gil_disabled,
+    ) {
+        (3, 8..=14, false) => Some(&["cp38-abi3"]),
+        (3, 14, true) => Some(&["cp314-cp314t"]),
+        (3, 15, false) => Some(&["cp315-abi3.abi3t"]),
+        (3, 15, true) => Some(&["cp315-abi3.abi3t"]),
+        _ => None,
+    }
+}
+
+pub fn combined_stable_abi_wheel_selection(unique_name: &str, features: &[&str]) -> Result<()> {
+    let python = crate::common::test_python_path()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("python3"));
+    let target_dir = crate::common::case_target_dir(unique_name);
+    let wheel_dir = crate::common::case_wheel_dir(unique_name);
+
+    let options = BuildOptions {
+        python: PythonOptions {
+            interpreter: vec![python],
+            ..Default::default()
+        },
+        output: OutputOptions {
+            out: Some(wheel_dir.clone()),
+            ..Default::default()
+        },
+        cargo: CargoOptions {
+            manifest_path: Some(Path::new("test-crates/pyo3-abi3-and-abi3t").join("Cargo.toml")),
+            quiet: true,
+            target_dir: Some(target_dir.clone()),
+            features: features.iter().map(|feature| feature.to_string()).collect(),
+            no_default_features: !features.is_empty(),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let build_context = options
+        .into_build_context()
+        .strip(Some(cfg!(feature = "faster-tests")))
+        .editable(false)
+        .build()?;
+    let python_interpreter = build_context
+        .python
+        .interpreter
+        .first()
+        .context("no Python interpreter resolved")?;
+    let Some(expected) = expected_combined_stable_abi_tags(python_interpreter) else {
+        eprintln!("Skipping combined stable ABI wheel-selection test for {python_interpreter}");
+        return Ok(());
+    };
+
+    for dir in [&target_dir, &wheel_dir] {
+        if dir.is_dir() {
+            fs_err::remove_dir_all(dir)?;
+        }
+    }
+    let wheels = BuildOrchestrator::new(&build_context).build_wheels()?;
+
+    let actual = wheels
+        .iter()
+        .map(|(wheel_path, _)| {
+            let filename = wheel_path.file_name().unwrap().to_str().unwrap();
+            let mut fields = filename.strip_suffix(".whl").unwrap().rsplit('-');
+            let _platform = fields.next().unwrap();
+            let abi = fields.next().unwrap();
+            let python = fields.next().unwrap();
+            format!("{python}-{abi}")
+        })
+        .collect::<BTreeSet<_>>();
+    let expected = expected.iter().copied().map(String::from).collect();
+    assert_eq!(actual, expected);
+
+    crate::common::cleanup_case(unique_name);
     Ok(())
 }
 

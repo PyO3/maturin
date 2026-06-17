@@ -111,24 +111,13 @@ impl BuildContextBuilder {
             })
         });
 
-        // Check whether conditional pyo3/pyo3-ffi features exist in pyproject.toml
-        // AND pyproject features are actually active (not overridden by CLI --features).
-        // When CLI --features is set, pyproject features are ignored at compile time
-        // (see cargo_options.merge_with_pyproject_toml), so bridge inference must
-        // ignore them too to stay in sync.
-        let has_conditional_pyo3_features = pyproject
-            .and_then(|p| p.maturin())
-            .and_then(|m| m.features.as_ref())
-            .is_some_and(|specs| {
-                // Only consider conditional features when pyproject features
-                // were actually adopted (not overridden by CLI).
-                let cli_overrides = !cargo_options.features.is_empty()
-                    && !pyproject_toml_maturin_options.contains(&"features");
-                !cli_overrides
-                    && FeatureSpec::split(specs.clone()).1.iter().any(|c| {
-                        c.feature.starts_with("pyo3/") || c.feature.starts_with("pyo3-ffi/")
-                    })
-            });
+        let cli_overrides_pyproject_features = !cargo_options.features.is_empty()
+            && !pyproject_toml_maturin_options.contains(&"features");
+        let pyproject_for_stable_abi = if cli_overrides_pyproject_features {
+            None
+        } else {
+            pyproject
+        };
 
         // Detect bridge without conditional pyo3 features — those are
         // evaluated after interpreter resolution via upgrade_bridge_stable_abi.
@@ -161,14 +150,15 @@ impl BuildContextBuilder {
             &cargo_metadata,
         )?;
 
-        // Upgrade bridge to abi3 if conditional pyo3 features
-        // (e.g. abi3-py311 gated on python-version>=3.11) match any
-        // of the resolved interpreters.
-        let bridge = if has_conditional_pyo3_features {
-            upgrade_bridge_stable_abi(bridge, &cargo_metadata, pyproject, &interpreter)?
-        } else {
-            bridge
-        };
+        // Select the stable ABI after interpreter resolution. This allows
+        // combined abi3/abi3t feature sets to choose the one stable ABI family
+        // this build can actually produce.
+        let bridge = upgrade_bridge_stable_abi(
+            bridge,
+            &cargo_metadata,
+            pyproject_for_stable_abi,
+            &interpreter,
+        )?;
         debug!("Resolved bridge model: {:?}", bridge);
         if let Some(stable_abi) = bridge.pyo3().and_then(|p| p.stable_abi.as_ref()) {
             match stable_abi.version {

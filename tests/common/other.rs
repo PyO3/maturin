@@ -489,6 +489,40 @@ pub fn abi3_without_version() -> Result<()> {
     Ok(())
 }
 
+pub fn pyo3_cffi_build_script() -> Result<()> {
+    let base = crate::common::test_python_path().map(PathBuf::from);
+    let venv_dir = crate::common::create_named_virtualenv("pyo3-cffi-build-script", base)?;
+    let venv_python = maturin::Target::from_target_triple(None)?.get_venv_python(&venv_dir);
+    crate::common::install_pip_packages(&venv_python, &["cffi"])?;
+    let python = venv_python
+        .to_str()
+        .context("venv python path is not utf-8")?;
+
+    // The first argument is ignored by clap
+    let cli = vec![
+        "build",
+        "--manifest-path",
+        "test-crates/pyo3-cffi-build-script/Cargo.toml",
+        "--quiet",
+        "--interpreter",
+        python,
+        "--target-dir",
+        "test-targets/wheels/pyo3_cffi_build_script",
+    ];
+
+    let options = BuildOptions::try_parse_from(cli)?;
+    let build_context = options
+        .into_build_context()
+        .strip(Some(cfg!(feature = "faster-tests")))
+        .editable(false)
+        .build()?;
+    // Actually build the wheel so the crate's build.rs runs.
+    let wheels = BuildOrchestrator::new(&build_context).build_wheels();
+    assert!(wheels.is_ok());
+
+    Ok(())
+}
+
 pub fn abi3t_without_version() -> Result<()> {
     let python = crate::common::test_python_path().unwrap_or_else(|| "python3".to_string());
     // The first argument is ignored by clap

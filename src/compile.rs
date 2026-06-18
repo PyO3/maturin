@@ -895,7 +895,7 @@ fn configure_pyo3_env(
     // Setup `PYO3_CONFIG_FILE` if we are cross compiling for pyo3 bindings
     if let Some(interpreter) = python_interpreter {
         // Target python interpreter isn't runnable when cross compiling
-        if interpreter.runnable && !force_target_abi {
+        if interpreter.runnable {
             if bridge_model.is_pyo3() {
                 debug!(
                     "Setting PYO3_PYTHON to {}",

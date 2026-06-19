@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.14.1
+
+* Bump uraimo/run-on-arch-action to v3 to fix pytest job ([#3221](https://github.com/pyo3/maturin/pull/3221))
+* Fix platform tag logic to generate the same as cpython on AIX ([#3220](https://github.com/pyo3/maturin/pull/3220))
+* Bump pyo3-introspection ([#3227](https://github.com/pyo3/maturin/pull/3227))
+* Upgrade cargo-zigbuild & cargo-xwin ([#3228](https://github.com/pyo3/maturin/pull/3228))
+* Fix issues around crates enabling abi3 and abi3t features ([#3226](https://github.com/pyo3/maturin/pull/3226))
+* Add PEP 740 publish attestations to PyPI releases ([#3230](https://github.com/pyo3/maturin/pull/3230))
+* Set PYO3_PYTHON to run scripts for stable ABI builds ([#3233](https://github.com/pyo3/maturin/pull/3233))
+* Fix shell quoting in CI scripts ([#3231](https://github.com/pyo3/maturin/pull/3231))
+
 ## 1.14.0
 
 * Support parent-relative pyproject metadata in sdists ([#3182](https://github.com/pyo3/maturin/pull/3182))

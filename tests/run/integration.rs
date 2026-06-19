@@ -169,6 +169,11 @@ fn abi3_without_version() {
 }
 
 #[test]
+fn pyo3_cffi_build_script() {
+    handle_result(other::pyo3_cffi_build_script())
+}
+
+#[test]
 fn abi3t_without_version() {
     // abi3t requires CPython >= 3.15 (PEP 803). On older runners the build
     // would reject the only available interpreter, so skip cleanly.

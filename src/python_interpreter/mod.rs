@@ -152,7 +152,7 @@ impl PythonInterpreter {
         }
     }
 
-    /// Format this interpreter as a value for uv's `--python` argument.
+    /// Formats this interpreter as a value for uv's `--python` argument.
     ///
     /// A runnable interpreter is passed by path. Otherwise the interpreter
     /// is passed as a version request for uv to resolve (e.g. if maturin

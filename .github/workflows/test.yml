@@ -135,6 +135,8 @@ jobs:
         if: startsWith(matrix.os, 'windows')
         shell: bash
         run: echo "RUSTFLAGS=-C debuginfo=0" >> "${GITHUB_ENV}"
+      - name: Install llvm-tools
+        run: rustup component add llvm-tools-preview
       - name: cargo test
         run: cargo nextest run --features password-storage
       - name: test cross compiling with zig

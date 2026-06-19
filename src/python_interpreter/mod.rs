@@ -3,6 +3,8 @@ use crate::Target;
 use crate::auditwheel::PlatformTag;
 use crate::bridge::{ABI3T_MINIMUM_PYTHON_MINOR, StableAbiKind};
 use anyhow::{Result, bail};
+use std::borrow::Cow;
+use std::ffi::OsStr;
 use std::fmt;
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -148,6 +150,35 @@ impl PythonInterpreter {
             StableAbiKind::Abi3 => self.has_abi3(),
             StableAbiKind::Abi3t => self.has_abi3t(),
         }
+    }
+
+    /// Format this interpreter as a value for uv's `--python` argument.
+    ///
+    /// A runnable interpreter is passed by path. Otherwise the interpreter
+    /// is passed as a version request for uv to resolve (e.g. if maturin
+    /// received `-i 3.10`, and no runnable interpreter was found, maturin
+    /// will pass `cpython@3.10` to uv).
+    pub fn as_uv_python_arg(&self) -> Cow<'_, OsStr> {
+        if self.runnable && !self.executable.as_os_str().is_empty() {
+            return self.executable.as_os_str().into();
+        }
+        let implementation = match self.interpreter_kind {
+            InterpreterKind::CPython => "cpython",
+            InterpreterKind::PyPy => "pypy",
+            InterpreterKind::GraalPy => "graalpy",
+        };
+        let mut request = format!(
+            "{implementation}@{major}.{minor}{abiflags}",
+            major = self.major,
+            minor = self.minor,
+            abiflags = self.abiflags,
+        );
+        // `3.14` might resolve to free-threaded python depending what is on the users'
+        // path (see https://github.com/astral-sh/uv/issues/16722), explicitly request `+gil` if needed
+        if self.interpreter_kind == InterpreterKind::CPython && !self.gil_disabled {
+            request.push_str("+gil");
+        }
+        Cow::Owned(request.into())
     }
 
     /// Returns the supported python environment in the PEP 425 format used for the wheel filename:
@@ -476,5 +507,82 @@ impl fmt::Display for PythonInterpreter {
                 self.config.abiflags,
             )
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn interpreter(
+        kind: InterpreterKind,
+        minor: usize,
+        abiflags: &str,
+        gil_disabled: bool,
+    ) -> PythonInterpreter {
+        PythonInterpreter {
+            config: InterpreterConfig {
+                major: 3,
+                minor,
+                interpreter_kind: kind,
+                abiflags: abiflags.to_string(),
+                ext_suffix: String::new(),
+                pointer_width: None,
+                gil_disabled,
+            },
+            executable: PathBuf::new(),
+            platform: None,
+            runnable: false,
+            implementation_name: kind.to_string().to_ascii_lowercase(),
+            soabi: None,
+        }
+    }
+
+    #[test]
+    fn uv_python_arg_runnable_uses_executable() {
+        let mut interp = interpreter(InterpreterKind::CPython, 10, "", false);
+        interp.executable = PathBuf::from("/usr/bin/python3.10");
+        interp.runnable = true;
+        assert_eq!(
+            interp.as_uv_python_arg(),
+            Cow::Borrowed(OsStr::new("/usr/bin/python3.10"))
+        );
+    }
+
+    #[test]
+    fn uv_python_arg_runnable_but_empty_executable_falls_back() {
+        let mut interp = interpreter(InterpreterKind::CPython, 10, "", false);
+        interp.runnable = true;
+        assert_eq!(interp.as_uv_python_arg(), OsStr::new("cpython@3.10+gil"));
+    }
+
+    #[test]
+    fn uv_python_arg_cpython_requests_gil() {
+        let interp = interpreter(InterpreterKind::CPython, 14, "", false);
+        assert_eq!(interp.as_uv_python_arg(), OsStr::new("cpython@3.14+gil"));
+    }
+
+    #[test]
+    fn uv_python_arg_free_threaded_uses_abiflags() {
+        let interp = interpreter(InterpreterKind::CPython, 14, "t", true);
+        assert_eq!(interp.as_uv_python_arg(), OsStr::new("cpython@3.14t"));
+    }
+
+    #[test]
+    fn uv_python_arg_debug_keeps_abiflags_and_gil() {
+        let interp = interpreter(InterpreterKind::CPython, 13, "d", false);
+        assert_eq!(interp.as_uv_python_arg(), OsStr::new("cpython@3.13d+gil"));
+    }
+
+    #[test]
+    fn uv_python_arg_pypy_omits_gil() {
+        let interp = interpreter(InterpreterKind::PyPy, 10, "", false);
+        assert_eq!(interp.as_uv_python_arg(), OsStr::new("pypy@3.10"));
+    }
+
+    #[test]
+    fn uv_python_arg_graalpy_omits_gil() {
+        let interp = interpreter(InterpreterKind::GraalPy, 11, "", false);
+        assert_eq!(interp.as_uv_python_arg(), OsStr::new("graalpy@3.11"));
     }
 }

@@ -129,11 +129,12 @@ jobs:
 
       - name: Set MATURIN_TEST_PYTHON
         shell: bash
-        run: echo "MATURIN_TEST_PYTHON=${{ steps.setup-python.outputs.python-path }}" >> $GITHUB_ENV
+        run: echo "MATURIN_TEST_PYTHON=${{ steps.setup-python.outputs.python-path }}" >> "${GITHUB_ENV}"
       # To save cache disk space
       - name: Disable debuginfo on Windows
         if: startsWith(matrix.os, 'windows')
-        run: echo "RUSTFLAGS="-C debuginfo=0"" >> $GITHUB_ENV
+        shell: bash
+        run: echo "RUSTFLAGS=-C debuginfo=0" >> "${GITHUB_ENV}"
       - name: cargo test
         run: cargo nextest run --features password-storage
       - name: test cross compiling with zig
@@ -173,7 +174,8 @@ jobs:
         run: |
           set -ex
           rustup target add x86_64-unknown-linux-gnu
-          export PYO3_CONFIG_FILE=$(pwd)/test-crates/pyo3-mixed/pyo3-config.txt
+          PYO3_CONFIG_FILE="$(pwd)/test-crates/pyo3-mixed/pyo3-config.txt"
+          export PYO3_CONFIG_FILE
           target/debug/maturin build -m test-crates/pyo3-mixed/Cargo.toml --target x86_64-unknown-linux-gnu --zig
       - name: test maturin new
         shell: bash

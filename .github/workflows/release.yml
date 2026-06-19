@@ -103,7 +103,8 @@ jobs:
         run: |
           set -euo pipefail
           # set SDKROOT for C dependencies like ring and bzip2
-          export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
+          SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"
+          export SDKROOT
           rustup target add aarch64-apple-darwin
           cargo run -- build --release -b bin -o dist --target universal2-apple-darwin --features password-storage,static --compatibility pypi
 

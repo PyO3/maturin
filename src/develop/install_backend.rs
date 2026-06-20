@@ -107,7 +107,7 @@ impl InstallBackend {
             },
             InstallBackend::Uv { path, args } => {
                 let mut cmd = Command::new(path);
-                cmd.args(args).arg("pip");
+                cmd.args(args).arg("pip").env("UV_PYTHON", python_path);
                 cmd
             }
         }

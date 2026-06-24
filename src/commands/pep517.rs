@@ -108,10 +108,30 @@ pub fn pep517(subcommand: Pep517Command) -> Result<()> {
             println!("{}", dist_info_dir.display());
         }
         Pep517Command::BuildWheel {
-            build_options,
+            mut build_options,
             strip_opt,
             editable,
         } => {
+            // PEP 517's `build_wheel` operates on a single interpreter (the
+            // one running pip). If duplicates of the same path were supplied
+            // (e.g. user-set `MATURIN_PEP517_ARGS=--interpreter ...` with
+            // multiple interpreters), collapse them first, then bail with a
+            // clear message instead of panicking. Mirrors the
+            // `write-dist-info` arm above.
+            {
+                let mut seen = std::collections::HashSet::new();
+                build_options
+                    .python
+                    .interpreter
+                    .retain(|p| seen.insert(p.clone()));
+            }
+            if build_options.python.interpreter.len() > 1 {
+                bail!(
+                    "`maturin pep517 build-wheel` expects exactly one --interpreter, got {}: {:?}",
+                    build_options.python.interpreter.len(),
+                    build_options.python.interpreter,
+                );
+            }
             let mut build_context = build_options
                 .into_build_context()
                 .strip(strip_opt.strip)
@@ -121,8 +141,20 @@ pub fn pep517(subcommand: Pep517Command) -> Result<()> {
 
             let orchestrator = BuildOrchestrator::new(&build_context);
             let wheels = orchestrator.build_wheels()?;
-            assert_eq!(wheels.len(), 1);
-            println!("{}", wheels[0].0.to_str().unwrap());
+            if wheels.len() != 1 {
+                bail!(
+                    "expected exactly one wheel to be built, got {}: {:?}",
+                    wheels.len(),
+                    wheels
+                        .iter()
+                        .map(|(path, _)| path.display().to_string())
+                        .collect::<Vec<_>>(),
+                );
+            }
+            let wheel_path = wheels[0].0.to_str().with_context(|| {
+                format!("wheel path is not valid UTF-8: {}", wheels[0].0.display())
+            })?;
+            println!("{wheel_path}");
         }
         Pep517Command::WriteSDist {
             sdist_directory,

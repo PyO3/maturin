@@ -48,7 +48,7 @@ impl ModuleWriterInternal for SDistWriter {
         let mut header = tar::Header::new_ustar();
         header.set_entry_type(tar::EntryType::Regular);
         header.set_mode(default_permission(source.executable()));
-        header.set_mtime(self.mtime);
+        set_sdist_header_metadata(&mut header, self.mtime);
 
         let data = match source {
             ArchiveSource::Generated(source) => source.data,
@@ -123,7 +123,7 @@ impl SDistWriter {
         header.set_path("././@PaxHeader")?;
         header.set_entry_type(tar::EntryType::XHeader);
         header.set_mode(0o644);
-        header.set_mtime(self.mtime);
+        set_sdist_header_metadata(&mut header, self.mtime);
         header.set_size(data.len() as u64);
         header.set_cksum();
 
@@ -155,6 +155,12 @@ impl SDistWriter {
         fs::write(&self.path, archive.finish()?)?;
         Ok(self.path)
     }
+}
+
+fn set_sdist_header_metadata(header: &mut tar::Header, mtime: u64) {
+    header.set_uid(0);
+    header.set_gid(0);
+    header.set_mtime(mtime);
 }
 
 /// Avoid the extra size for the path in the pax extended header if not required.
@@ -276,9 +282,9 @@ mod tests {
             \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00
             \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00
             \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00
-            \x00\x00\x00\x000000644\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00
-            \x00\x00\x00\x0000000000170\x0010461020
-            230\x000006522\x00x"#]].assert_eq(&pax_header);
+            \x00\x00\x00\x000000644\x000000000\x000000
+            000\x0000000000170\x0010461020
+            230\x000007762\x00x"#]].assert_eq(&pax_header);
         expect![[r#"
             block 1 bytes 0..128:
             120 path=data/aaaaaaaaaa
@@ -294,9 +300,9 @@ mod tests {
             \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00
             \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00
             \x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00
-            \x00\x00\x00\x000000644\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00
-            \x00\x00\x00\x0000000000005\x0010461020
-            230\x000006631\x000"#]].assert_eq(&file_header);
+            \x00\x00\x00\x000000644\x000000000\x000000
+            000\x0000000000005\x0010461020
+            230\x000010071\x000"#]].assert_eq(&file_header);
 
         Ok(())
     }

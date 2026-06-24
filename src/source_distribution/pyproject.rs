@@ -241,8 +241,13 @@ pub(super) fn add_pyproject_metadata(
     if let Some(project) = pyproject.project.as_ref()
         && let Some(license_files) = &project.license_files
     {
-        let escaped_pyproject_dir =
-            PathBuf::from(glob::Pattern::escape(pyproject_dir.to_str().unwrap()));
+        let pyproject_dir_str = pyproject_dir.to_str().with_context(|| {
+            format!(
+                "project path is not valid UTF-8: {}",
+                pyproject_dir.display()
+            )
+        })?;
+        let escaped_pyproject_dir = PathBuf::from(glob::Pattern::escape(pyproject_dir_str));
         let mut seen = HashSet::new();
         for license_glob in license_files {
             check_pep639_glob(license_glob)?;

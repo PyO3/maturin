@@ -160,7 +160,10 @@ pub fn find_sysconfigdata(lib_dir: &Path, target: &Target) -> Result<PathBuf> {
 fn search_lib_dir(path: impl AsRef<Path>, target: &Target) -> Result<Vec<PathBuf>> {
     let mut sysconfig_paths = vec![];
     let (cpython_version_pat, pypy_version_pat) = if let Some(v) =
-        env::var_os("PYO3_CROSS_PYTHON_VERSION").map(|s| s.into_string().unwrap())
+        env::var_os("PYO3_CROSS_PYTHON_VERSION")
+            .map(|s| s.into_string())
+            .transpose()
+            .map_err(|_| anyhow::anyhow!("PYO3_CROSS_PYTHON_VERSION is not valid UTF-8"))?
     {
         (format!("python{v}"), format!("pypy{v}"))
     } else {
@@ -250,18 +253,21 @@ struct BuildDetailsAbi {
 ///
 /// Starting from Python 3.14, the file is installed in the platform-independent
 /// standard library directory, e.g. `<prefix>/lib/python3.14/build-details.json`.
-pub fn find_build_details(path: &Path) -> Option<PathBuf> {
+pub fn find_build_details(path: &Path) -> Result<Option<PathBuf>> {
     let candidate = path.join("build-details.json");
     if candidate.is_file() {
-        return Some(candidate);
+        return Ok(Some(candidate));
     }
-    let cross_python_version =
-        env::var_os("PYO3_CROSS_PYTHON_VERSION").map(|s| s.into_string().unwrap());
+    let cross_python_version = env::var_os("PYO3_CROSS_PYTHON_VERSION")
+        .map(|s| s.into_string())
+        .transpose()
+        .map_err(|_| anyhow::anyhow!("PYO3_CROSS_PYTHON_VERSION is not valid UTF-8"))?;
     let version_pat = cross_python_version
         .as_deref()
         .map(|v| format!("python{v}"))
         .unwrap_or_else(|| "python3.".into());
-    let entries = fs::read_dir(path).ok()?;
+    let entries = fs::read_dir(path)
+        .with_context(|| format!("Failed to read directory {}", path.display()))?;
     for entry in entries.flatten() {
         let name = entry.file_name();
         let name_str = name.to_string_lossy();
@@ -273,12 +279,12 @@ pub fn find_build_details(path: &Path) -> Option<PathBuf> {
             || name_str.starts_with("3.");
         if dominated
             && entry.path().is_dir()
-            && let Some(found) = find_build_details(&entry.path())
+            && let Some(found) = find_build_details(&entry.path())?
         {
-            return Some(found);
+            return Ok(Some(found));
         }
     }
-    None
+    Ok(None)
 }
 
 /// Read and parse a PEP 739 `build-details.json` file into an `InterpreterConfig`.
@@ -455,7 +461,7 @@ mod tests {
         let path = dir.path().join("build-details.json");
         fs::write(&path, r#"{"schema_version":"1.0"}"#).unwrap();
 
-        let found = find_build_details(dir.path());
+        let found = find_build_details(dir.path()).unwrap();
         assert_eq!(found, Some(path));
     }
 
@@ -467,7 +473,7 @@ mod tests {
         let path = pydir.join("build-details.json");
         fs::write(&path, r#"{"schema_version":"1.0"}"#).unwrap();
 
-        let found = find_build_details(dir.path());
+        let found = find_build_details(dir.path()).unwrap();
         assert_eq!(found, Some(path));
     }
 
@@ -486,14 +492,14 @@ mod tests {
         let path = pydir.join("build-details.json");
         fs::write(&path, r#"{"schema_version":"1.0"}"#).unwrap();
 
-        let found = find_build_details(dir.path());
+        let found = find_build_details(dir.path()).unwrap();
         assert_eq!(found, Some(path));
     }
 
     #[test]
     fn test_find_build_details_not_present() {
         let dir = TempDir::new().unwrap();
-        let found = find_build_details(dir.path());
+        let found = find_build_details(dir.path()).unwrap();
         assert!(found.is_none());
     }
 }

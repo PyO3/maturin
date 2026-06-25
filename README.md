@@ -237,10 +237,12 @@ maturin itself is manylinux compliant when compiled for the musl target.
 - [deltalake-python](https://github.com/delta-io/delta-rs/tree/main/python) - Native Delta Lake Python binding based on delta-rs with Pandas integration
 - [opendal](https://github.com/apache/incubator-opendal/tree/main/bindings/python) - OpenDAL Python Binding to access data freely
 - [orjson](https://github.com/ijl/orjson) - A fast, correct JSON library for Python
+- [pdfcrate](https://github.com/ratazzi/pdfcrate) - An ergonomic, high-level PDF generation library for Rust and Python — a Prawn-style layout API for composing documents, not low-level PDF plumbing
 - [polars](https://github.com/pola-rs/polars/tree/master/py-polars) - Fast multi-threaded DataFrame library in Rust | Python | Node.js
 - [pydantic-core](https://github.com/pydantic/pydantic-core) - Core validation logic for pydantic written in Rust
 - [pyrus-cramjam](https://github.com/milesgranger/pyrus-cramjam) - Thin Python wrapper to de/compression algorithms in Rust
 - [pyxel](https://github.com/kitao/pyxel) - A retro game engine for Python
+- [quebec](https://github.com/ratazzi/quebec) - A database-backed background job queue for Python, inspired by Rails' Solid Queue
 - [roapi](https://github.com/roapi/roapi) - ROAPI automatically spins up read-only APIs for static datasets without requiring you to write a single line of code
 - [robyn](https://github.com/sansyrox/robyn) - A fast and extensible async python web server with a Rust runtime
 - [ruff](https://github.com/charliermarsh/ruff) - An extremely fast Python linter, written in Rust

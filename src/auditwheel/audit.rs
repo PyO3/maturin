@@ -86,7 +86,23 @@ pub fn get_sysroot_path(target: &Target) -> Result<PathBuf> {
     Ok(PathBuf::from("/"))
 }
 
-pub fn relpath(to: &Path, from: &Path) -> PathBuf {
+/// Compute the relative path from `from` to `to`.
+///
+/// Both inputs must be either absolute or relative — mixing them (e.g.
+/// one absolute and one relative) would otherwise produce nonsense `..`
+/// chains, since their components would never match and the entire `from`
+/// tail would be turned into `..` segments. That feeds the RPATH math with
+/// garbage, so reject it up front with a clear error.
+pub fn relpath(to: &Path, from: &Path) -> Result<PathBuf> {
+    let to_is_absolute = to.is_absolute();
+    let from_is_absolute = from.is_absolute();
+    if to_is_absolute != from_is_absolute {
+        bail!(
+            "cannot compute relative path between an absolute and a relative path: `{}` and `{}`",
+            from.display(),
+            to.display()
+        );
+    }
     let mut suffix_pos = 0;
     for (f, t) in from.components().zip(to.components()) {
         if f == t {
@@ -104,7 +120,7 @@ pub fn relpath(to: &Path, from: &Path) -> PathBuf {
         .skip(suffix_pos)
         .map(|x| result.push(x.as_os_str()))
         .last();
-    result
+    Ok(result)
 }
 
 #[cfg(test)]
@@ -123,7 +139,7 @@ mod tests {
         for (from, to, expected) in cases {
             let from = Path::new(from);
             let to = Path::new(to);
-            let result = relpath(from, to);
+            let result = relpath(from, to).unwrap();
             assert_eq!(result, Path::new(expected));
         }
     }

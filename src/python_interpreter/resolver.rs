@@ -321,7 +321,7 @@ impl<'a> InterpreterResolver<'a> {
 
     /// Discover from `PYO3_CROSS_LIB_DIR` (build-details.json or sysconfigdata).
     fn discover_from_cross_lib_dir(&self, cross_lib_path: &Path) -> Result<DiscoveryResult> {
-        if let Some(build_details_path) = find_build_details(cross_lib_path) {
+        if let Some(build_details_path) = find_build_details(cross_lib_path)? {
             eprintln!("🐍 Using build-details.json for cross-compiling preparation");
             let config = parse_build_details_json_file(&build_details_path)?;
             let host_python = self.find_host_python()?;

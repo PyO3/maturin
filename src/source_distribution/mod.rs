@@ -10,7 +10,6 @@ use anyhow::{Context, Result, bail};
 use cargo_metadata::camino::{self, Utf8Path};
 use ignore::overrides::Override;
 use normpath::PathExt as _;
-use path_slash::PathExt as _;
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::ffi::OsStr;
@@ -451,8 +450,14 @@ fn compute_sdist_root(
     python_dir: &Path,
     known_path_deps: &HashMap<String, PathDependency>,
 ) -> Result<PathBuf> {
-    let mut sdist_root =
-        common_path_prefix(workspace_root.as_std_path(), pyproject_toml_path).unwrap();
+    let mut sdist_root = common_path_prefix(workspace_root.as_std_path(), pyproject_toml_path)
+        .with_context(|| {
+            format!(
+                "Failed to determine common path prefix of workspace root `{}` and pyproject.toml `{}`",
+                workspace_root,
+                pyproject_toml_path.display()
+            )
+        })?;
     for path_dep in known_path_deps.values() {
         if let Some(prefix) =
             common_path_prefix(&sdist_root, path_dep.manifest_path.parent().unwrap())
@@ -779,10 +784,15 @@ fn add_workspace_manifest(
     let mut deps_to_keep = ctx.known_path_deps.clone();
     let main_member_name = logical_manifest_dir
         .strip_prefix(ctx.workspace_root)
-        .unwrap()
-        .to_slash()
-        .unwrap()
-        .to_string();
+        .with_context(|| {
+            format!(
+                "Failed to strip workspace root `{}` from manifest dir `{}`",
+                ctx.workspace_root,
+                logical_manifest_dir.display()
+            )
+        })?
+        .to_string_lossy()
+        .into_owned();
     deps_to_keep.insert(
         main_member_name,
         PathDependency {

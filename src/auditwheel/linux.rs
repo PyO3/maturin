@@ -578,8 +578,11 @@ impl ElfRepairer {
                 continue;
             }
             let mut new_rpaths = patchelf::get_rpath(&aa.artifact.path)?;
-            let new_rpath = Path::new("$ORIGIN").join(relpath(libs_dir, artifact_dir));
-            new_rpaths.push(new_rpath.to_str().unwrap().to_string());
+            let new_rpath = Path::new("$ORIGIN").join(relpath(libs_dir, artifact_dir)?);
+            let new_rpath = new_rpath.to_str().with_context(|| {
+                format!("computed rpath is not valid UTF-8: {}", new_rpath.display())
+            })?;
+            new_rpaths.push(new_rpath.to_string());
             let new_rpath = new_rpaths.join(":");
             patchelf::set_rpath(&aa.artifact.path, &new_rpath)?;
         }

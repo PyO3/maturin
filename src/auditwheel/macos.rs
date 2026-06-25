@@ -175,7 +175,7 @@ impl WheelRepairer for MacOSRepairer {
         // searches `LC_LOAD_DYLIB` for the exact `old` string and
         // silently no-ops on `DylibNameMissing`); add a regression
         // fixture before bumping `lddtree` past 0.5.x if so.
-        let rel = relpath(libs_dir, artifact_dir);
+        let rel = relpath(libs_dir, artifact_dir)?;
         for audited in artifacts {
             let artifact_deps: HashSet<&str> = audited
                 .external_libs

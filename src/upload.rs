@@ -286,9 +286,17 @@ fn resolve_pypi_token_via_oidc(registry_url: &str) -> Result<Option<String>> {
         audience_url.set_path("_/oidc/audience");
         debug!("Requesting OIDC audience from {}", audience_url);
 
-        // Create agent with timeout configuration
+        // Create agent with timeout configuration.
+        //
+        // `http_status_as_error(false)` matches `http_agent()` so that a 404
+        // from the `_/oidc/audience` endpoint is returned as a normal
+        // response (instead of an `Err` that the `?` below would propagate),
+        // letting the graceful `Ok(None)` fallback below actually run for
+        // registries that don't support OIDC (GitLab, Artifactory, pypiserver,
+        // custom indexes).
         let agent: ureq::Agent = ureq::Agent::config_builder()
             .proxy(ureq::Proxy::try_from_env())
+            .http_status_as_error(false)
             .timeout_global(Some(Duration::from_secs(30)))
             .build()
             .into();

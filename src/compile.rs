@@ -1147,83 +1147,17 @@ fn compile_target(
     Ok((artifacts, out_dirs))
 }
 
-/// Checks that the native library contains a function called `PyInit_<module name>` and warns
-/// if it's missing.
+/// Checks that the native library contains a Python extension entrypoint and warns if it's missing.
 ///
-/// That function is the python's entrypoint for loading native extensions, i.e. python will fail
-/// to import the module with error if it's missing or named incorrectly
+/// `PyInit_<module name>` is the traditional entrypoint. Free-threaded stable ABI builds can
+/// expose `PyModExport_<module name>` instead.
 ///
 /// Currently the check is only run on linux, macOS and Windows
 #[instrument(skip_all)]
 pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
     let py_init = format!("PyInit_{module_name}");
     let py_modexport = format!("PyModExport_{module_name}");
-    let fd = File::open(artifact)?;
-    // SAFETY: The caller stages (moves or copies) the artifact into a
-    // private directory before invoking this function, so no concurrent
-    // process (e.g. cargo / rust-analyzer) can modify it while we have
-    // it mapped.
-    let mmap = unsafe { memmap2::Mmap::map(&fd).context("mmap failed")? };
-    let mut found = false;
-    match goblin::Object::parse(&mmap)? {
-        goblin::Object::Elf(elf) => {
-            for dyn_sym in elf.dynsyms.iter() {
-                if py_init == elf.dynstrtab[dyn_sym.st_name] {
-                    found = true;
-                    break;
-                }
-            }
-        }
-        goblin::Object::Mach(mach) => {
-            match mach {
-                goblin::mach::Mach::Binary(macho) => {
-                    for sym in macho.exports()? {
-                        let sym_name = sym.name;
-                        if py_init == sym_name.strip_prefix('_').unwrap_or(&sym_name) {
-                            found = true;
-                            break;
-                        }
-                        if py_modexport == sym_name.strip_prefix('_').unwrap_or(&sym_name) {
-                            found = true;
-                            break;
-                        }
-                    }
-                    if !found {
-                        for sym in macho.symbols() {
-                            let (sym_name, _) = sym?;
-                            if py_init == sym_name.strip_prefix('_').unwrap_or(sym_name) {
-                                found = true;
-                                break;
-                            }
-                            if py_modexport == sym_name.strip_prefix('_').unwrap_or(sym_name) {
-                                found = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-                goblin::mach::Mach::Fat(_) => {
-                    // Ignore fat macho,
-                    // we only generate them by combining thin binaries which is handled above
-                    found = true
-                }
-            }
-        }
-        goblin::Object::PE(pe) => {
-            for sym in &pe.exports {
-                if let Some(sym_name) = sym.name
-                    && (py_init == sym_name || py_modexport == sym_name)
-                {
-                    found = true;
-                    break;
-                }
-            }
-        }
-        _ => {
-            // Currently, only linux, macOS and Windows are implemented
-            found = true
-        }
-    }
+    let found = native_library_has_python_entrypoint(artifact, module_name)?;
 
     if !found {
         eprintln!(
@@ -1234,6 +1168,72 @@ pub fn warn_missing_py_init(artifact: &Path, module_name: &str) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn native_library_has_python_entrypoint(artifact: &Path, module_name: &str) -> Result<bool> {
+    let py_init = format!("PyInit_{module_name}");
+    let py_modexport = format!("PyModExport_{module_name}");
+    let fd = File::open(artifact)?;
+    // SAFETY: The caller stages (moves or copies) the artifact into a
+    // private directory before invoking this function, so no concurrent
+    // process (e.g. cargo / rust-analyzer) can modify it while we have
+    // it mapped.
+    let mmap = unsafe { memmap2::Mmap::map(&fd).context("mmap failed")? };
+    let found = match goblin::Object::parse(&mmap)? {
+        goblin::Object::Elf(elf) => elf.dynsyms.iter().any(|dyn_sym| {
+            elf.dynstrtab
+                .get_at(dyn_sym.st_name)
+                .is_some_and(|sym_name| {
+                    is_python_entrypoint_symbol(sym_name, &py_init, &py_modexport)
+                })
+        }),
+        goblin::Object::Mach(mach) => {
+            match mach {
+                goblin::mach::Mach::Binary(macho) => {
+                    let mut found = false;
+                    for sym in macho.exports()? {
+                        let sym_name = sym.name;
+                        let sym_name = sym_name.strip_prefix('_').unwrap_or(&sym_name);
+                        if is_python_entrypoint_symbol(sym_name, &py_init, &py_modexport) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if !found {
+                        for sym in macho.symbols() {
+                            let (sym_name, _) = sym?;
+                            let sym_name = sym_name.strip_prefix('_').unwrap_or(sym_name);
+                            if is_python_entrypoint_symbol(sym_name, &py_init, &py_modexport) {
+                                found = true;
+                                break;
+                            }
+                        }
+                    }
+                    found
+                }
+                goblin::mach::Mach::Fat(_) => {
+                    // Ignore fat macho,
+                    // we only generate them by combining thin binaries which is handled above
+                    true
+                }
+            }
+        }
+        goblin::Object::PE(pe) => pe.exports.iter().any(|sym| {
+            sym.name.is_some_and(|sym_name| {
+                is_python_entrypoint_symbol(sym_name, &py_init, &py_modexport)
+            })
+        }),
+        _ => {
+            // Currently, only linux, macOS and Windows are implemented
+            true
+        }
+    };
+
+    Ok(found)
+}
+
+fn is_python_entrypoint_symbol(sym_name: &str, py_init: &str, py_modexport: &str) -> bool {
+    sym_name == py_init || sym_name == py_modexport
 }
 
 /// Ensures the `maturin` subdirectory inside the target directory exists
@@ -1261,4 +1261,18 @@ fn pyo3_version(cargo_metadata: &cargo_metadata::Metadata) -> Option<(u64, u64, 
         .get("pyo3")
         .or_else(|| packages.get("pyo3-ffi"))
         .map(|pkg| (pkg.version.major, pkg.version.minor, pkg.version.patch))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_python_entrypoint_symbol;
+
+    #[test]
+    fn python_entrypoint_symbol_accepts_pymodexport() {
+        assert!(is_python_entrypoint_symbol(
+            "PyModExport__core",
+            "PyInit__core",
+            "PyModExport__core"
+        ));
+    }
 }

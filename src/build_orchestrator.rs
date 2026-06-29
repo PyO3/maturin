@@ -100,7 +100,7 @@ impl<'a> BuildOrchestrator<'a> {
             .context("No instrumented wheel was built")?
             .0;
         pgo_ctx.run_instrumentation(
-            &instrumentation_python,
+            instrumentation_python,
             instrumented_wheel_path,
             self.context,
         )?;

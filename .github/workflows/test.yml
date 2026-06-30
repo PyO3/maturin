@@ -303,6 +303,8 @@ jobs:
       RUST_BACKTRACE: "1"
       CARGO_INCREMENTAL: "0"
       CARGO_TERM_COLOR: always
+      # no rustup, makes it awkward to install PGO tooling
+      MATURIN_TEST_SKIP_PGO: "1"
     container: alpine:latest
     steps:
       - name: Install build requirements
@@ -321,8 +323,6 @@ jobs:
         uses: taiki-e/install-action@7410117eef9b9bd416593a4ae34d1bda0b4a2766 # nextest
         with:
           tool: nextest
-      - name: Install llvm-tools
-        run: rustup component add llvm-tools-preview
       - name: cargo test
         run: |
           # unset GITHUB_ACTIONS env var to disable zig related tests

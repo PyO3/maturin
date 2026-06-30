@@ -11,6 +11,8 @@ mod errors;
 mod integration;
 #[path = "run/pep517.rs"]
 mod pep517;
+#[path = "run/pgo.rs"]
+mod pgo;
 #[path = "run/sdist.rs"]
 mod sdist;
 #[path = "run/wheel.rs"]

@@ -135,6 +135,8 @@ jobs:
         if: startsWith(matrix.os, 'windows')
         shell: bash
         run: echo "RUSTFLAGS=-C debuginfo=0" >> "${GITHUB_ENV}"
+      - name: Install llvm-tools
+        run: rustup component add llvm-tools-preview
       - name: cargo test
         run: cargo nextest run --features password-storage
       - name: test cross compiling with zig
@@ -301,6 +303,8 @@ jobs:
       RUST_BACKTRACE: "1"
       CARGO_INCREMENTAL: "0"
       CARGO_TERM_COLOR: always
+      # no rustup, makes it awkward to install PGO tooling
+      MATURIN_TEST_SKIP_PGO: "1"
     container: alpine:latest
     steps:
       - name: Install build requirements

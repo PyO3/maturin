@@ -20,3 +20,4 @@ print_cli_args = "pyo3_mixed:print_cli_args"
 
 [tool.maturin]
 include = ["pyo3_mixed/assets/*"]
+pgo-command = "print_cli_args"

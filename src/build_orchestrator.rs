@@ -75,24 +75,17 @@ impl<'a> BuildOrchestrator<'a> {
     fn build_wheels_pgo_single_pass(&self, pgo_command: String) -> Result<Vec<BuiltWheelMetadata>> {
         let pgo_ctx = PgoContext::new(pgo_command)?;
 
-        let instrumentation_python = self
-            .context
-            .python
-            .interpreter
-            .first()
-            .context(
-                "PGO builds require a Python interpreter. \
+        let instrumentation_python = self.context.python.interpreter.first().context(
+            "PGO builds require a Python interpreter. \
                  Please specify one with `--interpreter`.",
-            )?
-            .executable
-            .clone();
+        )?;
 
         // Phase 1: Build a single instrumented wheel for training.
         eprintln!("📊 Phase 1/3: Building instrumented wheel...");
         let mut instrumented_ctx = self.clone_context_for_pgo(PgoPhase::Generate(
             pgo_ctx.profdata_dir_path().to_path_buf(),
         ));
-        instrumented_ctx.python.interpreter = vec![self.context.python.interpreter[0].clone()];
+        instrumented_ctx.python.interpreter = vec![instrumentation_python.clone()];
         let instrumented_out =
             tempfile::TempDir::new().context("Failed to create temp dir for instrumented wheel")?;
         instrumented_ctx.artifact.out = instrumented_out.path().to_path_buf();
@@ -107,7 +100,7 @@ impl<'a> BuildOrchestrator<'a> {
             .context("No instrumented wheel was built")?
             .0;
         pgo_ctx.run_instrumentation(
-            &instrumentation_python,
+            instrumentation_python,
             instrumented_wheel_path,
             self.context,
         )?;
@@ -163,7 +156,7 @@ impl<'a> BuildOrchestrator<'a> {
             // Phase 2: Run instrumentation with this interpreter
             eprintln!("  🔬 Phase 2/3: Running PGO instrumentation...");
             pgo_ctx.run_instrumentation(
-                &python_interpreter.executable,
+                python_interpreter,
                 &instrumented_wheel_path,
                 self.context,
             )?;

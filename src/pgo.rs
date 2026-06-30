@@ -1,3 +1,4 @@
+use crate::PythonInterpreter;
 use crate::develop::install_backend::{find_uv_bin, find_uv_python};
 use anyhow::{Context, Result, bail};
 use fs_err as fs;
@@ -130,7 +131,7 @@ impl PgoContext {
     /// 4. Run the instrumentation command
     pub(crate) fn run_instrumentation(
         &self,
-        python: &Path,
+        python: &PythonInterpreter,
         wheel_path: &Path,
         build_context: &crate::BuildContext,
     ) -> Result<()> {
@@ -138,7 +139,9 @@ impl PgoContext {
         let venv_path = venv_dir.path();
 
         // Detect uv: try the binary first, then the Python module
-        let uv = find_uv_python(python).or_else(|_| find_uv_bin()).ok();
+        let uv = find_uv_python(&python.executable)
+            .or_else(|_| find_uv_bin())
+            .ok();
 
         // Create venv
         if let Some((uv_path, uv_args)) = &uv {
@@ -146,15 +149,15 @@ impl PgoContext {
             let status = Command::new(uv_path)
                 .args(uv_args.iter().copied())
                 .args(["venv", "--python"])
-                .arg(python)
+                .arg(python.as_uv_python_arg())
                 .arg(venv_path)
                 .status()
                 .context("Failed to create virtual environment with uv")?;
             if !status.success() {
                 bail!("Failed to create virtual environment with uv (exit status: {status})");
             }
-        } else {
-            let status = Command::new(python)
+        } else if python.runnable {
+            let status = Command::new(&python.executable)
                 .args(["-m", "venv"])
                 .arg(venv_path)
                 .status()
@@ -162,6 +165,11 @@ impl PgoContext {
             if !status.success() {
                 bail!("Failed to create virtual environment (exit status: {status})");
             }
+        } else {
+            bail!(
+                "Python interpreter {} is not runnable, cannot create virtual environment for PGO instrumentation",
+                python.executable.display()
+            );
         }
         debug!("Created temporary venv at {}", venv_path.display());
 
@@ -263,7 +271,8 @@ impl PgoContext {
         cmd.current_dir(project_dir)
             .env("LLVM_PROFILE_FILE", &profraw_pattern)
             .env("PATH", &path_env)
-            .env("VIRTUAL_ENV", venv_path);
+            .env("VIRTUAL_ENV", venv_path)
+            .env("UV_PYTHON", &venv_python);
 
         let status = cmd.status().with_context(|| {
             format!(

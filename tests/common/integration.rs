@@ -37,6 +37,8 @@ pub struct IntegrationCase<'a> {
     pub target: Option<&'a str>,
     /// Do introspection to generate type stubs
     pub generate_stubs: bool,
+    /// Build with `--pgo` flag
+    pub pgo: bool,
 }
 
 impl<'a> IntegrationCase<'a> {
@@ -49,6 +51,7 @@ impl<'a> IntegrationCase<'a> {
             zig: false,
             target: None,
             generate_stubs: false,
+            pgo: false,
         }
     }
 
@@ -69,6 +72,11 @@ impl<'a> IntegrationCase<'a> {
 
     pub fn generate_stubs(mut self) -> Self {
         self.generate_stubs = true;
+        self
+    }
+
+    pub fn pgo(mut self) -> Self {
+        self.pgo = true;
         self
     }
 }
@@ -297,6 +305,7 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
         .into_build_context()
         .strip(Some(cfg!(feature = "faster-tests")))
         .editable(false)
+        .pgo(case.pgo)
         .build()?;
     let wheels = BuildOrchestrator::new(&build_context).build_wheels()?;
 

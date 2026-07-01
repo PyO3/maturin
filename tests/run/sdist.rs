@@ -278,6 +278,163 @@ fn workspace_cargo_lock() {
     handle_result(other::test_workspace_cargo_lock())
 }
 
+/// Regression test for https://github.com/PyO3/maturin/issues/2609:
+/// `cargo build --locked` must succeed inside an sdist built from a workspace
+/// where some members were removed.
+#[test]
+fn sdist_workspace_removed_members_cargo_lock() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let workspace_dir = temp_dir.path().join("workspace");
+
+    let python_dir = workspace_dir.join("crates/python-pkg");
+    let devtool_dir = workspace_dir.join("crates/devtool");
+    fs_err::create_dir_all(python_dir.join("src")).unwrap();
+    fs_err::create_dir_all(devtool_dir.join("src")).unwrap();
+
+    fs_err::write(
+        workspace_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [workspace]
+            resolver = "2"
+            members = ["crates/python-pkg", "crates/devtool"]
+            "#
+        ),
+    )
+    .unwrap();
+
+    fs_err::write(
+        python_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "python-pkg"
+            version = "0.1.0"
+            edition = "2021"
+
+            [lib]
+            crate-type = ["cdylib"]
+
+            [dependencies]
+            pyo3 = { version = "0.28.3", features = ["extension-module"] }
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        python_dir.join("src/lib.rs"),
+        indoc!(
+            r#"
+            use pyo3::prelude::*;
+
+            #[pymodule]
+            fn python_pkg(_m: &Bound<'_, PyModule>) -> PyResult<()> {
+                Ok(())
+            }
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        python_dir.join("pyproject.toml"),
+        indoc!(
+            r#"
+            [build-system]
+            requires = ["maturin>=1.0,<2.0"]
+            build-backend = "maturin"
+
+            [project]
+            name = "python-pkg"
+            version = "0.1.0"
+
+            [tool.maturin]
+            module-name = "python_pkg"
+            "#
+        ),
+    )
+    .unwrap();
+
+    fs_err::write(
+        devtool_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "devtool"
+            version = "0.1.0"
+            edition = "2021"
+
+            [dependencies]
+            rand = "0.8"
+
+            [[bin]]
+            name = "devtool"
+            path = "src/main.rs"
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(devtool_dir.join("src/main.rs"), "fn main() {}\n").unwrap();
+
+    // Generate the workspace Cargo.lock that covers both members.
+    let output = Command::new("cargo")
+        .args(["generate-lockfile"])
+        .current_dir(&workspace_dir)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "failed to generate workspace Cargo.lock\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    // Build an sdist for python-pkg only — devtool will be stripped.
+    let sdist_dir = temp_dir.path().join("dist");
+    let build_options = BuildOptions {
+        output: OutputOptions {
+            out: Some(sdist_dir),
+            ..Default::default()
+        },
+        cargo: CargoOptions {
+            manifest_path: Some(python_dir.join("Cargo.toml")),
+            quiet: true,
+            target_dir: Some(temp_dir.path().join("target")),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let build_context = build_options
+        .into_build_context()
+        .strip(Some(false))
+        .editable(false)
+        .sdist_only(true)
+        .build()
+        .unwrap();
+    let (sdist_path, _) = BuildOrchestrator::new(&build_context)
+        .build_source_distribution()
+        .unwrap()
+        .expect("failed to build sdist");
+
+    // Unpack and verify `cargo metadata --frozen` succeeds (it uses the
+    // lockfile without modifying it, which fails if stale entries remain).
+    let maturin::UnpackedSdist {
+        tmpdir: _tmp,
+        cargo_toml,
+        pyproject_toml: _,
+    } = unpack_sdist(&sdist_path).unwrap();
+
+    let output = Command::new("cargo")
+        .args(["metadata", "--frozen", "--manifest-path"])
+        .arg(&cargo_toml)
+        .args(["--format-version", "1"])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "`cargo metadata --frozen` failed in unpacked sdist (stale Cargo.lock?)\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stderr),
+    );
+}
+
 fn write_workspace_bin_project(
     workspace_dir: &Path,
     member: &str,

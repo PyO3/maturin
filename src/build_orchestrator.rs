@@ -10,6 +10,7 @@ use crate::pgo::{PgoContext, PgoPhase};
 use crate::sbom::SbomData;
 use crate::source_distribution::source_distribution;
 use crate::target::{WheelTag, validate_wheel_filename_for_pypi};
+use crate::ui;
 use crate::util::zip_mtime;
 use crate::{
     BridgeModel, BuildArtifact, BuildContext, BuiltArtifactTag, BuiltWheel, Metadata24,
@@ -59,7 +60,7 @@ impl<'a> BuildOrchestrator<'a> {
                 })
             );
 
-            eprintln!("🚀 Starting PGO build...");
+            ui::status!("🚀 Starting PGO build...");
             PgoContext::find_llvm_profdata()?;
 
             return if needs_per_interpreter_pgo {
@@ -96,7 +97,7 @@ impl<'a> BuildOrchestrator<'a> {
             |optimized_orchestrator| optimized_orchestrator.build_wheels_inner(),
         )?;
 
-        eprintln!("🎉 PGO build complete!");
+        ui::status!("🎉 PGO build complete!");
         Ok(wheels)
     }
 
@@ -109,7 +110,7 @@ impl<'a> BuildOrchestrator<'a> {
         let mut wheels = Vec::new();
 
         for (i, python_interpreter) in self.context.python.interpreter.iter().enumerate() {
-            eprintln!(
+            ui::status!(
                 "📊 [{}/{}] PGO cycle for {} {}.{}...",
                 i + 1,
                 self.context.python.interpreter.len(),
@@ -133,7 +134,7 @@ impl<'a> BuildOrchestrator<'a> {
                 },
             )?;
 
-            eprintln!(
+            ui::status!(
                 "  📦 Built PGO-optimized wheel for {} {}.{}{} to {}",
                 python_interpreter.interpreter_kind,
                 python_interpreter.major,
@@ -146,7 +147,7 @@ impl<'a> BuildOrchestrator<'a> {
 
         self.validate_wheels_for_pypi(&wheels)?;
 
-        eprintln!("🎉 PGO build complete!");
+        ui::status!("🎉 PGO build complete!");
         Ok(wheels)
     }
 
@@ -169,7 +170,7 @@ impl<'a> BuildOrchestrator<'a> {
     {
         let pgo_ctx = PgoContext::new(pgo_command)?;
 
-        eprintln!("{message_prefix}📊 Phase 1/3: Building instrumented wheel...");
+        ui::status!("{message_prefix}📊 Phase 1/3: Building instrumented wheel...");
         let mut instrumented_ctx = self.clone_context_for_pgo(PgoPhase::Generate(
             pgo_ctx.profdata_dir_path().to_path_buf(),
         ));
@@ -181,7 +182,7 @@ impl<'a> BuildOrchestrator<'a> {
         let instrumented_orchestrator = BuildOrchestrator::new(&instrumented_ctx);
         let instrumented_wheel_path = build_instrumented_wheel(&instrumented_orchestrator)?;
 
-        eprintln!("{message_prefix}🔬 Phase 2/3: Running PGO instrumentation...");
+        ui::status!("{message_prefix}🔬 Phase 2/3: Running PGO instrumentation...");
         pgo_ctx.run_instrumentation(
             instrumentation_python,
             &instrumented_wheel_path,
@@ -189,7 +190,7 @@ impl<'a> BuildOrchestrator<'a> {
         )?;
         pgo_ctx.merge_profiles()?;
 
-        eprintln!("{message_prefix}⚡ Phase 3/3: Building PGO-optimized wheel...");
+        ui::status!("{message_prefix}⚡ Phase 3/3: Building PGO-optimized wheel...");
         let optimized_ctx =
             self.clone_context_for_pgo(PgoPhase::Use(pgo_ctx.merged_profdata_path().to_path_buf()));
         let optimized_orchestrator = BuildOrchestrator::new(&optimized_ctx);
@@ -463,7 +464,7 @@ impl<'a> BuildOrchestrator<'a> {
                 .iter()
                 .map(|interp| interp.to_string())
                 .collect();
-            eprintln!(
+            ui::warning!(
                 "⚠️ Warning: {} does not yet support {} so the build artifacts will be version-specific.",
                 stable_abi.kind,
                 interp_names.iter().join(", ")
@@ -599,7 +600,7 @@ impl<'a> BuildOrchestrator<'a> {
             &out_dirs,
         )?;
 
-        eprintln!(
+        ui::status!(
             "📦 Built wheel for {} Python ≥ {}.{} to {}",
             stable_abi.kind,
             major,
@@ -676,7 +677,7 @@ impl<'a> BuildOrchestrator<'a> {
         let mut wheels = Vec::new();
         for &python_interpreter in interpreters {
             let wheel = self.build_single_pyo3_wheel(python_interpreter, sbom_data)?;
-            eprintln!(
+            ui::status!(
                 "📦 Built wheel for {} {}.{}{} to {}",
                 python_interpreter.interpreter_kind,
                 python_interpreter.major,
@@ -786,13 +787,13 @@ impl<'a> BuildOrchestrator<'a> {
             .iter()
             .any(|requirement| requirement.name.as_ref() == "cffi")
         {
-            eprintln!(
+            ui::warning!(
                 "⚠️  Warning: missing cffi package dependency, please add it to pyproject.toml. \
                 e.g: `dependencies = [\"cffi\"]`. This will become an error."
             );
         }
 
-        eprintln!("📦 Built wheel to {}", wheel_path.display());
+        ui::status!("📦 Built wheel to {}", wheel_path.display());
         Ok(vec![BuiltWheel {
             path: wheel_path,
             tag: BuiltArtifactTag::Universal,
@@ -805,7 +806,7 @@ impl<'a> BuildOrchestrator<'a> {
         let (wheel_path, _) =
             self.build_cdylib_wheel(|_temp_dir| Ok(UniFfiBindingGenerator::default()), sbom_data)?;
 
-        eprintln!("📦 Built wheel to {}", wheel_path.display());
+        ui::status!("📦 Built wheel to {}", wheel_path.display());
         Ok(vec![BuiltWheel {
             path: wheel_path,
             tag: BuiltArtifactTag::Universal,
@@ -826,7 +827,7 @@ impl<'a> BuildOrchestrator<'a> {
         }
 
         if self.context.project.target.is_wasi() {
-            eprintln!("⚠️  Warning: wasi support is experimental");
+            ui::warning!("⚠️  Warning: wasi support is experimental");
             if !self.context.project.metadata24.entry_points.is_empty() {
                 bail!("You can't define entrypoints yourself for a binary project");
             }
@@ -920,7 +921,7 @@ impl<'a> BuildOrchestrator<'a> {
             sbom_data,
             &result.out_dirs,
         )?;
-        eprintln!("📦 Built wheel to {}", wheel_path.display());
+        ui::status!("📦 Built wheel to {}", wheel_path.display());
         // Interpreter-bound binary wheels (pyo3-bin) carry a real python tag; pure
         // standalone bins remain universal (`py3`).
         let artifact_tag = if python_interpreter.is_some() {

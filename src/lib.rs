@@ -82,6 +82,7 @@ mod source_distribution;
 mod target;
 #[cfg(test)]
 mod test_utils;
+pub(crate) mod ui;
 #[cfg(feature = "upload")]
 mod upload;
 pub(crate) mod util;

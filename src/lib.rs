@@ -47,7 +47,7 @@ pub use crate::python_interpreter::PythonInterpreter;
 pub use crate::source_distribution::{UnpackedSdist, find_path_deps, unpack_sdist};
 #[cfg(feature = "upload")]
 pub use crate::upload::{PublishOpt, Registry, UploadError, upload, upload_ui};
-pub use auditwheel::PlatformTag;
+pub use auditwheel::{CompatibilityTag, PlatformTag};
 pub use target::Target;
 
 mod archive_source;

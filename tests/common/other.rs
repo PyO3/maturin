@@ -289,7 +289,7 @@ fn build_wheel_files(package: impl AsRef<Path>, unique_name: &str) -> Result<Zip
             ..Default::default()
         },
         platform: PlatformOptions {
-            platform_tag: vec![PlatformTag::Linux],
+            platform_tag: vec![PlatformTag::Linux.into()],
             ..Default::default()
         },
         ..Default::default()

@@ -583,8 +583,11 @@ impl<'a> BuildOrchestrator<'a> {
             &tag,
             &mut audited,
             |temp_dir| {
-                Pyo3BindingGenerator::new(Some(stable_abi.kind), python_interpreter, temp_dir)
-                    .context("Failed to initialize PyO3 binding generator")
+                Ok(Pyo3BindingGenerator::new_stable_abi(
+                    stable_abi.kind,
+                    python_interpreter,
+                    temp_dir,
+                ))
             },
             sbom_data,
             &out_dirs,
@@ -617,8 +620,10 @@ impl<'a> BuildOrchestrator<'a> {
             &tag,
             audited,
             |temp_dir| {
-                Pyo3BindingGenerator::new(None, Some(python_interpreter), temp_dir)
-                    .context("Failed to initialize PyO3 binding generator")
+                Ok(Pyo3BindingGenerator::new_version_specific(
+                    python_interpreter,
+                    temp_dir,
+                ))
             },
             sbom_data,
             out_dirs,

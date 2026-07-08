@@ -362,7 +362,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
             bindings,
         },
         platform: PlatformOptions {
-            platform_tag: vec![PlatformTag::Linux],
+            platform_tag: vec![PlatformTag::Linux.into()],
             auditwheel: Some(AuditWheelMode::Skip),
             skip_auditwheel: false,
             #[cfg(feature = "zig")]

@@ -23,8 +23,6 @@ pub enum PlatformTag {
     },
     /// Use the native linux tag
     Linux,
-    /// Ensure that a PyPI-compatible tag is used, error if the target is not supported by PyPI.
-    Pypi,
 }
 
 impl PlatformTag {
@@ -73,18 +71,12 @@ impl PlatformTag {
         matches!(self, PlatformTag::Musllinux { .. })
     }
 
-    /// Is this the PyPI compatibility option
-    pub fn is_pypi(&self) -> bool {
-        matches!(self, PlatformTag::Pypi)
-    }
-
     /// Is it supported by Rust compiler and manylinux project
     pub fn is_supported(&self) -> bool {
         match self {
             PlatformTag::Manylinux { major, minor } => (*major, *minor) >= (2, 17),
             PlatformTag::Musllinux { .. } => true,
             PlatformTag::Linux => true,
-            PlatformTag::Pypi => true,
         }
     }
 }
@@ -95,7 +87,6 @@ impl fmt::Display for PlatformTag {
             PlatformTag::Manylinux { major, minor } => write!(f, "manylinux_{major}_{minor}"),
             PlatformTag::Musllinux { major, minor } => write!(f, "musllinux_{major}_{minor}"),
             PlatformTag::Linux => write!(f, "linux"),
-            PlatformTag::Pypi => write!(f, "pypi"),
         }
     }
 }
@@ -103,11 +94,10 @@ impl fmt::Display for PlatformTag {
 impl FromStr for PlatformTag {
     type Err = &'static str;
 
-    fn from_str(value: &str) -> anyhow::Result<Self, Self::Err> {
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
         let value = value.to_ascii_lowercase();
         match value.as_str() {
             "off" | "linux" => Ok(PlatformTag::Linux),
-            "pypi" => Ok(PlatformTag::Pypi),
             "1" | "manylinux1" => Ok(PlatformTag::manylinux1()),
             "2010" | "manylinux2010" => Ok(PlatformTag::manylinux2010()),
             "2014" | "manylinux2014" => Ok(PlatformTag::manylinux2014()),
@@ -142,6 +132,101 @@ impl FromStr for PlatformTag {
 }
 
 impl<'de> Deserialize<'de> for PlatformTag {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        FromStr::from_str(&s).map_err(serde::de::Error::custom)
+    }
+}
+
+/// Parsed `--compatibility` / `[tool.maturin] compatibility` value.
+///
+/// `pypi` is not a real platform tag. It is normalized by `BuildContextBuilder`
+/// into a PyPI-validation flag and never stored on `PythonContext.platform_tag`.
+#[derive(Serialize, Debug, Clone, Eq, PartialEq, Copy, Ord, PartialOrd)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub enum CompatibilityTag {
+    /// Use the `manylinux_<major>_<minor>` tag
+    Manylinux {
+        /// GLIBC version major
+        major: u16,
+        /// GLIBC version minor
+        minor: u16,
+    },
+    /// Use the `musllinux_<major>_<minor>` tag
+    Musllinux {
+        /// musl libc version major
+        major: u16,
+        /// musl libc version minor
+        minor: u16,
+    },
+    /// Use the native linux tag
+    Linux,
+    /// Ensure that a PyPI-compatible tag is used, error if the target is not supported by PyPI.
+    Pypi,
+}
+
+impl CompatibilityTag {
+    /// Returns `None` for the `pypi` pseudo-option.
+    pub fn into_platform_tag(self) -> Option<PlatformTag> {
+        match self {
+            CompatibilityTag::Manylinux { major, minor } => {
+                Some(PlatformTag::Manylinux { major, minor })
+            }
+            CompatibilityTag::Musllinux { major, minor } => {
+                Some(PlatformTag::Musllinux { major, minor })
+            }
+            CompatibilityTag::Linux => Some(PlatformTag::Linux),
+            CompatibilityTag::Pypi => None,
+        }
+    }
+
+    /// Is this the PyPI compatibility option
+    pub fn is_pypi(&self) -> bool {
+        matches!(self, CompatibilityTag::Pypi)
+    }
+}
+
+impl From<PlatformTag> for CompatibilityTag {
+    fn from(value: PlatformTag) -> Self {
+        match value {
+            PlatformTag::Manylinux { major, minor } => CompatibilityTag::Manylinux { major, minor },
+            PlatformTag::Musllinux { major, minor } => CompatibilityTag::Musllinux { major, minor },
+            PlatformTag::Linux => CompatibilityTag::Linux,
+        }
+    }
+}
+
+impl fmt::Display for CompatibilityTag {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            CompatibilityTag::Manylinux { major, minor } => {
+                write!(f, "manylinux_{major}_{minor}")
+            }
+            CompatibilityTag::Musllinux { major, minor } => {
+                write!(f, "musllinux_{major}_{minor}")
+            }
+            CompatibilityTag::Linux => write!(f, "linux"),
+            CompatibilityTag::Pypi => write!(f, "pypi"),
+        }
+    }
+}
+
+impl FromStr for CompatibilityTag {
+    type Err = &'static str;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        if value.eq_ignore_ascii_case("pypi") {
+            Ok(CompatibilityTag::Pypi)
+        } else {
+            PlatformTag::from_str(value).map(CompatibilityTag::from)
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for CompatibilityTag {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,

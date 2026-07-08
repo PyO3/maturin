@@ -6,7 +6,6 @@ use std::rc::Rc;
 
 use anyhow::Context;
 use anyhow::Result;
-use anyhow::anyhow;
 use anyhow::bail;
 use pyo3_introspection::{introspect_cdylib, module_stub_files};
 use tempfile::TempDir;
@@ -42,29 +41,26 @@ enum BindingType<'a> {
 }
 
 impl<'a> Pyo3BindingGenerator<'a> {
-    pub fn new(
-        stable_abi: Option<StableAbiKind>,
+    pub fn new_stable_abi(
+        stable_abi: StableAbiKind,
         interpreter: Option<&'a PythonInterpreter>,
         tempdir: Rc<TempDir>,
-    ) -> Result<Self> {
+    ) -> Self {
         let binding_type = match stable_abi {
-            Some(kind) => match kind {
-                StableAbiKind::Abi3 => BindingType::Abi3(interpreter),
-                StableAbiKind::Abi3t => BindingType::Abi3t(interpreter),
-            },
-            None => {
-                let interpreter = interpreter.ok_or_else(|| {
-                    anyhow!(
-                    "A python interpreter is required for non-abi3 builds but one was not provided"
-                )
-                })?;
-                BindingType::VersionSpecific(interpreter)
-            }
+            StableAbiKind::Abi3 => BindingType::Abi3(interpreter),
+            StableAbiKind::Abi3t => BindingType::Abi3t(interpreter),
         };
-        Ok(Self {
+        Self {
             binding_type,
             tempdir,
-        })
+        }
+    }
+
+    pub fn new_version_specific(interpreter: &'a PythonInterpreter, tempdir: Rc<TempDir>) -> Self {
+        Self {
+            binding_type: BindingType::VersionSpecific(interpreter),
+            tempdir,
+        }
     }
 }
 

@@ -16,7 +16,7 @@ pub fn publish(
     //
     // do it here to take precedence over pyproject.toml profile setting
     if debug {
-        build.profile = Some("dev".to_string());
+        build.cargo.profile = Some("dev".to_string());
     }
 
     // Keep tempdir alive for the duration of the build

@@ -1,9 +1,8 @@
-use crate::auditwheel::{AuditWheelMode, PlatformTag};
+use crate::auditwheel::{AuditWheelMode, CompatibilityTag};
 use crate::build_context::BuildContextBuilder;
 pub use crate::cargo_options::{CargoOptions, TargetTriple};
 use crate::compression::CompressionOptions;
 use serde::{Deserialize, Serialize};
-use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use tracing::instrument;
 
@@ -55,7 +54,7 @@ pub struct PlatformOptions {
         num_args = 0..,
         action = clap::ArgAction::Append
     )]
-    pub platform_tag: Vec<PlatformTag>,
+    pub platform_tag: Vec<CompatibilityTag>,
 
     /// Audit wheel for manylinux compliance
     #[arg(long, conflicts_with = "skip_auditwheel")]
@@ -128,20 +127,6 @@ pub struct BuildOptions {
     /// Auto generate Python type stubs by introspecting the binary. Requires PyO3 and its "experimental-inspect" feature
     #[arg(long)]
     pub generate_stubs: bool,
-}
-
-impl Deref for BuildOptions {
-    type Target = CargoOptions;
-
-    fn deref(&self) -> &Self::Target {
-        &self.cargo
-    }
-}
-
-impl DerefMut for BuildOptions {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.cargo
-    }
 }
 
 impl BuildOptions {

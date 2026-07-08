@@ -15,7 +15,7 @@ pub fn build(
     let strip = strip_opt.strip;
     // set profile to release if specified; `--release` and `--profile` are mutually exclusive
     if release {
-        build.profile = Some("release".to_string());
+        build.cargo.profile = Some("release".to_string());
     }
     // Keep tempdir alive for the duration of the build
     let _sdist_tmp;

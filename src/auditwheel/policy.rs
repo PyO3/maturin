@@ -94,7 +94,6 @@ impl Policy {
                 .iter()
                 .find(|p| p.name == "linux")
                 .cloned(),
-            PlatformTag::Pypi => unreachable!("pypi is not a policy"),
         }
     }
 

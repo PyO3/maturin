@@ -222,7 +222,11 @@ fn min_python3_minor(requires_python: &VersionSpecifiers) -> Option<u8> {
         .filter(|spec| {
             matches!(
                 spec.operator(),
-                Operator::GreaterThanEqual | Operator::GreaterThan | Operator::Equal
+                Operator::GreaterThanEqual
+                    | Operator::GreaterThan
+                    | Operator::Equal
+                    | Operator::TildeEqual
+                    | Operator::EqualStar
             )
         })
         .filter(|spec| spec.version().release().first() == Some(&3))
@@ -335,6 +339,9 @@ mod tests {
         assert_eq!(min_python3_minor(&parse(">=3.12,<4")), Some(12));
         assert_eq!(min_python3_minor(&parse(">3.12")), Some(13));
         assert_eq!(min_python3_minor(&parse(">=3.8")), Some(8));
+        assert_eq!(min_python3_minor(&parse("~=3.13")), Some(13));
+        assert_eq!(min_python3_minor(&parse("~=3.12.2")), Some(12));
+        assert_eq!(min_python3_minor(&parse("==3.11.*")), Some(11));
         assert_eq!(min_python3_minor(&parse("<4")), None);
         assert_eq!(min_python3_minor(&parse("!=3.5")), None);
     }

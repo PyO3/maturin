@@ -45,7 +45,7 @@ impl SbomData {
             // cargo_metadata 0.23. The Metadata structs are incompatible at the
             // type level but share the same JSON representation, so we bridge
             // them via a serde round-trip.
-            let json = serde_json::to_value(&context.project.cargo_metadata)?;
+            let json = serde_json::to_value(context.project.cargo_metadata.as_ref())?;
             let metadata = serde_json::from_value(json)
                 .context("Failed to convert cargo metadata for SBOM generation")?;
             let sboms = SbomGenerator::create_sboms(metadata, &config)

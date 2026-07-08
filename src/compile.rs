@@ -922,6 +922,15 @@ fn configure_pyo3_env(
 
             // and legacy pyo3 versions
             build_command.env("PYTHON_SYS_EXECUTABLE", &interpreter.executable);
+        } else if let Some(host_python) = context.python.host_python.as_ref() {
+            if bridge_model.is_pyo3() {
+                debug!(
+                    "Setting PYO3_PYTHON to host interpreter {}",
+                    host_python.display()
+                );
+                build_command.env("PYO3_PYTHON", host_python);
+            }
+            build_command.env("PYTHON_SYS_EXECUTABLE", host_python);
         }
 
         if bridge_model.is_pyo3()

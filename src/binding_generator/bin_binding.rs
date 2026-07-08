@@ -1,3 +1,4 @@
+use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::path::Path;
 use std::str::FromStr as _;
@@ -19,7 +20,7 @@ use super::GeneratorOutput;
 
 /// A generator for producing bin (and wasm) bindings.
 pub struct BinBindingGenerator<'m> {
-    metadata: &'m mut Metadata24,
+    metadata: &'m Metadata24,
     /// When `true`, the real binary is placed in `{dist_name}.scripts/` in
     /// platlib and a Python shim is placed in `.data/scripts/` instead.
     /// This is needed when the binary has external shared library
@@ -30,8 +31,25 @@ pub struct BinBindingGenerator<'m> {
 }
 
 impl<'m> BinBindingGenerator<'m> {
-    pub fn new(metadata: &'m mut Metadata24, use_shim: bool) -> Self {
+    pub fn new(metadata: &'m Metadata24, use_shim: bool) -> Self {
         Self { metadata, use_shim }
+    }
+
+    pub fn prepare_metadata<A>(
+        metadata: &mut Metadata24,
+        context: &BuildContext,
+        artifacts: &[A],
+    ) -> Result<()>
+    where
+        A: Borrow<BuildArtifact>,
+    {
+        if context.project.target.is_wasi() {
+            for artifact in artifacts {
+                let bin_name = artifact_bin_name(artifact.borrow())?;
+                update_entry_points(metadata, &bin_name)?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -42,15 +60,7 @@ impl<'m> BindingGenerator for BinBindingGenerator<'m> {
         artifact: &BuildArtifact,
         _module: &Path,
     ) -> Result<GeneratorOutput> {
-        // I wouldn't know of any case where this would be the wrong (and neither do
-        // I know a better alternative)
-        let bin_name = artifact
-            .path
-            .file_name()
-            .context("Couldn't get the filename from the binary produced by cargo")?
-            .to_str()
-            .context("binary produced by cargo has non-utf8 filename")?
-            .to_string();
+        let bin_name = artifact_bin_name(artifact)?;
 
         let scripts_dir = self.metadata.get_data_dir().join("scripts");
 
@@ -85,8 +95,6 @@ impl<'m> BindingGenerator for BinBindingGenerator<'m> {
         };
 
         if context.project.target.is_wasi() {
-            update_entry_points(self.metadata, &bin_name)?;
-
             let dist_name = self.metadata.get_distribution_escaped();
             additional_files.insert(
                 Path::new(&dist_name)
@@ -106,6 +114,19 @@ impl<'m> BindingGenerator for BinBindingGenerator<'m> {
             additional_files,
         })
     }
+}
+
+fn artifact_bin_name(artifact: &BuildArtifact) -> Result<String> {
+    // I wouldn't know of any case where this would be the wrong (and neither do
+    // I know a better alternative)
+    let bin_name = artifact
+        .path
+        .file_name()
+        .context("Couldn't get the filename from the binary produced by cargo")?
+        .to_str()
+        .context("binary produced by cargo has non-utf8 filename")?
+        .to_string();
+    Ok(bin_name)
 }
 
 /// Generate a Python shim script that execs the real binary from platlib.

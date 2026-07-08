@@ -53,8 +53,6 @@ pub(crate) fn missing_cdylib_error(arch: Option<&str>) -> anyhow::Error {
 pub struct CompileTarget {
     /// The cargo target to build
     pub target: cargo_metadata::Target,
-    /// The bridge model to use
-    pub bridge_model: BridgeModel,
 }
 
 /// A single-architecture thin binary artifact for universal2 builds.
@@ -164,7 +162,7 @@ pub fn compile(
 /// Filter cargo targets based on bridge model and optional configuration.
 pub(crate) fn filter_cargo_targets(
     cargo_metadata: &cargo_metadata::Metadata,
-    bridge: BridgeModel,
+    bridge: &BridgeModel,
     config_targets: Option<&[crate::pyproject_toml::CargoTarget]>,
 ) -> Result<Vec<CompileTarget>> {
     let root_pkg = cargo_metadata
@@ -197,7 +195,6 @@ pub(crate) fn filter_cargo_targets(
         })
         .map(|target| CompileTarget {
             target: target.clone(),
-            bridge_model: bridge.clone(),
         })
         .collect();
     if targets.is_empty() && !bridge.is_bin() {
@@ -212,14 +209,13 @@ pub(crate) fn filter_cargo_targets(
         if let Some(target) = lib_target {
             targets.push(CompileTarget {
                 target: target.clone(),
-                bridge_model: bridge,
             });
         }
     }
 
     // Filter targets by config_targets
     if let Some(config_targets) = config_targets {
-        targets.retain(|CompileTarget { target, .. }| {
+        targets.retain(|CompileTarget { target }| {
             config_targets.iter().any(|config_target| {
                 let name_eq = config_target.name == target.name;
                 match &config_target.kind {
@@ -235,7 +231,7 @@ pub(crate) fn filter_cargo_targets(
         } else {
             let target_names = targets
                 .iter()
-                .map(|CompileTarget { target, .. }| target.name.as_str())
+                .map(|CompileTarget { target }| target.name.as_str())
                 .collect::<Vec<_>>();
             eprintln!(
                 "🎯 Found {} Cargo targets in `Cargo.toml`: {}",
@@ -266,19 +262,16 @@ fn compile_universal2(
         .context("Failed to build a x86_64 library through cargo")?;
 
     let mut universal_artifacts = Vec::with_capacity(targets.len());
-    for (bridge_model, (aarch64_artifact, x86_64_artifact)) in
-        targets.iter().map(|target| &target.bridge_model).zip(
-            aarch64_result
-                .artifacts
-                .iter()
-                .zip(&x86_64_result.artifacts),
-        )
+    let build_type = if context.project.bridge().is_bin() {
+        CrateType::Bin
+    } else {
+        CrateType::CDyLib
+    };
+    for (aarch64_artifact, x86_64_artifact) in aarch64_result
+        .artifacts
+        .iter()
+        .zip(&x86_64_result.artifacts)
     {
-        let build_type = if bridge_model.is_bin() {
-            CrateType::Bin
-        } else {
-            CrateType::CDyLib
-        };
         let aarch64_artifact = aarch64_artifact.get(&build_type).cloned().ok_or_else(|| {
             if build_type == CrateType::CDyLib {
                 missing_cdylib_error(Some("aarch64"))
@@ -350,7 +343,7 @@ fn compile_universal2(
             thin_artifacts,
             staging: CargoOutputState::NotStaged,
         };
-        result.insert(build_type, universal_artifact);
+        result.insert(build_type.clone(), universal_artifact);
         universal_artifacts.push(result);
     }
     // Note: we use x86_64 OUT_DIR paths for universal2 builds.
@@ -464,7 +457,7 @@ fn cargo_build_command(
         }
     }
 
-    let bridge_model = &compile_target.bridge_model;
+    let bridge_model = context.project.bridge();
     configure_bin_lib_flags(
         &mut cargo_rustc,
         &mut rustflags,

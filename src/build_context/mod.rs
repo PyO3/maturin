@@ -27,6 +27,8 @@ use std::sync::Arc;
 /// is generally independent of the target Python interpreter.
 #[derive(Clone, Debug)]
 pub struct ProjectContext {
+    /// The bridge model used by this project
+    pub bridge: BridgeModel,
     /// The platform, i.e. os and pointer width
     pub target: Target,
     /// Whether this project is pure rust or rust mixed with python
@@ -62,8 +64,7 @@ pub struct ProjectContext {
 impl ProjectContext {
     /// Bridge model
     pub fn bridge(&self) -> &BridgeModel {
-        // FIXME: currently we only allow multiple bin targets so bridges are all the same
-        &self.compile_targets[0].bridge_model
+        &self.bridge
     }
 
     /// Returns the platform part of the tag for the wheel name

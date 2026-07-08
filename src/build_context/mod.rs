@@ -91,7 +91,7 @@ pub struct ArtifactContext {
     /// Compression options
     pub compression: CompressionOptions,
     /// SBOM configuration
-    pub sbom: Option<SbomConfig>,
+    pub sbom: SbomConfig,
     /// Include the import library in the wheel on Windows
     pub include_import_lib: bool,
     /// Include debug info files (.pdb, .dSYM, .dwp) in the wheel

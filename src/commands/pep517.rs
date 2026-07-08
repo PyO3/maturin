@@ -50,6 +50,25 @@ pub enum Pep517Command {
     },
 }
 
+/// Ensure a PEP 517 hook is scoped to the single interpreter running pip.
+///
+/// Duplicate interpreter paths can be supplied when user-set
+/// `MATURIN_PEP517_ARGS=--interpreter ...` combines with the auto-injected
+/// interpreter, so collapse duplicates first. Only genuinely different
+/// interpreters should error here, before later hook code can panic.
+fn require_single_interpreter(opts: &mut BuildOptions, cmd: &str) -> Result<()> {
+    let mut seen = std::collections::HashSet::new();
+    opts.python.interpreter.retain(|p| seen.insert(p.clone()));
+    if opts.python.interpreter.len() > 1 {
+        bail!(
+            "`maturin pep517 {cmd}` expects exactly one --interpreter, got {}: {:?}",
+            opts.python.interpreter.len(),
+            opts.python.interpreter,
+        );
+    }
+    Ok(())
+}
+
 /// Dispatches into the native implementations of the PEP 517 functions
 ///
 /// The last line of stdout is used as return value from the python part of the implementation
@@ -68,25 +87,7 @@ pub fn pep517(subcommand: Pep517Command) -> Result<()> {
             metadata_directory,
             strip_opt,
         } => {
-            // PEP 517's `prepare_metadata_for_build_wheel` operates on a single
-            // interpreter (the one running pip). If duplicates of the same path
-            // were supplied (e.g. user-set `MATURIN_PEP517_ARGS=--interpreter ...`
-            // combined with the auto-injected one), collapse them. Otherwise
-            // bail with a clear message instead of panicking.
-            {
-                let mut seen = std::collections::HashSet::new();
-                build_options
-                    .python
-                    .interpreter
-                    .retain(|p| seen.insert(p.clone()));
-            }
-            if build_options.python.interpreter.len() > 1 {
-                bail!(
-                    "`maturin pep517 write-dist-info` expects exactly one --interpreter, got {}: {:?}",
-                    build_options.python.interpreter.len(),
-                    build_options.python.interpreter,
-                );
-            }
+            require_single_interpreter(&mut build_options, "write-dist-info")?;
             let mut context = build_options
                 .into_build_context()
                 .strip(strip_opt.strip)
@@ -112,26 +113,7 @@ pub fn pep517(subcommand: Pep517Command) -> Result<()> {
             strip_opt,
             editable,
         } => {
-            // PEP 517's `build_wheel` operates on a single interpreter (the
-            // one running pip). If duplicates of the same path were supplied
-            // (e.g. user-set `MATURIN_PEP517_ARGS=--interpreter ...` with
-            // multiple interpreters), collapse them first, then bail with a
-            // clear message instead of panicking. Mirrors the
-            // `write-dist-info` arm above.
-            {
-                let mut seen = std::collections::HashSet::new();
-                build_options
-                    .python
-                    .interpreter
-                    .retain(|p| seen.insert(p.clone()));
-            }
-            if build_options.python.interpreter.len() > 1 {
-                bail!(
-                    "`maturin pep517 build-wheel` expects exactly one --interpreter, got {}: {:?}",
-                    build_options.python.interpreter.len(),
-                    build_options.python.interpreter,
-                );
-            }
+            require_single_interpreter(&mut build_options, "build-wheel")?;
             let mut build_context = build_options
                 .into_build_context()
                 .strip(strip_opt.strip)

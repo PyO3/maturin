@@ -1,5 +1,5 @@
-use crate::PythonInterpreter;
 use crate::develop::install_backend::{find_uv_bin, find_uv_python};
+use crate::{PythonInterpreter, Target};
 use anyhow::{Context, Result, bail};
 use fs_err as fs;
 use std::path::{Path, PathBuf};
@@ -173,16 +173,9 @@ impl PgoContext {
         }
         debug!("Created temporary venv at {}", venv_path.display());
 
-        let venv_bin_dir = if cfg!(windows) {
-            venv_path.join("Scripts")
-        } else {
-            venv_path.join("bin")
-        };
-        let venv_python = venv_bin_dir.join(if cfg!(windows) {
-            "python.exe"
-        } else {
-            "python"
-        });
+        let host_target = Target::from_target_triple(None)?;
+        let venv_python = host_target.get_venv_python(venv_path);
+        let venv_bin_dir = host_target.get_venv_bin_dir(venv_path);
 
         // Install the instrumented wheel
         eprintln!("📦 Installing instrumented wheel into temporary venv...");
@@ -251,7 +244,7 @@ impl PgoContext {
             .to_string();
 
         let current_path = std::env::var("PATH").unwrap_or_default();
-        let sep = if cfg!(windows) { ";" } else { ":" };
+        let sep = if host_target.is_windows() { ";" } else { ":" };
         let path_env = format!("{}{sep}{current_path}", venv_bin_dir.display());
 
         let project_dir = build_context.project.project_layout.project_root.as_path();

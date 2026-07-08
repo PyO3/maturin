@@ -391,7 +391,7 @@ impl BuildContextBuilder {
     fn resolve_sbom_config(
         build_options: &BuildOptions,
         pyproject: Option<&PyProjectToml>,
-    ) -> Option<SbomConfig> {
+    ) -> SbomConfig {
         let mut config = pyproject
             .and_then(|x| x.maturin())
             .and_then(|x| x.sbom.clone())
@@ -401,7 +401,7 @@ impl BuildContextBuilder {
             includes.extend(build_options.output.sbom_include.iter().cloned());
             includes.dedup();
         }
-        Some(config)
+        config
     }
 }
 

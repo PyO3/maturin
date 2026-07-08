@@ -24,6 +24,7 @@ pub(crate) mod glob;
 #[cfg(test)]
 mod mock_writer;
 mod path_writer;
+mod py_preamble;
 mod sdist_writer;
 mod util;
 mod virtual_writer;

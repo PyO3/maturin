@@ -31,6 +31,23 @@ pub(crate) const LIB_CRATE_TYPES: [CrateType; 4] = [
     CrateType::StaticLib,
 ];
 
+const MISSING_CDYLIB_HINT: &str =
+    "Did you miss crate-type = [\"cdylib\"] in the lib section of your Cargo.toml?";
+
+pub(crate) fn missing_cdylib_message(arch: Option<&str>) -> String {
+    match arch {
+        Some(arch) => {
+            let article = if arch == "aarch64" { "an" } else { "a" };
+            format!("Cargo didn't build {article} {arch} cdylib. {MISSING_CDYLIB_HINT}")
+        }
+        None => format!("Cargo didn't build a cdylib. {MISSING_CDYLIB_HINT}"),
+    }
+}
+
+pub(crate) fn missing_cdylib_error(arch: Option<&str>) -> anyhow::Error {
+    anyhow!("{}", missing_cdylib_message(arch))
+}
+
 /// A cargo target to build
 #[derive(Debug, Clone)]
 pub struct CompileTarget {
@@ -264,20 +281,14 @@ fn compile_universal2(
         };
         let aarch64_artifact = aarch64_artifact.get(&build_type).cloned().ok_or_else(|| {
             if build_type == CrateType::CDyLib {
-                anyhow!(
-                    "Cargo didn't build an aarch64 cdylib. Did you miss crate-type = [\"cdylib\"] \
-                 in the lib section of your Cargo.toml?",
-                )
+                missing_cdylib_error(Some("aarch64"))
             } else {
                 anyhow!("Cargo didn't build an aarch64 bin.")
             }
         })?;
         let x86_64_artifact = x86_64_artifact.get(&build_type).cloned().ok_or_else(|| {
             if build_type == CrateType::CDyLib {
-                anyhow!(
-                    "Cargo didn't build a x86_64 cdylib. Did you miss crate-type = [\"cdylib\"] \
-                 in the lib section of your Cargo.toml?",
-                )
+                missing_cdylib_error(Some("x86_64"))
             } else {
                 anyhow!("Cargo didn't build a x86_64 bin.")
             }
@@ -627,7 +638,7 @@ fn configure_macos_pyo3_linker_args(
     let stable_abi_suffix = python_interpreter.and_then(|i| {
         bridge_model
             .stable_abi_for_interpreter(i)
-            .map(|stable_abi| format!("{}", stable_abi))
+            .map(|stable_abi| stable_abi.kind.to_string())
     });
 
     let so_filename = if let Some(suffix) = stable_abi_suffix {

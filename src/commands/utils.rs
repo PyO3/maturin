@@ -20,10 +20,10 @@ pub fn build_sdist(build: &BuildOptions, strip: Option<bool>) -> Result<PathBuf>
         .build()?;
 
     let orchestrator = BuildOrchestrator::new(&sdist_context);
-    let (sdist_path, _) = orchestrator
+    let sdist = orchestrator
         .build_source_distribution()?
         .context("Failed to build source distribution, pyproject.toml not found")?;
-    Ok(sdist_path)
+    Ok(sdist.path)
 }
 
 /// Build an sdist, unpack it, and point build options at the unpacked source.

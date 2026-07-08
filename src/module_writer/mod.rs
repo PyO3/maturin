@@ -8,7 +8,6 @@ use anyhow::bail;
 use fs_err as fs;
 use ignore::WalkBuilder;
 use indexmap::IndexMap;
-use itertools::Itertools as _;
 use normpath::PathExt as _;
 use tracing::{debug, trace};
 
@@ -19,6 +18,7 @@ use crate::archive_source::FileSourceData;
 use crate::archive_source::GeneratedSourceData;
 use crate::project_layout::ProjectLayout;
 use crate::pyproject_toml::Format;
+use crate::target::WheelTag;
 
 pub(crate) mod glob;
 #[cfg(test)]
@@ -528,13 +528,6 @@ fn is_develop_build_artifact(relative_path: &Path, extension_name: &str) -> bool
     (is_native_ext || is_debuginfo) && name_matches
 }
 
-fn expand_compressed_tag(tag: &str) -> impl Iterator<Item = String> + '_ {
-    tag.split('-')
-        .map(|component| component.split('.'))
-        .multi_cartesian_product()
-        .map(|components| components.join("-"))
-}
-
 fn wheel_file(tags: &[String]) -> Result<String> {
     let mut wheel_file = format!(
         "Wheel-Version: 1.0
@@ -545,18 +538,9 @@ Root-Is-Purelib: false
         version = env!("CARGO_PKG_VERSION"),
     );
 
-    // N.B.: Tags should be in expanded form in this metadata (See:
-    // https://packaging.python.org/en/latest/specifications/binary-distribution-format/#file-contents
-    // items 7 and 11); so we do that expansion here if needed.
-    //
-    // It might make sense to reify a Tag struct in the code base and then, when a compressed tag
-    // set needs to be rendered, render a single string at that time. As things stand though, this
-    // is the only place in the codebase that needs reified tags (compressed tag sets expanded); so
-    // we do the expansion here.
-    //
-    // See: https://github.com/PyO3/maturin/issues/2761
     for tag in tags {
-        for expanded_tag in expand_compressed_tag(tag) {
+        let tag = tag.parse::<WheelTag>()?;
+        for expanded_tag in tag.expand() {
             writeln!(wheel_file, "Tag: {expanded_tag}")?;
         }
     }

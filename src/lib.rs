@@ -25,7 +25,7 @@
 
 pub use crate::bridge::{BridgeModel, PyO3, PyO3Crate, StableAbi, StableAbiKind, StableAbiVersion};
 pub use crate::build_context::{
-    ArtifactContext, BuildContext, BuiltWheelMetadata, ProjectContext, PythonContext,
+    ArtifactContext, BuildContext, BuiltArtifactTag, BuiltWheel, ProjectContext, PythonContext,
 };
 pub use crate::build_options::{BuildOptions, OutputOptions, PlatformOptions, PythonOptions};
 pub use crate::build_orchestrator::BuildOrchestrator;

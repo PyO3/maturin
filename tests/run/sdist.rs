@@ -238,7 +238,7 @@ fn sdist_excludes_explicit_build_script() {
         .sdist_only(true)
         .build()
         .unwrap();
-    let (sdist_path, _) = BuildOrchestrator::new(&build_context)
+    let sdist = BuildOrchestrator::new(&build_context)
         .build_source_distribution()
         .unwrap()
         .expect("failed to build sdist");
@@ -247,7 +247,7 @@ fn sdist_excludes_explicit_build_script() {
         tmpdir: _tmp,
         cargo_toml,
         pyproject_toml: _pyproject_toml,
-    } = unpack_sdist(&sdist_path).unwrap();
+    } = unpack_sdist(&sdist.path).unwrap();
     let sdist_root = cargo_toml.parent().unwrap();
     assert!(
         !sdist_root.join("build.rs").exists(),
@@ -821,7 +821,7 @@ fn lib_with_parent_workspace_git_dep_sdist() {
         .sdist_only(true)
         .build()
         .unwrap();
-    let (sdist_path, _) = BuildOrchestrator::new(&build_context)
+    let sdist = BuildOrchestrator::new(&build_context)
         .build_source_distribution()
         .unwrap()
         .expect("failed to build sdist");
@@ -830,7 +830,7 @@ fn lib_with_parent_workspace_git_dep_sdist() {
         tmpdir: _tmp,
         cargo_toml,
         pyproject_toml: _pyproject_toml,
-    } = unpack_sdist(&sdist_path).unwrap();
+    } = unpack_sdist(&sdist.path).unwrap();
     let sdist_root = cargo_toml.parent().unwrap().parent().unwrap();
     let shared_manifest = sdist_root.join("shared_crate/Cargo.toml");
     let rewritten_shared_manifest = fs_err::read_to_string(&shared_manifest).unwrap();
@@ -964,7 +964,7 @@ fn lib_with_parent_workspace_lints_sdist() {
         .sdist_only(true)
         .build()
         .unwrap();
-    let (sdist_path, _) = BuildOrchestrator::new(&build_context)
+    let sdist = BuildOrchestrator::new(&build_context)
         .build_source_distribution()
         .unwrap()
         .expect("failed to build sdist");
@@ -973,7 +973,7 @@ fn lib_with_parent_workspace_lints_sdist() {
         tmpdir: _tmp,
         cargo_toml,
         pyproject_toml: _pyproject_toml,
-    } = unpack_sdist(&sdist_path).unwrap();
+    } = unpack_sdist(&sdist.path).unwrap();
     let sdist_root = cargo_toml.parent().unwrap().parent().unwrap();
     let shared_manifest = sdist_root.join("shared_crate/Cargo.toml");
     let rewritten_shared_manifest = fs_err::read_to_string(&shared_manifest).unwrap();

@@ -9,11 +9,11 @@ use crate::module_writer::{WheelWriter, add_data, write_pth};
 use crate::pgo::{PgoContext, PgoPhase};
 use crate::sbom::SbomData;
 use crate::source_distribution::source_distribution;
-use crate::target::validate_wheel_filename_for_pypi;
+use crate::target::{WheelTag, validate_wheel_filename_for_pypi};
 use crate::util::zip_mtime;
 use crate::{
-    BridgeModel, BuildArtifact, BuildContext, BuiltWheelMetadata, Metadata24, PythonInterpreter,
-    StableAbi, VirtualWriter, compile, pyproject_toml::Format,
+    BridgeModel, BuildArtifact, BuildContext, BuiltArtifactTag, BuiltWheel, Metadata24,
+    PythonInterpreter, StableAbi, VirtualWriter, compile, pyproject_toml::Format,
 };
 use anyhow::{Context, Result, anyhow, bail};
 use cargo_metadata::CrateType;
@@ -49,7 +49,7 @@ impl<'a> BuildOrchestrator<'a> {
     /// Checks which kind of bindings we have (pyo3 or cffi or bin) and calls the
     /// correct builder.
     #[instrument(skip_all)]
-    pub fn build_wheels(&self) -> Result<Vec<BuiltWheelMetadata>> {
+    pub fn build_wheels(&self) -> Result<Vec<BuiltWheel>> {
         if let Some(pgo_command) = &self.context.artifact.pgo_command {
             let needs_per_interpreter_pgo = matches!(
                 self.context.project.bridge(),
@@ -72,7 +72,7 @@ impl<'a> BuildOrchestrator<'a> {
     }
 
     /// Single-pass PGO for abi3, cffi, uniffi, and bin builds.
-    fn build_wheels_pgo_single_pass(&self, pgo_command: String) -> Result<Vec<BuiltWheelMetadata>> {
+    fn build_wheels_pgo_single_pass(&self, pgo_command: String) -> Result<Vec<BuiltWheel>> {
         let instrumentation_python = self.context.python.interpreter.first().context(
             "PGO builds require a Python interpreter. \
                  Please specify one with `--interpreter`.",
@@ -90,7 +90,7 @@ impl<'a> BuildOrchestrator<'a> {
                 Ok(instrumented_wheels
                     .first()
                     .context("No instrumented wheel was built")?
-                    .0
+                    .path
                     .clone())
             },
             |optimized_orchestrator| optimized_orchestrator.build_wheels_inner(),
@@ -101,10 +101,7 @@ impl<'a> BuildOrchestrator<'a> {
     }
 
     /// Per-interpreter PGO for non-abi3 PyO3 builds.
-    fn build_wheels_pgo_per_interpreter(
-        &self,
-        pgo_command: String,
-    ) -> Result<Vec<BuiltWheelMetadata>> {
+    fn build_wheels_pgo_per_interpreter(&self, pgo_command: String) -> Result<Vec<BuiltWheel>> {
         fs::create_dir_all(&self.context.artifact.out)
             .context("Failed to create the target directory for the wheels")?;
 
@@ -121,15 +118,15 @@ impl<'a> BuildOrchestrator<'a> {
                 python_interpreter.minor,
             );
 
-            let (wheel_path, tag) = self.run_pgo_cycle(
+            let wheel = self.run_pgo_cycle(
                 pgo_command.clone(),
                 python_interpreter,
                 "  ",
                 |_| {},
                 |instrumented_orchestrator| {
-                    let (instrumented_wheel_path, _) = instrumented_orchestrator
+                    let instrumented_wheel = instrumented_orchestrator
                         .build_single_pyo3_wheel(python_interpreter, &sbom_data)?;
-                    Ok(instrumented_wheel_path)
+                    Ok(instrumented_wheel.path)
                 },
                 |optimized_orchestrator| {
                     optimized_orchestrator.build_single_pyo3_wheel(python_interpreter, &sbom_data)
@@ -142,9 +139,9 @@ impl<'a> BuildOrchestrator<'a> {
                 python_interpreter.major,
                 python_interpreter.minor,
                 python_interpreter.abiflags,
-                wheel_path.display()
+                wheel.path.display()
             );
-            wheels.push((wheel_path, tag));
+            wheels.push(wheel);
         }
 
         self.validate_wheels_for_pypi(&wheels)?;
@@ -201,7 +198,7 @@ impl<'a> BuildOrchestrator<'a> {
 
     /// Standard wheel build pipeline (no PGO).
     #[instrument(skip_all)]
-    pub(crate) fn build_wheels_inner(&self) -> Result<Vec<BuiltWheelMetadata>> {
+    pub(crate) fn build_wheels_inner(&self) -> Result<Vec<BuiltWheel>> {
         fs::create_dir_all(&self.context.artifact.out)
             .context("Failed to create the target directory for the wheels")?;
 
@@ -228,14 +225,14 @@ impl<'a> BuildOrchestrator<'a> {
 
     /// Validates built wheel filenames against PyPI platform tag rules when
     /// `--compatibility pypi` validation was requested.
-    fn validate_wheels_for_pypi(&self, wheels: &[BuiltWheelMetadata]) -> Result<()> {
+    fn validate_wheels_for_pypi(&self, wheels: &[BuiltWheel]) -> Result<()> {
         if self.context.python.pypi_validation {
             for wheel in wheels {
                 let filename = wheel
-                    .0
+                    .path
                     .file_name()
                     .and_then(|name| name.to_str())
-                    .ok_or_else(|| anyhow!("Invalid wheel filename: {:?}", wheel.0))?;
+                    .ok_or_else(|| anyhow!("Invalid wheel filename: {:?}", wheel.path))?;
 
                 if let Err(error) = validate_wheel_filename_for_pypi(filename) {
                     bail!("PyPI validation failed: {}", error);
@@ -256,7 +253,7 @@ impl<'a> BuildOrchestrator<'a> {
 
     /// Builds a source distribution and returns the same metadata as [BuildOrchestrator::build_wheels]
     #[instrument(skip_all)]
-    pub fn build_source_distribution(&self) -> Result<Option<BuiltWheelMetadata>> {
+    pub fn build_source_distribution(&self) -> Result<Option<BuiltWheel>> {
         fs::create_dir_all(&self.context.artifact.out)
             .context("Failed to create the target directory for the source distribution")?;
 
@@ -269,7 +266,10 @@ impl<'a> BuildOrchestrator<'a> {
                     self.excludes(Format::Sdist)?,
                 )
                 .context("Failed to build source distribution")?;
-                Ok(Some((sdist_path, "source".to_string())))
+                Ok(Some(BuiltWheel {
+                    path: sdist_path,
+                    tag: BuiltArtifactTag::Source,
+                }))
             }
             None => Ok(None),
         }
@@ -303,14 +303,17 @@ impl<'a> BuildOrchestrator<'a> {
                         let stable_abi_tag = stable_abi_interps.first().map(|interp| {
                             let (major, minor) =
                                 min_version.unwrap_or((interp.major as u8, interp.minor as u8));
-                            format!("cp{major}{minor}-{abi_tag}-{platform}")
+                            WheelTag::new(format!("cp{major}{minor}"), abi_tag, platform.clone())
+                                .to_string()
                         });
                         // Some interpreters in this build may not support the selected stable ABI
                         // family, e.g. 3.14t when abi3t was selected for 3.15.
                         let version_specific_tags = version_specific_interps
                             .iter()
                             .map(|interpreter| {
-                                interpreter.get_tag(&self.context.project, &[PlatformTag::Linux])
+                                interpreter
+                                    .get_wheel_tag(&self.context.project, &[PlatformTag::Linux])
+                                    .map(|tag| tag.to_string())
                             })
                             .collect::<Result<Vec<_>>>()?;
                         let tags = stable_abi_tag
@@ -323,12 +326,16 @@ impl<'a> BuildOrchestrator<'a> {
                         tags
                     }
                     None => {
-                        vec![interp.get_tag(&self.context.project, &[PlatformTag::Linux])?]
+                        vec![
+                            interp
+                                .get_wheel_tag(&self.context.project, &[PlatformTag::Linux])?
+                                .to_string(),
+                        ]
                     }
                 }
             }
             BridgeModel::Bin(None) | BridgeModel::Cffi | BridgeModel::UniFfi => {
-                vec![self.get_universal_tag(&[PlatformTag::Linux])?]
+                vec![self.get_universal_tag(&[PlatformTag::Linux])?.to_string()]
             }
         };
         Ok(tags)
@@ -379,10 +386,10 @@ impl<'a> BuildOrchestrator<'a> {
         Ok(excludes.build()?)
     }
 
-    /// Returns the platform tag without python version (e.g. `py3-none-manylinux_2_17_x86_64`)
-    fn get_universal_tag(&self, platform_tags: &[PlatformTag]) -> Result<String> {
+    /// Returns the universal Python 3 wheel tag for the given platform tags.
+    fn get_universal_tag(&self, platform_tags: &[PlatformTag]) -> Result<WheelTag> {
         let platform = self.context.project.get_platform_tag(platform_tags)?;
-        Ok(format!("py3-none-{platform}"))
+        Ok(WheelTag::new("py3", "none", platform))
     }
 
     /// Returns user-specified platform tags, or falls back to the auditwheel
@@ -402,7 +409,7 @@ impl<'a> BuildOrchestrator<'a> {
         &self,
         stable_abi: &StableAbi,
         sbom_data: &Option<SbomData>,
-    ) -> Result<Vec<BuiltWheelMetadata>> {
+    ) -> Result<Vec<BuiltWheel>> {
         let min_version = stable_abi.version.min_version();
         // With mixed abi3 and abi3t features, selecting abi3t for a 3.15+
         // interpreter intentionally sends older interpreters to version-specific wheels.
@@ -478,7 +485,7 @@ impl<'a> BuildOrchestrator<'a> {
     #[allow(clippy::too_many_arguments)]
     fn write_wheel_inner<F, G>(
         &self,
-        tag: &str,
+        tag: &WheelTag,
         metadata24: &Metadata24,
         audited: &mut [AuditedArtifact],
         use_external_lib_shim: bool,
@@ -496,7 +503,13 @@ impl<'a> BuildOrchestrator<'a> {
             .compression
             .get_file_options()
             .last_modified_time(zip_mtime());
-        let writer = WheelWriter::new(tag, &self.context.artifact.out, metadata24, file_options)?;
+        let tag_string = tag.to_string();
+        let writer = WheelWriter::new(
+            &tag_string,
+            &self.context.artifact.out,
+            metadata24,
+            file_options,
+        )?;
         let mut writer = VirtualWriter::new(writer, self.excludes(Format::Wheel)?);
         self.context
             .add_external_libs(&mut writer, audited, use_external_lib_shim)?;
@@ -520,7 +533,7 @@ impl<'a> BuildOrchestrator<'a> {
             &metadata24.get_dist_info_dir(),
         )?;
 
-        let tags = [tag.to_string()];
+        let tags = [tag_string];
         let wheel_path = writer.finish(
             metadata24,
             &self.context.project.project_layout.project_root,
@@ -534,7 +547,7 @@ impl<'a> BuildOrchestrator<'a> {
     /// and writing the final .whl archive to the output directory.
     fn write_wheel<F, G>(
         &self,
-        tag: &str,
+        tag: &WheelTag,
         audited: &mut [AuditedArtifact],
         make_generator: F,
         sbom_data: &Option<SbomData>,
@@ -565,7 +578,7 @@ impl<'a> BuildOrchestrator<'a> {
         major: u8,
         min_minor: u8,
         sbom_data: &Option<SbomData>,
-    ) -> Result<Vec<BuiltWheelMetadata>> {
+    ) -> Result<Vec<BuiltWheel>> {
         let mut wheels = Vec::new();
         let python_interpreter = interpreters.first().copied();
         let (audited_artifact, policy, out_dirs) = self.compile_and_audit(
@@ -576,7 +589,7 @@ impl<'a> BuildOrchestrator<'a> {
 
         let platform = self.context.project.get_platform_tag(&platform_tags)?;
         let abi_tag = stable_abi.kind.wheel_tag();
-        let tag = format!("cp{major}{min_minor}-{abi_tag}-{platform}");
+        let tag = WheelTag::new(format!("cp{major}{min_minor}"), abi_tag, platform);
 
         let mut audited = [audited_artifact];
         let wheel_path = self.write_wheel(
@@ -600,7 +613,10 @@ impl<'a> BuildOrchestrator<'a> {
             min_minor,
             wheel_path.display()
         );
-        wheels.push((wheel_path, format!("cp{major}{min_minor}")));
+        wheels.push(BuiltWheel {
+            path: wheel_path,
+            tag: BuiltArtifactTag::interpreter(tag.python()),
+        });
 
         Ok(wheels)
     }
@@ -613,10 +629,10 @@ impl<'a> BuildOrchestrator<'a> {
         platform_tags: &[PlatformTag],
         sbom_data: &Option<SbomData>,
         out_dirs: &HashMap<String, PathBuf>,
-    ) -> Result<PathBuf> {
-        let tag = python_interpreter.get_tag(&self.context.project, platform_tags)?;
+    ) -> Result<(PathBuf, WheelTag)> {
+        let tag = python_interpreter.get_wheel_tag(&self.context.project, platform_tags)?;
 
-        self.write_wheel(
+        let path = self.write_wheel(
             &tag,
             audited,
             |temp_dir| {
@@ -627,7 +643,8 @@ impl<'a> BuildOrchestrator<'a> {
             },
             sbom_data,
             out_dirs,
-        )
+        )?;
+        Ok((path, tag))
     }
 
     /// Compile, audit, and write a single PyO3 wheel for one interpreter.
@@ -636,22 +653,24 @@ impl<'a> BuildOrchestrator<'a> {
         &self,
         python_interpreter: &PythonInterpreter,
         sbom_data: &Option<SbomData>,
-    ) -> Result<BuiltWheelMetadata> {
+    ) -> Result<BuiltWheel> {
         let (audited_artifact, policy, out_dirs) = self.compile_and_audit(
             Some(python_interpreter),
             Some(&self.context.project.project_layout.extension_name),
         )?;
         let platform_tags = self.resolve_platform_tags(&policy);
         let mut audited = [audited_artifact];
-        let wheel_path = self.write_pyo3_wheel(
+        let (wheel_path, tag) = self.write_pyo3_wheel(
             python_interpreter,
             &mut audited,
             &platform_tags,
             sbom_data,
             &out_dirs,
         )?;
-        let tag = format!("cp{}{}", python_interpreter.major, python_interpreter.minor);
-        Ok((wheel_path, tag))
+        Ok(BuiltWheel {
+            path: wheel_path,
+            tag: BuiltArtifactTag::interpreter(tag.python()),
+        })
     }
 
     /// Builds wheels for a pyo3 extension for all given python versions.
@@ -660,19 +679,19 @@ impl<'a> BuildOrchestrator<'a> {
         &self,
         interpreters: &[&PythonInterpreter],
         sbom_data: &Option<SbomData>,
-    ) -> Result<Vec<BuiltWheelMetadata>> {
+    ) -> Result<Vec<BuiltWheel>> {
         let mut wheels = Vec::new();
         for &python_interpreter in interpreters {
-            let (wheel_path, tag) = self.build_single_pyo3_wheel(python_interpreter, sbom_data)?;
+            let wheel = self.build_single_pyo3_wheel(python_interpreter, sbom_data)?;
             eprintln!(
                 "📦 Built wheel for {} {}.{}{} to {}",
                 python_interpreter.interpreter_kind,
                 python_interpreter.major,
                 python_interpreter.minor,
                 python_interpreter.abiflags,
-                wheel_path.display()
+                wheel.path.display()
             );
-            wheels.push((wheel_path, tag));
+            wheels.push(wheel);
         }
 
         Ok(wheels)
@@ -754,7 +773,7 @@ impl<'a> BuildOrchestrator<'a> {
 
     /// Builds a wheel with cffi bindings
     #[instrument(skip_all)]
-    fn build_cffi_wheel(&self, sbom_data: &Option<SbomData>) -> Result<Vec<BuiltWheelMetadata>> {
+    fn build_cffi_wheel(&self, sbom_data: &Option<SbomData>) -> Result<Vec<BuiltWheel>> {
         let interpreter = self.context.python.interpreter.first().ok_or_else(|| {
             anyhow!("A python interpreter is required for cffi builds but one was not provided")
         })?;
@@ -781,17 +800,23 @@ impl<'a> BuildOrchestrator<'a> {
         }
 
         eprintln!("📦 Built wheel to {}", wheel_path.display());
-        Ok(vec![(wheel_path, "py3".to_string())])
+        Ok(vec![BuiltWheel {
+            path: wheel_path,
+            tag: BuiltArtifactTag::Universal,
+        }])
     }
 
     /// Builds a wheel with uniffi bindings
     #[instrument(skip_all)]
-    fn build_uniffi_wheel(&self, sbom_data: &Option<SbomData>) -> Result<Vec<BuiltWheelMetadata>> {
+    fn build_uniffi_wheel(&self, sbom_data: &Option<SbomData>) -> Result<Vec<BuiltWheel>> {
         let (wheel_path, _) =
             self.build_cdylib_wheel(|_temp_dir| Ok(UniFfiBindingGenerator::default()), sbom_data)?;
 
         eprintln!("📦 Built wheel to {}", wheel_path.display());
-        Ok(vec![(wheel_path, "py3".to_string())])
+        Ok(vec![BuiltWheel {
+            path: wheel_path,
+            tag: BuiltArtifactTag::Universal,
+        }])
     }
 
     /// Internal implementation for writing a binary wheel.
@@ -821,7 +846,7 @@ impl<'a> BuildOrchestrator<'a> {
         let tag = match (self.context.project.bridge(), python_interpreter) {
             (BridgeModel::Bin(None), _) => self.get_universal_tag(platform_tags)?,
             (BridgeModel::Bin(Some(..)), Some(python_interpreter)) => {
-                python_interpreter.get_tag(&self.context.project, platform_tags)?
+                python_interpreter.get_wheel_tag(&self.context.project, platform_tags)?
             }
             _ => unreachable!(),
         };
@@ -859,7 +884,7 @@ impl<'a> BuildOrchestrator<'a> {
         &self,
         python_interpreter: Option<&PythonInterpreter>,
         sbom_data: &Option<SbomData>,
-    ) -> Result<Vec<BuiltWheelMetadata>> {
+    ) -> Result<Vec<BuiltWheel>> {
         let mut wheels = Vec::new();
         let result = compile(
             self.context,
@@ -902,7 +927,10 @@ impl<'a> BuildOrchestrator<'a> {
             &result.out_dirs,
         )?;
         eprintln!("📦 Built wheel to {}", wheel_path.display());
-        wheels.push((wheel_path, "py3".to_string()));
+        wheels.push(BuiltWheel {
+            path: wheel_path,
+            tag: BuiltArtifactTag::Universal,
+        });
 
         Ok(wheels)
     }
@@ -913,7 +941,7 @@ impl<'a> BuildOrchestrator<'a> {
         &self,
         interpreters: &[&PythonInterpreter],
         sbom_data: &Option<SbomData>,
-    ) -> Result<Vec<BuiltWheelMetadata>> {
+    ) -> Result<Vec<BuiltWheel>> {
         let mut wheels = Vec::new();
         for &python_interpreter in interpreters {
             wheels.extend(self.build_bin_wheel(Some(python_interpreter), sbom_data)?);

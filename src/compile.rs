@@ -779,7 +779,7 @@ fn create_build_command(
                 };
 
                 let mut build = cargo_xwin::Rustc::from(cargo_rustc);
-                build.target = vec![target_triple.to_string()];
+                build.cargo.target = vec![target_triple.to_string()];
                 build.xwin = xwin_options;
                 build.build_command()?
             } else {
@@ -805,7 +805,7 @@ fn create_build_command(
             if !context.python.zig {
                 build.disable_zig_linker = true;
                 if target.user_specified {
-                    build.target = vec![target_triple.to_string()];
+                    build.cargo.target = vec![target_triple.to_string()];
                 }
             } else {
                 println!("🛠️ Using zig for cross-compiling to {target_triple}");
@@ -825,7 +825,7 @@ fn create_build_command(
                 } else {
                     target_triple.to_string()
                 };
-                build.target = vec![zig_triple];
+                build.cargo.target = vec![zig_triple];
             }
             build.build_command()?
         }

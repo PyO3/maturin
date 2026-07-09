@@ -141,8 +141,38 @@ pub struct BuildContext {
     pub python: PythonContext,
 }
 
-/// The wheel file location and its Python version tag (e.g. `py3`).
-///
-/// For bindings the version tag contains the Python interpreter version
-/// they bind against (e.g. `cp37`).
-pub type BuiltWheelMetadata = (PathBuf, String);
+/// A built distribution artifact and the high-level tag maturin associates with it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct BuiltWheel {
+    /// Path to the built wheel or source distribution.
+    pub path: PathBuf,
+    /// High-level tag describing the artifact kind or bound interpreter.
+    pub tag: BuiltArtifactTag,
+}
+
+/// High-level tag for a built artifact.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum BuiltArtifactTag {
+    /// A Python interpreter tag such as `cp312`.
+    Interpreter(String),
+    /// Universal Python 3 artifact tag, rendered as `py3` at string boundaries.
+    Universal,
+    /// Source distribution artifact tag, rendered as `source` at string boundaries.
+    Source,
+}
+
+impl BuiltArtifactTag {
+    pub(crate) fn interpreter(tag: impl Into<String>) -> Self {
+        Self::Interpreter(tag.into())
+    }
+}
+
+impl std::fmt::Display for BuiltArtifactTag {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Interpreter(tag) => f.write_str(tag),
+            Self::Universal => f.write_str("py3"),
+            Self::Source => f.write_str("source"),
+        }
+    }
+}

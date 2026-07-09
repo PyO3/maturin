@@ -199,11 +199,11 @@ pub fn build_source_distribution(
     pyproject_toml.tool = Some(tool);
     build_context.project.pyproject_toml = Some(pyproject_toml);
 
-    let (path, _) = BuildOrchestrator::new(&build_context)
+    let sdist = BuildOrchestrator::new(&build_context)
         .build_source_distribution()?
         .context("Failed to build source distribution")?;
 
-    let tar_gz = fs_err::File::open(path)?;
+    let tar_gz = fs_err::File::open(sdist.path)?;
     let tar = GzDecoder::new(tar_gz);
     let archive = Archive::new(tar);
     Ok(archive)
@@ -289,7 +289,7 @@ fn build_wheel_files(package: impl AsRef<Path>, unique_name: &str) -> Result<Zip
             ..Default::default()
         },
         platform: PlatformOptions {
-            platform_tag: vec![PlatformTag::Linux],
+            platform_tag: vec![PlatformTag::Linux.into()],
             ..Default::default()
         },
         ..Default::default()
@@ -304,7 +304,7 @@ fn build_wheel_files(package: impl AsRef<Path>, unique_name: &str) -> Result<Zip
         .build_wheels()
         .context("Failed to build wheels")?;
     assert!(!wheels.is_empty());
-    let (wheel_path, _) = &wheels[0];
+    let wheel_path = &wheels[0].path;
 
     let wheel = ZipArchive::new(File::open(wheel_path)?)?;
     Ok(wheel)
@@ -617,7 +617,8 @@ pub fn combined_stable_abi_wheel_selection(unique_name: &str, features: &[&str])
 
     let actual = wheels
         .iter()
-        .map(|(wheel_path, _)| {
+        .map(|wheel| {
+            let wheel_path = &wheel.path;
             let filename = wheel_path.file_name().unwrap().to_str().unwrap();
             let mut fields = filename.strip_suffix(".whl").unwrap().rsplit('-');
             let _platform = fields.next().unwrap();
@@ -734,7 +735,7 @@ pub fn test_build_wheels_from_sdist(package: impl AsRef<Path>, unique_name: &str
         .editable(false)
         .sdist_only(true)
         .build()?;
-    let (sdist_path, _) = BuildOrchestrator::new(&sdist_context)
+    let sdist = BuildOrchestrator::new(&sdist_context)
         .build_source_distribution()?
         .context("Failed to build source distribution")?;
 
@@ -743,7 +744,7 @@ pub fn test_build_wheels_from_sdist(package: impl AsRef<Path>, unique_name: &str
         tmpdir: _tmp,
         cargo_toml,
         pyproject_toml,
-    } = unpack_sdist(&sdist_path)?;
+    } = unpack_sdist(&sdist.path)?;
     let wheel_options = BuildOptions {
         output: OutputOptions {
             out: Some(wheel_dir),

@@ -129,12 +129,15 @@ pub fn pep517(subcommand: Pep517Command) -> Result<()> {
                     wheels.len(),
                     wheels
                         .iter()
-                        .map(|(path, _)| path.display().to_string())
+                        .map(|wheel| wheel.path.display().to_string())
                         .collect::<Vec<_>>(),
                 );
             }
-            let wheel_path = wheels[0].0.to_str().with_context(|| {
-                format!("wheel path is not valid UTF-8: {}", wheels[0].0.display())
+            let wheel_path = wheels[0].path.to_str().with_context(|| {
+                format!(
+                    "wheel path is not valid UTF-8: {}",
+                    wheels[0].path.display()
+                )
             })?;
             println!("{wheel_path}");
         }
@@ -164,10 +167,10 @@ pub fn pep517(subcommand: Pep517Command) -> Result<()> {
                 .build()?;
 
             let orchestrator = BuildOrchestrator::new(&build_context);
-            let (path, _) = orchestrator
+            let sdist = orchestrator
                 .build_source_distribution()?
                 .context("Failed to build source distribution, pyproject.toml not found")?;
-            println!("{}", path.file_name().unwrap().to_str().unwrap());
+            println!("{}", sdist.path.file_name().unwrap().to_str().unwrap());
         }
     };
 

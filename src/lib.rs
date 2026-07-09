@@ -25,7 +25,7 @@
 
 pub use crate::bridge::{BridgeModel, PyO3, PyO3Crate, StableAbi, StableAbiKind, StableAbiVersion};
 pub use crate::build_context::{
-    ArtifactContext, BuildContext, BuiltWheelMetadata, ProjectContext, PythonContext,
+    ArtifactContext, BuildContext, BuiltArtifactTag, BuiltWheel, ProjectContext, PythonContext,
 };
 pub use crate::build_options::{BuildOptions, OutputOptions, PlatformOptions, PythonOptions};
 pub use crate::build_orchestrator::BuildOrchestrator;
@@ -47,8 +47,8 @@ pub use crate::python_interpreter::PythonInterpreter;
 pub use crate::source_distribution::{UnpackedSdist, find_path_deps, unpack_sdist};
 #[cfg(feature = "upload")]
 pub use crate::upload::{PublishOpt, Registry, UploadError, upload, upload_ui};
-pub use auditwheel::PlatformTag;
-pub use target::Target;
+pub use auditwheel::{CompatibilityTag, PlatformTag};
+pub use target::{Target, WheelTag};
 
 mod archive_source;
 mod auditwheel;

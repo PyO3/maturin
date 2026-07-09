@@ -1,6 +1,6 @@
 //! A pyproject.toml as specified in PEP 517
 
-use crate::PlatformTag;
+use crate::CompatibilityTag;
 use crate::auditwheel::AuditWheelMode;
 use anyhow::{Context, Result};
 use fs_err as fs;
@@ -369,7 +369,7 @@ pub struct ToolMaturin {
     pub bindings: Option<String>,
     /// Platform compatibility
     #[serde(alias = "manylinux")]
-    pub compatibility: Option<PlatformTag>,
+    pub compatibility: Option<CompatibilityTag>,
     /// Audit wheel mode
     pub auditwheel: Option<AuditWheelMode>,
     /// Skip audit wheel
@@ -600,7 +600,7 @@ impl PyProjectToml {
     }
 
     /// Returns the value of `[tool.maturin.compatibility]` in pyproject.toml
-    pub fn compatibility(&self) -> Option<PlatformTag> {
+    pub fn compatibility(&self) -> Option<CompatibilityTag> {
         self.maturin()?.compatibility
     }
 
@@ -778,12 +778,12 @@ impl PyProjectToml {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_utils::test_crate_path;
     use crate::{
-        PyProjectToml,
+        CompatibilityTag, PyProjectToml,
         pyproject_toml::{
             FeatureConditionEnv, FeatureSpec, Format, Formats, GlobPattern, ToolMaturin,
         },
+        test_utils::test_crate_path,
     };
     use expect_test::expect;
     use fs_err as fs;
@@ -1157,6 +1157,15 @@ mod tests {
                 },
             ])
         );
+    }
+
+    #[test]
+    fn test_compatibility_pypi_deserializes() {
+        let toml_str = r#"
+            compatibility = "pypi"
+        "#;
+        let maturin: ToolMaturin = toml::from_str(toml_str).unwrap();
+        assert_eq!(maturin.compatibility, Some(CompatibilityTag::Pypi));
     }
 
     #[test]

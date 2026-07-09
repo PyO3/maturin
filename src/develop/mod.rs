@@ -362,7 +362,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
             bindings,
         },
         platform: PlatformOptions {
-            platform_tag: vec![PlatformTag::Linux],
+            platform_tag: vec![PlatformTag::Linux.into()],
             auditwheel: Some(AuditWheelMode::Skip),
             skip_auditwheel: false,
             #[cfg(feature = "zig")]
@@ -450,12 +450,12 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
     let orchestrator = BuildOrchestrator::new(&build_context);
     let wheels = orchestrator.build_wheels()?;
     if !skip_install {
-        for (filename, _supported_version) in wheels.iter() {
+        for wheel in &wheels {
             install_wheel(
                 &build_context,
                 &python,
                 venv_dir,
-                filename,
+                &wheel.path,
                 &install_backend,
             )?;
             eprintln!(

@@ -1,4 +1,4 @@
-use crate::auditwheel::{AuditWheelMode, PlatformTag};
+use crate::auditwheel::{AuditWheelMode, CompatibilityTag, PlatformTag};
 use crate::bridge::{
     StableAbiVersion, find_bridge, has_windows_import_lib_support, upgrade_bridge_stable_abi,
 };
@@ -96,7 +96,7 @@ impl BuildContextBuilder {
             cargo_metadata,
             mut pyproject_toml_maturin_options,
         } = ProjectResolver::resolve(
-            build_options.manifest_path.clone(),
+            build_options.cargo.manifest_path.clone(),
             build_options.cargo.clone(),
             editable,
             explicit_pyproject_path,
@@ -133,7 +133,7 @@ impl BuildContextBuilder {
         }
 
         let (target, universal2) = resolve_target(
-            build_options.target.clone(),
+            build_options.cargo.target.clone(),
             build_options.python.interpreter.first(),
         )?;
 
@@ -194,15 +194,10 @@ impl BuildContextBuilder {
 
         let sbom = Self::resolve_sbom_config(&build_options, pyproject);
 
-        // Check if PyPI validation is needed from the original user input,
-        // since resolve_platform_tags filters out PlatformTag::Pypi
-        let pypi_validation = build_options
-            .platform
-            .platform_tag
-            .iter()
-            .any(|platform_tag| platform_tag == &PlatformTag::Pypi);
-
-        let platform_tags = resolve_platform_tags(
+        let ResolvedPlatformTags {
+            platform_tags,
+            pypi_validation,
+        } = resolve_platform_tags(
             build_options.platform.platform_tag,
             &target,
             &bridge,
@@ -454,15 +449,23 @@ fn resolve_target(
     Ok((target, universal2))
 }
 
+/// Real platform tags plus whether PyPI filename validation was requested via the pypi compatibility option.
+#[derive(Debug)]
+struct ResolvedPlatformTags {
+    platform_tags: Vec<PlatformTag>,
+    pypi_validation: bool,
+}
+
 /// Resolve platform tags from CLI flags, pyproject.toml, and target properties.
 fn resolve_platform_tags(
-    user_tags: Vec<PlatformTag>,
+    user_tags: Vec<CompatibilityTag>,
     target: &Target,
     bridge: &BridgeModel,
     pyproject: Option<&PyProjectToml>,
     pyproject_options: &mut Vec<&str>,
     #[cfg(feature = "zig")] use_zig: bool,
-) -> Result<Vec<PlatformTag>> {
+) -> Result<ResolvedPlatformTags> {
+    let pypi_validation;
     let platform_tags = if user_tags.is_empty() {
         #[cfg(feature = "zig")]
         let zig = use_zig;
@@ -477,27 +480,34 @@ fn resolve_platform_tags(
             })
             .or(if zig {
                 if target.is_musl_libc() {
-                    Some(PlatformTag::Musllinux { major: 1, minor: 2 })
+                    Some(PlatformTag::Musllinux { major: 1, minor: 2 }.into())
                 } else {
-                    Some(target.get_minimum_manylinux_tag())
+                    Some(target.get_minimum_manylinux_tag().into())
                 }
             } else if target.is_musl_libc() && !bridge.is_bin() {
-                Some(PlatformTag::Musllinux { major: 1, minor: 2 })
+                Some(PlatformTag::Musllinux { major: 1, minor: 2 }.into())
             } else {
                 None
             });
-        if let Some(platform_tag) = compatibility {
+        pypi_validation = compatibility
+            .as_ref()
+            .is_some_and(CompatibilityTag::is_pypi);
+        if pypi_validation && !is_arch_supported_by_pypi(target) {
+            bail!("Rust target {target} is not supported by PyPI");
+        }
+        if let Some(platform_tag) = compatibility.and_then(CompatibilityTag::into_platform_tag) {
             vec![platform_tag]
         } else {
             Vec::new()
         }
     } else {
-        if user_tags.iter().any(|tag| tag.is_pypi()) && !is_arch_supported_by_pypi(target) {
+        pypi_validation = user_tags.iter().any(CompatibilityTag::is_pypi);
+        if pypi_validation && !is_arch_supported_by_pypi(target) {
             bail!("Rust target {target} is not supported by PyPI");
         }
         user_tags
             .into_iter()
-            .filter(|platform_tag| platform_tag != &PlatformTag::Pypi)
+            .filter_map(CompatibilityTag::into_platform_tag)
             .collect()
     };
 
@@ -509,7 +519,10 @@ fn resolve_platform_tags(
         }
     }
 
-    Ok(platform_tags)
+    Ok(ResolvedPlatformTags {
+        platform_tags,
+        pypi_validation,
+    })
 }
 
 /// Checks for bridge/platform type edge cases
@@ -557,4 +570,107 @@ fn validate_bridge_type(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pretty_assertions::assert_eq;
+
+    fn pyproject_with_compatibility(compatibility: &str) -> PyProjectToml {
+        toml::from_str(&format!(
+            r#"
+            [build-system]
+            requires = ["maturin"]
+            build-backend = "maturin"
+
+            [tool.maturin]
+            compatibility = "{compatibility}"
+            "#
+        ))
+        .unwrap()
+    }
+
+    fn resolve_for_test(
+        user_tags: Vec<CompatibilityTag>,
+        target: &Target,
+        pyproject: Option<&PyProjectToml>,
+        pyproject_options: &mut Vec<&str>,
+    ) -> Result<ResolvedPlatformTags> {
+        resolve_platform_tags(
+            user_tags,
+            target,
+            &BridgeModel::Bin(None),
+            pyproject,
+            pyproject_options,
+            #[cfg(feature = "zig")]
+            false,
+        )
+    }
+
+    #[test]
+    fn resolve_platform_tags_filters_cli_pypi() {
+        let target = Target::from_target_triple(Some(&TargetTriple::Regular(
+            "x86_64-unknown-linux-gnu".to_string(),
+        )))
+        .unwrap();
+        let mut pyproject_options = Vec::new();
+
+        let resolved = resolve_for_test(
+            vec![CompatibilityTag::Pypi],
+            &target,
+            None,
+            &mut pyproject_options,
+        )
+        .unwrap();
+
+        assert!(resolved.platform_tags.is_empty());
+        assert!(resolved.pypi_validation);
+        assert!(pyproject_options.is_empty());
+    }
+
+    #[test]
+    fn resolve_platform_tags_filters_pyproject_pypi() {
+        let target = Target::from_target_triple(Some(&TargetTriple::Regular(
+            "x86_64-unknown-linux-gnu".to_string(),
+        )))
+        .unwrap();
+        let pyproject = pyproject_with_compatibility("pypi");
+        let mut pyproject_options = Vec::new();
+
+        let resolved = resolve_for_test(
+            Vec::new(),
+            &target,
+            Some(&pyproject),
+            &mut pyproject_options,
+        )
+        .unwrap();
+
+        assert!(resolved.platform_tags.is_empty());
+        assert!(resolved.pypi_validation);
+        assert_eq!(pyproject_options, vec!["compatibility"]);
+    }
+
+    #[test]
+    fn resolve_platform_tags_rejects_pyproject_pypi_for_unsupported_target() {
+        let target = Target::from_target_triple(Some(&TargetTriple::Regular(
+            "riscv32gc-unknown-linux-gnu".to_string(),
+        )))
+        .unwrap();
+        let pyproject = pyproject_with_compatibility("pypi");
+        let mut pyproject_options = Vec::new();
+
+        let err = resolve_for_test(
+            Vec::new(),
+            &target,
+            Some(&pyproject),
+            &mut pyproject_options,
+        )
+        .unwrap_err();
+
+        assert_eq!(
+            err.to_string(),
+            "Rust target riscv32gc-unknown-linux-gnu is not supported by PyPI"
+        );
+    }
 }

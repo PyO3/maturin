@@ -15,6 +15,7 @@ use itertools::Itertools as _;
 use crate::BuildOptions;
 use crate::CargoOptions;
 use crate::Metadata24;
+use crate::WheelTag;
 use crate::archive_source::ArchiveSource;
 use crate::build_orchestrator::BuildOrchestrator;
 use crate::write_dist_info;
@@ -136,7 +137,7 @@ fn write_dist_info_uses_license_file_sources() -> Result<()> {
         &mut writer,
         &pyproject_dir,
         &metadata,
-        &["py3-none-any".to_string()],
+        &[WheelTag::new("py3", "none", "any")],
     )?;
 
     let files = writer.finish()?;
@@ -168,7 +169,7 @@ fn write_dist_info_rejects_absolute_license_paths() {
         &mut writer,
         pyproject_dir,
         &metadata,
-        &["py3-none-any".to_string()],
+        &[WheelTag::new("py3", "none", "any")],
     )
     .unwrap_err();
 
@@ -215,7 +216,7 @@ fn write_dist_info_respects_metadata_directory_env_var() -> Result<()> {
     // SAFETY: This test is serialized and the env var is removed before returning.
     unsafe { std::env::set_var("MATURIN_PEP517_METADATA_DIR", &pre_existing_dir) };
     let mut writer = VirtualWriter::new(MockWriter::default(), Override::empty());
-    let tags = &["cp310-cp310-manylinux_2_17_x86_64".to_string()];
+    let tags = &[WheelTag::new("cp310", "cp310", "manylinux_2_17_x86_64")];
     let result = write_dist_info(&mut writer, &pyproject_dir, &metadata, tags);
     unsafe { std::env::remove_var("MATURIN_PEP517_METADATA_DIR") };
     result?;
@@ -286,7 +287,7 @@ fn write_dist_info_metadata_dir_as_parent_directory() -> Result<()> {
     // SAFETY: This test is serialized and the env var is removed before returning.
     unsafe { std::env::set_var("MATURIN_PEP517_METADATA_DIR", &parent_dir) };
     let mut writer = VirtualWriter::new(MockWriter::default(), Override::empty());
-    let tags = &["cp310-cp310-manylinux_2_17_x86_64".to_string()];
+    let tags = &[WheelTag::new("cp310", "cp310", "manylinux_2_17_x86_64")];
     let result = write_dist_info(&mut writer, &pyproject_dir, &metadata, tags);
     unsafe { std::env::remove_var("MATURIN_PEP517_METADATA_DIR") };
     result?;

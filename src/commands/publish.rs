@@ -1,6 +1,8 @@
 use crate::commands::utils::unpack_sdist_for_build;
 use anyhow::Result;
-use maturin::{BuildOptions, BuildOrchestrator, PublishOpt, upload_ui};
+use maturin::{
+    BuildOptions, BuildOrchestrator, BuiltArtifactTag, BuiltWheel, PublishOpt, upload_ui,
+};
 use tracing::instrument;
 
 #[instrument(skip_all)]
@@ -16,7 +18,7 @@ pub fn publish(
     //
     // do it here to take precedence over pyproject.toml profile setting
     if debug {
-        build.profile = Some("dev".to_string());
+        build.cargo.profile = Some("dev".to_string());
     }
 
     // Keep tempdir alive for the duration of the build
@@ -56,10 +58,16 @@ pub fn publish(
     let orchestrator = BuildOrchestrator::new(&build_context);
     let mut wheels = orchestrator.build_wheels()?;
     if let Some(sdist_path) = sdist_path {
-        wheels.push((sdist_path, "source".to_string()));
+        wheels.push(BuiltWheel {
+            path: sdist_path,
+            tag: BuiltArtifactTag::Source,
+        });
     }
 
-    let items = wheels.into_iter().map(|wheel| wheel.0).collect::<Vec<_>>();
+    let items = wheels
+        .into_iter()
+        .map(|wheel| wheel.path)
+        .collect::<Vec<_>>();
     publish.non_interactive_on_ci();
     upload_ui(&items, &publish)?;
     Ok(())

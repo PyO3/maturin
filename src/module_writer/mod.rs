@@ -8,7 +8,6 @@ use anyhow::bail;
 use fs_err as fs;
 use ignore::WalkBuilder;
 use indexmap::IndexMap;
-use itertools::Itertools as _;
 use normpath::PathExt as _;
 use tracing::{debug, trace};
 
@@ -19,6 +18,7 @@ use crate::archive_source::FileSourceData;
 use crate::archive_source::GeneratedSourceData;
 use crate::project_layout::ProjectLayout;
 use crate::pyproject_toml::Format;
+use crate::target::WheelTag;
 
 pub(crate) mod glob;
 #[cfg(test)]
@@ -300,7 +300,7 @@ pub fn write_dist_info(
     writer: &mut VirtualWriter<impl ModuleWriterInternal>,
     pyproject_dir: &Path,
     metadata24: &Metadata24,
-    tags: &[String],
+    tags: &[WheelTag],
 ) -> Result<PathBuf> {
     let dist_info_dir = metadata24.get_dist_info_dir();
 
@@ -406,7 +406,7 @@ fn write_dist_info_from_dir(
     writer: &mut VirtualWriter<impl ModuleWriterInternal>,
     dist_info_dir: &Path,
     source_dir: &Path,
-    tags: &[String],
+    tags: &[WheelTag],
 ) -> Result<PathBuf> {
     // Always regenerate WHEEL to ensure correct tags for the built wheel
     writer.add_bytes(
@@ -528,14 +528,7 @@ fn is_develop_build_artifact(relative_path: &Path, extension_name: &str) -> bool
     (is_native_ext || is_debuginfo) && name_matches
 }
 
-fn expand_compressed_tag(tag: &str) -> impl Iterator<Item = String> + '_ {
-    tag.split('-')
-        .map(|component| component.split('.'))
-        .multi_cartesian_product()
-        .map(|components| components.join("-"))
-}
-
-fn wheel_file(tags: &[String]) -> Result<String> {
+fn wheel_file(tags: &[WheelTag]) -> Result<String> {
     let mut wheel_file = format!(
         "Wheel-Version: 1.0
 Generator: {name} ({version})
@@ -545,18 +538,8 @@ Root-Is-Purelib: false
         version = env!("CARGO_PKG_VERSION"),
     );
 
-    // N.B.: Tags should be in expanded form in this metadata (See:
-    // https://packaging.python.org/en/latest/specifications/binary-distribution-format/#file-contents
-    // items 7 and 11); so we do that expansion here if needed.
-    //
-    // It might make sense to reify a Tag struct in the code base and then, when a compressed tag
-    // set needs to be rendered, render a single string at that time. As things stand though, this
-    // is the only place in the codebase that needs reified tags (compressed tag sets expanded); so
-    // we do the expansion here.
-    //
-    // See: https://github.com/PyO3/maturin/issues/2761
     for tag in tags {
-        for expanded_tag in expand_compressed_tag(tag) {
+        for expanded_tag in tag.expand() {
             writeln!(wheel_file, "Tag: {expanded_tag}")?;
         }
     }
@@ -623,6 +606,7 @@ mod tests {
     use super::add_data;
     use super::wheel_file;
     use crate::Metadata24;
+    use crate::WheelTag;
 
     #[test]
     fn wheel_file_compressed_tags() -> Result<()> {
@@ -640,9 +624,9 @@ Tag: cp37-abi3-manylinux2014_x86_64
             version = env!("CARGO_PKG_VERSION"),
         );
         let actual = wheel_file(&[
-            "py2.py3-none-any".to_string(),
-            "pre-expanded-tag".to_string(),
-            "cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64".to_string(),
+            WheelTag::new("py2.py3", "none", "any"),
+            WheelTag::new("pre", "expanded", "tag"),
+            WheelTag::new("cp37", "abi3", "manylinux_2_17_x86_64.manylinux2014_x86_64"),
         ])?;
         assert_eq!(expected, actual);
 
@@ -665,7 +649,11 @@ Tag: cp315-abi3t-manylinux_2_17_x86_64
             name = env!("CARGO_PKG_NAME"),
             version = env!("CARGO_PKG_VERSION"),
         );
-        let actual = wheel_file(&["cp315-abi3.abi3t-manylinux_2_17_x86_64".to_string()])?;
+        let actual = wheel_file(&[WheelTag::new(
+            "cp315",
+            "abi3.abi3t",
+            "manylinux_2_17_x86_64",
+        )])?;
         assert_eq!(expected, actual);
 
         Ok(())
@@ -698,7 +686,11 @@ Tag: cp315-abi3t-manylinux_2_17_x86_64
         let mut writer = VirtualWriter::new(wheel_writer, Override::empty());
         let wheel_path = {
             add_data(&mut writer, &metadata, Some(&data_dir))?;
-            writer.finish(&metadata, tmp_dir.path(), &["py3-none-any".to_string()])?
+            writer.finish(
+                &metadata,
+                tmp_dir.path(),
+                &[WheelTag::new("py3", "none", "any")],
+            )?
         };
 
         let mut wheel = ZipArchive::new(fs::File::open(&wheel_path)?)?;

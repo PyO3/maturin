@@ -9,7 +9,7 @@ use cargo_zigbuild::Zig;
 use clap::Parser;
 use fs_err::File;
 use fs4::fs_err3::FileExt;
-use maturin::{BuildOptions, BuildOrchestrator, Target};
+use maturin::{BuildOptions, BuildOrchestrator, BuiltArtifactTag, Target};
 use normpath::PathExt;
 use std::collections::HashSet;
 use std::env;
@@ -325,9 +325,10 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
     };
     // We can do this since we know that wheels are built and returned in the
     // order they are in the build context
-    for ((filename, supported_version), python_interpreter) in wheels.iter().zip(interpreter) {
+    for (wheel, python_interpreter) in wheels.iter().zip(interpreter) {
+        let filename = &wheel.path;
         check_for_duplicates(filename)?;
-        let mut venv_name = if supported_version == "py3" {
+        let mut venv_name = if matches!(&wheel.tag, BuiltArtifactTag::Universal) {
             format!("{}-py3", case.id)
         } else {
             format!(
@@ -406,10 +407,10 @@ pub fn test_integration_conda(
     let wheels = BuildOrchestrator::new(&build_context).build_wheels()?;
 
     let mut conda_wheels: Vec<(PathBuf, PathBuf)> = vec![];
-    for ((filename, _), python_interpreter) in wheels.iter().zip(build_context.python.interpreter) {
+    for (wheel, python_interpreter) in wheels.iter().zip(build_context.python.interpreter) {
         let executable = python_interpreter.executable;
         if executable.to_string_lossy().contains(case_id) {
-            conda_wheels.push((filename.clone(), executable))
+            conda_wheels.push((wheel.path.clone(), executable))
         }
     }
 

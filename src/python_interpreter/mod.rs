@@ -2,6 +2,7 @@ pub use self::config::InterpreterConfig;
 use crate::Target;
 use crate::auditwheel::PlatformTag;
 use crate::bridge::{ABI3T_MINIMUM_PYTHON_MINOR, StableAbiKind};
+use crate::target::WheelTag;
 use anyhow::{Result, bail};
 use std::borrow::Cow;
 use std::ffi::OsStr;
@@ -182,16 +183,29 @@ impl PythonInterpreter {
     }
 
     /// Returns the supported python environment in the PEP 425 format used for the wheel filename:
-    /// {python tag}-{abi tag}-{platform tag}
+    /// `{python tag}-{abi tag}-{platform tag}`.
     ///
-    /// Don't ask me why or how, this is just what setuptools uses so I'm also going to use
+    /// This is a **compatibility string helper** for external callers that need the tag as a
+    /// single string. New maturin code should prefer [`Self::get_wheel_tag`] and keep the
+    /// structured [`crate::WheelTag`] through to WHEEL metadata generation.
     ///
-    /// If abi3 is true, cpython wheels use the generic abi3 with the given version as minimum
+    /// If abi3 is true, cpython wheels use the generic abi3 with the given version as minimum.
     pub fn get_tag(
         &self,
         project: &crate::ProjectContext,
         platform_tags: &[PlatformTag],
     ) -> Result<String> {
+        Ok(self.get_wheel_tag(project, platform_tags)?.to_string())
+    }
+
+    /// Structured PEP 425 wheel tag for this interpreter.
+    ///
+    /// Prefer this over [`Self::get_tag`] inside maturin so tags are not re-parsed from strings.
+    pub(crate) fn get_wheel_tag(
+        &self,
+        project: &crate::ProjectContext,
+        platform_tags: &[PlatformTag],
+    ) -> Result<WheelTag> {
         // Restrict `sysconfig.get_platform()` usage to Windows and non-portable Linux only for now
         // so we don't need to deal with macOS deployment target
         let target = &project.target;
@@ -210,51 +224,53 @@ impl PythonInterpreter {
         let tag = if self.implementation_name.parse::<InterpreterKind>().is_err() {
             // Use generic tags when `sys.implementation.name` != `platform.python_implementation()`, for example Pyston
             // See also https://github.com/pypa/packaging/blob/0031046f7fad649580bc3127d1cef9157da0dd79/packaging/tags.py#L234-L261
-            format!(
-                "{interpreter}{major}{minor}-{soabi}-{platform}",
-                interpreter = self.implementation_name,
-                major = self.major,
-                minor = self.minor,
-                soabi = self
-                    .soabi
+            WheelTag::new(
+                format!(
+                    "{interpreter}{major}{minor}",
+                    interpreter = self.implementation_name,
+                    major = self.major,
+                    minor = self.minor,
+                ),
+                self.soabi
                     .as_deref()
                     .unwrap_or("none")
                     .replace(['-', '.'], "_"),
-                platform = platform
+                platform,
             )
         } else {
             match self.interpreter_kind {
-                InterpreterKind::CPython => {
+                InterpreterKind::CPython => WheelTag::new(
+                    format!("cp{major}{minor}", major = self.major, minor = self.minor),
                     format!(
-                        "cp{major}{minor}-cp{major}{minor}{abiflags}-{platform}",
+                        "cp{major}{minor}{abiflags}",
                         major = self.major,
                         minor = self.minor,
                         abiflags = self.abiflags,
-                        platform = platform
-                    )
-                }
+                    ),
+                    platform,
+                ),
                 InterpreterKind::PyPy => {
                     // pypy uses its version as part of the ABI, e.g.
                     // pypy 3.11 7.3 => numpy-1.20.1-pp311-pypy311_pp73-manylinux2014_x86_64.whl
-                    format!(
-                        "pp{major}{minor}-{abi_tag}-{platform}",
-                        major = self.major,
-                        minor = self.minor,
-                        abi_tag = abiflags::calculate_abi_tag(&self.ext_suffix)
+                    WheelTag::new(
+                        format!("pp{major}{minor}", major = self.major, minor = self.minor),
+                        abiflags::calculate_abi_tag(&self.ext_suffix)
                             .expect("PyPy's syconfig didn't define a valid `EXT_SUFFIX` ಠ_ಠ"),
-                        platform = platform,
+                        platform,
                     )
                 }
                 InterpreterKind::GraalPy => {
                     // GraalPy like PyPy uses its version as part of the ABI
                     // graalpy 3.10 23.1 => numpy-1.23.5-graalpy310-graalpy231_310_native-manylinux2014_x86_64.whl
-                    format!(
-                        "graalpy{major}{minor}-{abi_tag}-{platform}",
-                        major = self.major,
-                        minor = self.minor,
-                        abi_tag = abiflags::calculate_abi_tag(&self.ext_suffix)
+                    WheelTag::new(
+                        format!(
+                            "graalpy{major}{minor}",
+                            major = self.major,
+                            minor = self.minor
+                        ),
+                        abiflags::calculate_abi_tag(&self.ext_suffix)
                             .expect("GraalPy's syconfig didn't define a valid `EXT_SUFFIX` ಠ_ಠ"),
-                        platform = platform,
+                        platform,
                     )
                 }
             }

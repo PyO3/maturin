@@ -12,8 +12,8 @@ use crate::source_distribution::source_distribution;
 use crate::target::validate_wheel_filename_for_pypi;
 use crate::util::zip_mtime;
 use crate::{
-    BridgeModel, BuildArtifact, BuildContext, BuiltWheelMetadata, PythonInterpreter, StableAbi,
-    VirtualWriter, compile, pyproject_toml::Format,
+    BridgeModel, BuildArtifact, BuildContext, BuiltWheelMetadata, Metadata24, PythonInterpreter,
+    StableAbi, VirtualWriter, compile, pyproject_toml::Format,
 };
 use anyhow::{Context, Result, anyhow, bail};
 use cargo_metadata::CrateType;
@@ -73,45 +73,28 @@ impl<'a> BuildOrchestrator<'a> {
 
     /// Single-pass PGO for abi3, cffi, uniffi, and bin builds.
     fn build_wheels_pgo_single_pass(&self, pgo_command: String) -> Result<Vec<BuiltWheelMetadata>> {
-        let pgo_ctx = PgoContext::new(pgo_command)?;
-
         let instrumentation_python = self.context.python.interpreter.first().context(
             "PGO builds require a Python interpreter. \
                  Please specify one with `--interpreter`.",
         )?;
 
-        // Phase 1: Build a single instrumented wheel for training.
-        eprintln!("📊 Phase 1/3: Building instrumented wheel...");
-        let mut instrumented_ctx = self.clone_context_for_pgo(PgoPhase::Generate(
-            pgo_ctx.profdata_dir_path().to_path_buf(),
-        ));
-        instrumented_ctx.python.interpreter = vec![instrumentation_python.clone()];
-        let instrumented_out =
-            tempfile::TempDir::new().context("Failed to create temp dir for instrumented wheel")?;
-        instrumented_ctx.artifact.out = instrumented_out.path().to_path_buf();
-
-        let instrumented_orchestrator = BuildOrchestrator::new(&instrumented_ctx);
-        let instrumented_wheels = instrumented_orchestrator.build_wheels_inner()?;
-
-        // Phase 2: Instrumentation
-        eprintln!("🔬 Phase 2/3: Running PGO instrumentation...");
-        let instrumented_wheel_path = &instrumented_wheels
-            .first()
-            .context("No instrumented wheel was built")?
-            .0;
-        pgo_ctx.run_instrumentation(
+        let wheels = self.run_pgo_cycle(
+            pgo_command,
             instrumentation_python,
-            instrumented_wheel_path,
-            self.context,
+            "",
+            |instrumented_ctx| {
+                instrumented_ctx.python.interpreter = vec![instrumentation_python.clone()];
+            },
+            |instrumented_orchestrator| {
+                let instrumented_wheels = instrumented_orchestrator.build_wheels_inner()?;
+                Ok(instrumented_wheels
+                    .first()
+                    .context("No instrumented wheel was built")?
+                    .0
+                    .clone())
+            },
+            |optimized_orchestrator| optimized_orchestrator.build_wheels_inner(),
         )?;
-        pgo_ctx.merge_profiles()?;
-
-        // Phase 3: Optimized build
-        eprintln!("⚡ Phase 3/3: Building PGO-optimized wheel...");
-        let optimized_ctx =
-            self.clone_context_for_pgo(PgoPhase::Use(pgo_ctx.merged_profdata_path().to_path_buf()));
-        let optimized_orchestrator = BuildOrchestrator::new(&optimized_ctx);
-        let wheels = optimized_orchestrator.build_wheels_inner()?;
 
         eprintln!("🎉 PGO build complete!");
         Ok(wheels)
@@ -138,37 +121,20 @@ impl<'a> BuildOrchestrator<'a> {
                 python_interpreter.minor,
             );
 
-            let pgo_ctx = PgoContext::new(pgo_command.clone())?;
-
-            // Phase 1: Build instrumented wheel for this interpreter
-            eprintln!("  📊 Phase 1/3: Building instrumented wheel...");
-            let mut instrumented_ctx = self.clone_context_for_pgo(PgoPhase::Generate(
-                pgo_ctx.profdata_dir_path().to_path_buf(),
-            ));
-            let instrumented_out = tempfile::TempDir::new()
-                .context("Failed to create temp dir for instrumented wheel")?;
-            instrumented_ctx.artifact.out = instrumented_out.path().to_path_buf();
-
-            let instrumented_orchestrator = BuildOrchestrator::new(&instrumented_ctx);
-            let (instrumented_wheel_path, _) = instrumented_orchestrator
-                .build_single_pyo3_wheel(python_interpreter, &sbom_data)?;
-
-            // Phase 2: Run instrumentation with this interpreter
-            eprintln!("  🔬 Phase 2/3: Running PGO instrumentation...");
-            pgo_ctx.run_instrumentation(
+            let (wheel_path, tag) = self.run_pgo_cycle(
+                pgo_command.clone(),
                 python_interpreter,
-                &instrumented_wheel_path,
-                self.context,
+                "  ",
+                |_| {},
+                |instrumented_orchestrator| {
+                    let (instrumented_wheel_path, _) = instrumented_orchestrator
+                        .build_single_pyo3_wheel(python_interpreter, &sbom_data)?;
+                    Ok(instrumented_wheel_path)
+                },
+                |optimized_orchestrator| {
+                    optimized_orchestrator.build_single_pyo3_wheel(python_interpreter, &sbom_data)
+                },
             )?;
-            pgo_ctx.merge_profiles()?;
-
-            // Phase 3: Build optimized wheel for this interpreter
-            eprintln!("  ⚡ Phase 3/3: Building PGO-optimized wheel...");
-            let optimized_ctx = self
-                .clone_context_for_pgo(PgoPhase::Use(pgo_ctx.merged_profdata_path().to_path_buf()));
-            let optimized_orchestrator = BuildOrchestrator::new(&optimized_ctx);
-            let (wheel_path, tag) =
-                optimized_orchestrator.build_single_pyo3_wheel(python_interpreter, &sbom_data)?;
 
             eprintln!(
                 "  📦 Built PGO-optimized wheel for {} {}.{}{} to {}",
@@ -181,22 +147,56 @@ impl<'a> BuildOrchestrator<'a> {
             wheels.push((wheel_path, tag));
         }
 
-        // Validate wheel filenames against PyPI platform tag rules if requested
-        if self.context.python.pypi_validation {
-            for (wheel_path, _) in &wheels {
-                let filename = wheel_path
-                    .file_name()
-                    .and_then(|name| name.to_str())
-                    .ok_or_else(|| anyhow!("Invalid wheel filename: {:?}", wheel_path))?;
-
-                if let Err(error) = crate::target::validate_wheel_filename_for_pypi(filename) {
-                    bail!("PyPI validation failed: {}", error);
-                }
-            }
-        }
+        self.validate_wheels_for_pypi(&wheels)?;
 
         eprintln!("🎉 PGO build complete!");
         Ok(wheels)
+    }
+
+    /// Runs the shared PGO cycle: instrumented build, instrumentation, then optimized build.
+    ///
+    /// `message_prefix` preserves user-visible indentation for per-interpreter PGO output.
+    fn run_pgo_cycle<T, ConfigureInstrumented, BuildInstrumented, BuildOptimized>(
+        &self,
+        pgo_command: String,
+        instrumentation_python: &PythonInterpreter,
+        message_prefix: &str,
+        configure_instrumented_context: ConfigureInstrumented,
+        build_instrumented_wheel: BuildInstrumented,
+        build_optimized_wheels: BuildOptimized,
+    ) -> Result<T>
+    where
+        ConfigureInstrumented: FnOnce(&mut BuildContext),
+        BuildInstrumented: for<'ctx> FnOnce(&BuildOrchestrator<'ctx>) -> Result<PathBuf>,
+        BuildOptimized: for<'ctx> FnOnce(&BuildOrchestrator<'ctx>) -> Result<T>,
+    {
+        let pgo_ctx = PgoContext::new(pgo_command)?;
+
+        eprintln!("{message_prefix}📊 Phase 1/3: Building instrumented wheel...");
+        let mut instrumented_ctx = self.clone_context_for_pgo(PgoPhase::Generate(
+            pgo_ctx.profdata_dir_path().to_path_buf(),
+        ));
+        configure_instrumented_context(&mut instrumented_ctx);
+        let instrumented_out =
+            tempfile::TempDir::new().context("Failed to create temp dir for instrumented wheel")?;
+        instrumented_ctx.artifact.out = instrumented_out.path().to_path_buf();
+
+        let instrumented_orchestrator = BuildOrchestrator::new(&instrumented_ctx);
+        let instrumented_wheel_path = build_instrumented_wheel(&instrumented_orchestrator)?;
+
+        eprintln!("{message_prefix}🔬 Phase 2/3: Running PGO instrumentation...");
+        pgo_ctx.run_instrumentation(
+            instrumentation_python,
+            &instrumented_wheel_path,
+            self.context,
+        )?;
+        pgo_ctx.merge_profiles()?;
+
+        eprintln!("{message_prefix}⚡ Phase 3/3: Building PGO-optimized wheel...");
+        let optimized_ctx =
+            self.clone_context_for_pgo(PgoPhase::Use(pgo_ctx.merged_profdata_path().to_path_buf()));
+        let optimized_orchestrator = BuildOrchestrator::new(&optimized_ctx);
+        build_optimized_wheels(&optimized_orchestrator)
     }
 
     /// Standard wheel build pipeline (no PGO).
@@ -221,9 +221,16 @@ impl<'a> BuildOrchestrator<'a> {
             BridgeModel::UniFfi => self.build_uniffi_wheel(&sbom_data)?,
         };
 
-        // Validate wheel filenames against PyPI platform tag rules if requested
+        self.validate_wheels_for_pypi(&wheels)?;
+
+        Ok(wheels)
+    }
+
+    /// Validates built wheel filenames against PyPI platform tag rules when
+    /// `--compatibility pypi` validation was requested.
+    fn validate_wheels_for_pypi(&self, wheels: &[BuiltWheelMetadata]) -> Result<()> {
         if self.context.python.pypi_validation {
-            for wheel in &wheels {
+            for wheel in wheels {
                 let filename = wheel
                     .0
                     .file_name()
@@ -235,8 +242,7 @@ impl<'a> BuildOrchestrator<'a> {
                 }
             }
         }
-
-        Ok(wheels)
+        Ok(())
     }
 
     /// Clone the context with PGO disabled (to prevent recursion) and
@@ -466,19 +472,23 @@ impl<'a> BuildOrchestrator<'a> {
         Ok(built_wheels)
     }
 
-    /// The internal wheel-writing loop. Handles metadata generation, file compression,
-    /// and writing the final .whl archive to the output directory.
-    #[allow(clippy::too_many_arguments, clippy::needless_lifetimes)]
-    fn write_wheel<'b, F>(
-        &'b self,
+    /// Single shared wheel-writing pipeline used by extension and binary wheels.
+    ///
+    /// `metadata24` is a parameter because binary wheels write a locally mutated metadata copy.
+    #[allow(clippy::too_many_arguments)]
+    fn write_wheel_inner<F, G>(
+        &self,
         tag: &str,
+        metadata24: &Metadata24,
         audited: &mut [AuditedArtifact],
+        use_external_lib_shim: bool,
         make_generator: F,
         sbom_data: &Option<SbomData>,
         out_dirs: &HashMap<String, PathBuf>,
     ) -> Result<PathBuf>
     where
-        F: FnOnce(Rc<tempfile::TempDir>) -> Result<Box<dyn BindingGenerator + 'b>>,
+        F: FnOnce(Rc<tempfile::TempDir>) -> Result<G>,
+        G: BindingGenerator,
     {
         let file_options = self
             .context
@@ -486,31 +496,20 @@ impl<'a> BuildOrchestrator<'a> {
             .compression
             .get_file_options()
             .last_modified_time(zip_mtime());
-        let writer = WheelWriter::new(
-            tag,
-            &self.context.artifact.out,
-            &self.context.project.metadata24,
-            file_options,
-        )?;
+        let writer = WheelWriter::new(tag, &self.context.artifact.out, metadata24, file_options)?;
         let mut writer = VirtualWriter::new(writer, self.excludes(Format::Wheel)?);
         self.context
-            .add_external_libs(&mut writer, audited, false)?;
+            .add_external_libs(&mut writer, audited, use_external_lib_shim)?;
 
         let temp_dir = writer.temp_dir()?;
         let mut generator = make_generator(temp_dir)?;
-        generate_binding(
-            &mut writer,
-            generator.as_mut(),
-            self.context,
-            audited,
-            out_dirs,
-        )
-        .context("Failed to add the files to the wheel")?;
+        generate_binding(&mut writer, &mut generator, self.context, audited, out_dirs)
+            .context("Failed to add the files to the wheel")?;
 
         self.add_pth(&mut writer)?;
         add_data(
             &mut writer,
-            &self.context.project.metadata24,
+            metadata24,
             self.context.project.project_layout.data.as_deref(),
         )?;
 
@@ -518,17 +517,42 @@ impl<'a> BuildOrchestrator<'a> {
             sbom_data.as_ref(),
             self.context,
             &mut writer,
-            &self.context.project.metadata24.get_dist_info_dir(),
+            &metadata24.get_dist_info_dir(),
         )?;
 
         let tags = [tag.to_string()];
         let wheel_path = writer.finish(
-            &self.context.project.metadata24,
+            metadata24,
             &self.context.project.project_layout.project_root,
             &tags,
         )?;
         finalize_staged_artifacts(audited);
         Ok(wheel_path)
+    }
+
+    /// The extension-wheel writing loop. Handles metadata generation, file compression,
+    /// and writing the final .whl archive to the output directory.
+    fn write_wheel<F, G>(
+        &self,
+        tag: &str,
+        audited: &mut [AuditedArtifact],
+        make_generator: F,
+        sbom_data: &Option<SbomData>,
+        out_dirs: &HashMap<String, PathBuf>,
+    ) -> Result<PathBuf>
+    where
+        F: FnOnce(Rc<tempfile::TempDir>) -> Result<G>,
+        G: BindingGenerator,
+    {
+        self.write_wheel_inner(
+            tag,
+            &self.context.project.metadata24,
+            audited,
+            false,
+            make_generator,
+            sbom_data,
+            out_dirs,
+        )
     }
 
     /// For abi3 and abi3t we only need to build a single wheel and we don't
@@ -544,34 +568,23 @@ impl<'a> BuildOrchestrator<'a> {
     ) -> Result<Vec<BuiltWheelMetadata>> {
         let mut wheels = Vec::new();
         let python_interpreter = interpreters.first().copied();
-        let (artifact, out_dirs) = self.compile_cdylib(
+        let (audited_artifact, policy, out_dirs) = self.compile_and_audit(
             python_interpreter,
             Some(&self.context.project.project_layout.extension_name),
         )?;
-        let audit_result = self.context.auditwheel(
-            &artifact,
-            &self.context.python.platform_tag,
-            python_interpreter,
-        )?;
-        let platform_tags = self.resolve_platform_tags(&audit_result.policy);
+        let platform_tags = self.resolve_platform_tags(&policy);
 
         let platform = self.context.project.get_platform_tag(&platform_tags)?;
         let abi_tag = stable_abi.kind.wheel_tag();
         let tag = format!("cp{major}{min_minor}-{abi_tag}-{platform}");
 
-        let mut audited = [AuditedArtifact {
-            artifact,
-            external_libs: audit_result.external_libs,
-            arch_requirements: audit_result.arch_requirements,
-        }];
+        let mut audited = [audited_artifact];
         let wheel_path = self.write_wheel(
             &tag,
             &mut audited,
             |temp_dir| {
-                Ok(Box::new(
-                    Pyo3BindingGenerator::new(Some(stable_abi.kind), python_interpreter, temp_dir)
-                        .context("Failed to initialize PyO3 binding generator")?,
-                ))
+                Pyo3BindingGenerator::new(Some(stable_abi.kind), python_interpreter, temp_dir)
+                    .context("Failed to initialize PyO3 binding generator")
             },
             sbom_data,
             &out_dirs,
@@ -604,10 +617,8 @@ impl<'a> BuildOrchestrator<'a> {
             &tag,
             audited,
             |temp_dir| {
-                Ok(Box::new(
-                    Pyo3BindingGenerator::new(None, Some(python_interpreter), temp_dir)
-                        .context("Failed to initialize PyO3 binding generator")?,
-                ))
+                Pyo3BindingGenerator::new(None, Some(python_interpreter), temp_dir)
+                    .context("Failed to initialize PyO3 binding generator")
             },
             sbom_data,
             out_dirs,
@@ -621,21 +632,12 @@ impl<'a> BuildOrchestrator<'a> {
         python_interpreter: &PythonInterpreter,
         sbom_data: &Option<SbomData>,
     ) -> Result<BuiltWheelMetadata> {
-        let (artifact, out_dirs) = self.compile_cdylib(
+        let (audited_artifact, policy, out_dirs) = self.compile_and_audit(
             Some(python_interpreter),
             Some(&self.context.project.project_layout.extension_name),
         )?;
-        let audit_result = self.context.auditwheel(
-            &artifact,
-            &self.context.python.platform_tag,
-            Some(python_interpreter),
-        )?;
-        let platform_tags = self.resolve_platform_tags(&audit_result.policy);
-        let mut audited = [AuditedArtifact {
-            artifact,
-            external_libs: audit_result.external_libs,
-            arch_requirements: audit_result.arch_requirements,
-        }];
+        let platform_tags = self.resolve_platform_tags(&policy);
+        let mut audited = [audited_artifact];
         let wheel_path = self.write_pyo3_wheel(
             python_interpreter,
             &mut audited,
@@ -702,27 +704,44 @@ impl<'a> BuildOrchestrator<'a> {
         Ok((artifact, result.out_dirs))
     }
 
+    /// Compiles the cdylib, runs auditwheel, and bundles the audited artifact,
+    /// selected policy, and OUT_DIR map for wheel writing.
+    fn compile_and_audit(
+        &self,
+        python_interpreter: Option<&PythonInterpreter>,
+        extension_name: Option<&str>,
+    ) -> Result<(AuditedArtifact, Policy, HashMap<String, PathBuf>)> {
+        let (artifact, out_dirs) = self.compile_cdylib(python_interpreter, extension_name)?;
+        let audit_result = self.context.auditwheel(
+            &artifact,
+            &self.context.python.platform_tag,
+            python_interpreter,
+        )?;
+        Ok((
+            AuditedArtifact {
+                artifact,
+                external_libs: audit_result.external_libs,
+                arch_requirements: audit_result.arch_requirements,
+            },
+            audit_result.policy,
+            out_dirs,
+        ))
+    }
+
     /// Compiles a cdylib and builds a wheel for it.
-    #[allow(clippy::needless_lifetimes)]
-    fn build_cdylib_wheel<'b, F>(
-        &'b self,
+    fn build_cdylib_wheel<F, G>(
+        &self,
         make_generator: F,
         sbom_data: &Option<SbomData>,
     ) -> Result<(PathBuf, HashMap<String, PathBuf>)>
     where
-        F: FnOnce(Rc<tempfile::TempDir>) -> Result<Box<dyn BindingGenerator + 'b>>,
+        F: FnOnce(Rc<tempfile::TempDir>) -> Result<G>,
+        G: BindingGenerator,
     {
-        let (artifact, out_dirs) = self.compile_cdylib(None, None)?;
-        let audit_result =
-            self.context
-                .auditwheel(&artifact, &self.context.python.platform_tag, None)?;
-        let platform_tags = self.resolve_platform_tags(&audit_result.policy);
+        let (audited_artifact, policy, out_dirs) = self.compile_and_audit(None, None)?;
+        let platform_tags = self.resolve_platform_tags(&policy);
         let tag = self.get_universal_tag(&platform_tags)?;
-        let mut audited = [AuditedArtifact {
-            artifact,
-            external_libs: audit_result.external_libs,
-            arch_requirements: audit_result.arch_requirements,
-        }];
+        let mut audited = [audited_artifact];
         let wheel_path =
             self.write_wheel(&tag, &mut audited, make_generator, sbom_data, &out_dirs)?;
         Ok((wheel_path, out_dirs))
@@ -736,10 +755,8 @@ impl<'a> BuildOrchestrator<'a> {
         })?;
         let (wheel_path, _) = self.build_cdylib_wheel(
             |temp_dir| {
-                Ok(Box::new(
-                    CffiBindingGenerator::new(interpreter, temp_dir)
-                        .context("Failed to initialize Cffi binding generator")?,
-                ))
+                CffiBindingGenerator::new(interpreter, temp_dir)
+                    .context("Failed to initialize Cffi binding generator")
             },
             sbom_data,
         )?;
@@ -765,10 +782,8 @@ impl<'a> BuildOrchestrator<'a> {
     /// Builds a wheel with uniffi bindings
     #[instrument(skip_all)]
     fn build_uniffi_wheel(&self, sbom_data: &Option<SbomData>) -> Result<Vec<BuiltWheelMetadata>> {
-        let (wheel_path, _) = self.build_cdylib_wheel(
-            |_temp_dir| Ok(Box::new(UniFfiBindingGenerator::default())),
-            sbom_data,
-        )?;
+        let (wheel_path, _) =
+            self.build_cdylib_wheel(|_temp_dir| Ok(UniFfiBindingGenerator::default()), sbom_data)?;
 
         eprintln!("📦 Built wheel to {}", wheel_path.display());
         Ok(vec![(wheel_path, "py3".to_string())])
@@ -807,15 +822,6 @@ impl<'a> BuildOrchestrator<'a> {
         };
 
         let mut metadata24 = self.context.project.metadata24.clone();
-        let file_options = self
-            .context
-            .artifact
-            .compression
-            .get_file_options()
-            .last_modified_time(zip_mtime());
-        let writer = WheelWriter::new(&tag, &self.context.artifact.out, &metadata24, file_options)?;
-        let mut writer = VirtualWriter::new(writer, self.excludes(Format::Wheel)?);
-
         // When repair mode bundles external shared library dependencies, use
         // the shim approach: move the real binary to {dist}.scripts/ in
         // platlib (where it has a predictable relative path to the bundled
@@ -828,35 +834,18 @@ impl<'a> BuildOrchestrator<'a> {
             self.context.project.target.is_wasi(),
             has_external_libs,
         );
-        self.context
-            .add_external_libs(&mut writer, audited, use_shim)?;
-
-        let mut generator = BinBindingGenerator::new(&mut metadata24, use_shim);
-        generate_binding(&mut writer, &mut generator, self.context, audited, out_dirs)
+        BinBindingGenerator::prepare_metadata(&mut metadata24, self.context, audited)
             .context("Failed to add the files to the wheel")?;
 
-        self.add_pth(&mut writer)?;
-        add_data(
-            &mut writer,
+        self.write_wheel_inner(
+            &tag,
             &metadata24,
-            self.context.project.project_layout.data.as_deref(),
-        )?;
-
-        SbomData::write(
-            sbom_data.as_ref(),
-            self.context,
-            &mut writer,
-            &metadata24.get_dist_info_dir(),
-        )?;
-
-        let tags = [tag];
-        let wheel_path = writer.finish(
-            &metadata24,
-            &self.context.project.project_layout.project_root,
-            &tags,
-        )?;
-        finalize_staged_artifacts(audited);
-        Ok(wheel_path)
+            audited,
+            use_shim,
+            |_temp_dir| Ok(BinBindingGenerator::new(&metadata24, use_shim)),
+            sbom_data,
+            out_dirs,
+        )
     }
 
     /// Builds a wheel that contains a binary

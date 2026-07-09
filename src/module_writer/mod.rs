@@ -300,7 +300,7 @@ pub fn write_dist_info(
     writer: &mut VirtualWriter<impl ModuleWriterInternal>,
     pyproject_dir: &Path,
     metadata24: &Metadata24,
-    tags: &[String],
+    tags: &[WheelTag],
 ) -> Result<PathBuf> {
     let dist_info_dir = metadata24.get_dist_info_dir();
 
@@ -406,7 +406,7 @@ fn write_dist_info_from_dir(
     writer: &mut VirtualWriter<impl ModuleWriterInternal>,
     dist_info_dir: &Path,
     source_dir: &Path,
-    tags: &[String],
+    tags: &[WheelTag],
 ) -> Result<PathBuf> {
     // Always regenerate WHEEL to ensure correct tags for the built wheel
     writer.add_bytes(
@@ -528,7 +528,7 @@ fn is_develop_build_artifact(relative_path: &Path, extension_name: &str) -> bool
     (is_native_ext || is_debuginfo) && name_matches
 }
 
-fn wheel_file(tags: &[String]) -> Result<String> {
+fn wheel_file(tags: &[WheelTag]) -> Result<String> {
     let mut wheel_file = format!(
         "Wheel-Version: 1.0
 Generator: {name} ({version})
@@ -539,7 +539,6 @@ Root-Is-Purelib: false
     );
 
     for tag in tags {
-        let tag = tag.parse::<WheelTag>()?;
         for expanded_tag in tag.expand() {
             writeln!(wheel_file, "Tag: {expanded_tag}")?;
         }
@@ -607,6 +606,7 @@ mod tests {
     use super::add_data;
     use super::wheel_file;
     use crate::Metadata24;
+    use crate::WheelTag;
 
     #[test]
     fn wheel_file_compressed_tags() -> Result<()> {
@@ -624,9 +624,9 @@ Tag: cp37-abi3-manylinux2014_x86_64
             version = env!("CARGO_PKG_VERSION"),
         );
         let actual = wheel_file(&[
-            "py2.py3-none-any".to_string(),
-            "pre-expanded-tag".to_string(),
-            "cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64".to_string(),
+            WheelTag::new("py2.py3", "none", "any"),
+            WheelTag::new("pre", "expanded", "tag"),
+            WheelTag::new("cp37", "abi3", "manylinux_2_17_x86_64.manylinux2014_x86_64"),
         ])?;
         assert_eq!(expected, actual);
 
@@ -649,7 +649,11 @@ Tag: cp315-abi3t-manylinux_2_17_x86_64
             name = env!("CARGO_PKG_NAME"),
             version = env!("CARGO_PKG_VERSION"),
         );
-        let actual = wheel_file(&["cp315-abi3.abi3t-manylinux_2_17_x86_64".to_string()])?;
+        let actual = wheel_file(&[WheelTag::new(
+            "cp315",
+            "abi3.abi3t",
+            "manylinux_2_17_x86_64",
+        )])?;
         assert_eq!(expected, actual);
 
         Ok(())
@@ -682,7 +686,11 @@ Tag: cp315-abi3t-manylinux_2_17_x86_64
         let mut writer = VirtualWriter::new(wheel_writer, Override::empty());
         let wheel_path = {
             add_data(&mut writer, &metadata, Some(&data_dir))?;
-            writer.finish(&metadata, tmp_dir.path(), &["py3-none-any".to_string()])?
+            writer.finish(
+                &metadata,
+                tmp_dir.path(),
+                &[WheelTag::new("py3", "none", "any")],
+            )?
         };
 
         let mut wheel = ZipArchive::new(fs::File::open(&wheel_path)?)?;

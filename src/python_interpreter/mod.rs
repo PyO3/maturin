@@ -183,11 +183,13 @@ impl PythonInterpreter {
     }
 
     /// Returns the supported python environment in the PEP 425 format used for the wheel filename:
-    /// {python tag}-{abi tag}-{platform tag}
+    /// `{python tag}-{abi tag}-{platform tag}`.
     ///
-    /// Don't ask me why or how, this is just what setuptools uses so I'm also going to use
+    /// This is a **compatibility string helper** for external callers that need the tag as a
+    /// single string. New maturin code should prefer [`Self::get_wheel_tag`] and keep the
+    /// structured [`crate::WheelTag`] through to WHEEL metadata generation.
     ///
-    /// If abi3 is true, cpython wheels use the generic abi3 with the given version as minimum
+    /// If abi3 is true, cpython wheels use the generic abi3 with the given version as minimum.
     pub fn get_tag(
         &self,
         project: &crate::ProjectContext,
@@ -196,6 +198,9 @@ impl PythonInterpreter {
         Ok(self.get_wheel_tag(project, platform_tags)?.to_string())
     }
 
+    /// Structured PEP 425 wheel tag for this interpreter.
+    ///
+    /// Prefer this over [`Self::get_tag`] inside maturin so tags are not re-parsed from strings.
     pub(crate) fn get_wheel_tag(
         &self,
         project: &crate::ProjectContext,

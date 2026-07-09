@@ -25,7 +25,7 @@ mod wheel_tag;
 pub use platform_tag::get_platform_tag;
 pub(crate) use platform_tag::rustc_macosx_target_version;
 pub use pypi_tags::{is_arch_supported_by_pypi, validate_wheel_filename_for_pypi};
-pub(crate) use wheel_tag::WheelTag;
+pub use wheel_tag::WheelTag;
 
 pub(crate) const RUST_1_64_0: semver::Version = semver::Version::new(1, 64, 0);
 pub(crate) const RUST_1_93_0: semver::Version = semver::Version::new(1, 93, 0);

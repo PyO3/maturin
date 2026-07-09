@@ -332,85 +332,8 @@
       ]
     },
     "CompatibilityTag": {
-      "description": "Parsed `--compatibility` / `[tool.maturin] compatibility` value.\n\n`pypi` is not a real platform tag. It is normalized by `BuildContextBuilder`\ninto a PyPI-validation flag and never stored on `PythonContext.platform_tag`.",
-      "oneOf": [
-        {
-          "description": "Use the `manylinux_<major>_<minor>` tag",
-          "type": "object",
-          "properties": {
-            "Manylinux": {
-              "type": "object",
-              "properties": {
-                "major": {
-                  "description": "GLIBC version major",
-                  "type": "integer",
-                  "format": "uint16",
-                  "maximum": 65535,
-                  "minimum": 0
-                },
-                "minor": {
-                  "description": "GLIBC version minor",
-                  "type": "integer",
-                  "format": "uint16",
-                  "maximum": 65535,
-                  "minimum": 0
-                }
-              },
-              "required": [
-                "major",
-                "minor"
-              ]
-            }
-          },
-          "additionalProperties": false,
-          "required": [
-            "Manylinux"
-          ]
-        },
-        {
-          "description": "Use the `musllinux_<major>_<minor>` tag",
-          "type": "object",
-          "properties": {
-            "Musllinux": {
-              "type": "object",
-              "properties": {
-                "major": {
-                  "description": "musl libc version major",
-                  "type": "integer",
-                  "format": "uint16",
-                  "maximum": 65535,
-                  "minimum": 0
-                },
-                "minor": {
-                  "description": "musl libc version minor",
-                  "type": "integer",
-                  "format": "uint16",
-                  "maximum": 65535,
-                  "minimum": 0
-                }
-              },
-              "required": [
-                "major",
-                "minor"
-              ]
-            }
-          },
-          "additionalProperties": false,
-          "required": [
-            "Musllinux"
-          ]
-        },
-        {
-          "description": "Use the native linux tag",
-          "type": "string",
-          "const": "Linux"
-        },
-        {
-          "description": "Ensure that a PyPI-compatible tag is used, error if the target is not supported by PyPI.",
-          "type": "string",
-          "const": "Pypi"
-        }
-      ]
+      "description": "Parsed `--compatibility` / `[tool.maturin] compatibility` value.\n\nAccepts platform tags such as `linux`, `manylinux2014`, `manylinux_2_17`, `musllinux_1_2`, or the `pypi` pseudo-option (PyPI filename validation; not a real platform tag).",
+      "type": "string"
     },
     "FeatureSpec": {
       "description": "A cargo feature specification that can be either a plain feature name\nor a conditional feature that is only enabled for certain Python versions.\n\n# Examples\n\n```toml\n[tool.maturin]\nfeatures = [\n  \"some-feature\",\n  { feature = \"pyo3/abi3-py311\", python-version = \">=3.11\" },\n  { feature = \"pyo3/abi3-py38\", python-version = \"<3.11\" },\n  { feature = \"pyo3/abi3-py311\", python-version = \">=3.11\", python-implementation = \"cpython\" },\n  { feature = \"pypy-compat\", python-implementation = \"pypy\" },\n]\n```",

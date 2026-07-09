@@ -350,7 +350,7 @@ impl VirtualWriter<WheelWriter> {
         mut self,
         metadata24: &Metadata24,
         pyproject_dir: &Path,
-        tags: &[String],
+        tags: &[crate::WheelTag],
     ) -> Result<PathBuf> {
         let dist_info_dir = write_dist_info(&mut self, pyproject_dir, metadata24, tags)?;
         let mut comparator = self.inner.file_ordering(&dist_info_dir);

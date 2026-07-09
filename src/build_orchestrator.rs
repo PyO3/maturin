@@ -276,7 +276,7 @@ impl<'a> BuildOrchestrator<'a> {
     }
 
     /// Return the tags of the wheel that this build context builds.
-    pub fn tags_from_bridge(&self) -> Result<Vec<String>> {
+    pub fn tags_from_bridge(&self) -> Result<Vec<WheelTag>> {
         let bridge = self.context.project.bridge();
         let tags = match bridge {
             BridgeModel::PyO3(bindings) | BridgeModel::Bin(Some(bindings)) => {
@@ -304,7 +304,6 @@ impl<'a> BuildOrchestrator<'a> {
                             let (major, minor) =
                                 min_version.unwrap_or((interp.major as u8, interp.minor as u8));
                             WheelTag::new(format!("cp{major}{minor}"), abi_tag, platform.clone())
-                                .to_string()
                         });
                         // Some interpreters in this build may not support the selected stable ABI
                         // family, e.g. 3.14t when abi3t was selected for 3.15.
@@ -313,7 +312,6 @@ impl<'a> BuildOrchestrator<'a> {
                             .map(|interpreter| {
                                 interpreter
                                     .get_wheel_tag(&self.context.project, &[PlatformTag::Linux])
-                                    .map(|tag| tag.to_string())
                             })
                             .collect::<Result<Vec<_>>>()?;
                         let tags = stable_abi_tag
@@ -326,16 +324,12 @@ impl<'a> BuildOrchestrator<'a> {
                         tags
                     }
                     None => {
-                        vec![
-                            interp
-                                .get_wheel_tag(&self.context.project, &[PlatformTag::Linux])?
-                                .to_string(),
-                        ]
+                        vec![interp.get_wheel_tag(&self.context.project, &[PlatformTag::Linux])?]
                     }
                 }
             }
             BridgeModel::Bin(None) | BridgeModel::Cffi | BridgeModel::UniFfi => {
-                vec![self.get_universal_tag(&[PlatformTag::Linux])?.to_string()]
+                vec![self.get_universal_tag(&[PlatformTag::Linux])?]
             }
         };
         Ok(tags)
@@ -533,11 +527,10 @@ impl<'a> BuildOrchestrator<'a> {
             &metadata24.get_dist_info_dir(),
         )?;
 
-        let tags = [tag_string];
         let wheel_path = writer.finish(
             metadata24,
             &self.context.project.project_layout.project_root,
-            &tags,
+            std::slice::from_ref(tag),
         )?;
         finalize_staged_artifacts(audited);
         Ok(wheel_path)
@@ -827,7 +820,7 @@ impl<'a> BuildOrchestrator<'a> {
         platform_tags: &[PlatformTag],
         sbom_data: &Option<SbomData>,
         out_dirs: &HashMap<String, PathBuf>,
-    ) -> Result<PathBuf> {
+    ) -> Result<(PathBuf, WheelTag)> {
         if !self.context.project.metadata24.scripts.is_empty() {
             bail!("Defining scripts and working with a binary doesn't mix well");
         }
@@ -867,7 +860,7 @@ impl<'a> BuildOrchestrator<'a> {
         BinBindingGenerator::prepare_metadata(&mut metadata24, self.context, audited)
             .context("Failed to add the files to the wheel")?;
 
-        self.write_wheel_inner(
+        let path = self.write_wheel_inner(
             &tag,
             &metadata24,
             audited,
@@ -875,7 +868,8 @@ impl<'a> BuildOrchestrator<'a> {
             |_temp_dir| Ok(BinBindingGenerator::new(&metadata24, use_shim)),
             sbom_data,
             out_dirs,
-        )
+        )?;
+        Ok((path, tag))
     }
 
     /// Builds a wheel that contains a binary
@@ -919,7 +913,7 @@ impl<'a> BuildOrchestrator<'a> {
         let policy = policies.iter().min_by_key(|p| p.priority).unwrap();
         let platform_tags = self.resolve_platform_tags(policy);
 
-        let wheel_path = self.write_bin_wheel(
+        let (wheel_path, tag) = self.write_bin_wheel(
             python_interpreter,
             &mut audited_artifacts,
             &platform_tags,
@@ -927,9 +921,16 @@ impl<'a> BuildOrchestrator<'a> {
             &result.out_dirs,
         )?;
         eprintln!("📦 Built wheel to {}", wheel_path.display());
+        // Interpreter-bound binary wheels (pyo3-bin) carry a real python tag; pure
+        // standalone bins remain universal (`py3`).
+        let artifact_tag = if python_interpreter.is_some() {
+            BuiltArtifactTag::interpreter(tag.python())
+        } else {
+            BuiltArtifactTag::Universal
+        };
         wheels.push(BuiltWheel {
             path: wheel_path,
-            tag: BuiltArtifactTag::Universal,
+            tag: artifact_tag,
         });
 
         Ok(wheels)

@@ -1,5 +1,5 @@
 use crate::auditwheel::Policy;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 use std::str::FromStr;
 
@@ -145,25 +145,13 @@ impl<'de> Deserialize<'de> for PlatformTag {
 ///
 /// `pypi` is not a real platform tag. It is normalized by `BuildContextBuilder`
 /// into a PyPI-validation flag and never stored on `PythonContext.platform_tag`.
-#[derive(Serialize, Debug, Clone, Eq, PartialEq, Copy, Ord, PartialOrd)]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+///
+/// Real platform tags are stored as [`CompatibilityTag::Platform`] so new
+/// [`PlatformTag`] variants only need to be added in one place.
+#[derive(Debug, Clone, Eq, PartialEq, Copy, Ord, PartialOrd)]
 pub enum CompatibilityTag {
-    /// Use the `manylinux_<major>_<minor>` tag
-    Manylinux {
-        /// GLIBC version major
-        major: u16,
-        /// GLIBC version minor
-        minor: u16,
-    },
-    /// Use the `musllinux_<major>_<minor>` tag
-    Musllinux {
-        /// musl libc version major
-        major: u16,
-        /// musl libc version minor
-        minor: u16,
-    },
-    /// Use the native linux tag
-    Linux,
+    /// A real platform tag (manylinux, musllinux, or linux).
+    Platform(PlatformTag),
     /// Ensure that a PyPI-compatible tag is used, error if the target is not supported by PyPI.
     Pypi,
 }
@@ -172,13 +160,7 @@ impl CompatibilityTag {
     /// Returns `None` for the `pypi` pseudo-option.
     pub fn into_platform_tag(self) -> Option<PlatformTag> {
         match self {
-            CompatibilityTag::Manylinux { major, minor } => {
-                Some(PlatformTag::Manylinux { major, minor })
-            }
-            CompatibilityTag::Musllinux { major, minor } => {
-                Some(PlatformTag::Musllinux { major, minor })
-            }
-            CompatibilityTag::Linux => Some(PlatformTag::Linux),
+            CompatibilityTag::Platform(tag) => Some(tag),
             CompatibilityTag::Pypi => None,
         }
     }
@@ -191,24 +173,14 @@ impl CompatibilityTag {
 
 impl From<PlatformTag> for CompatibilityTag {
     fn from(value: PlatformTag) -> Self {
-        match value {
-            PlatformTag::Manylinux { major, minor } => CompatibilityTag::Manylinux { major, minor },
-            PlatformTag::Musllinux { major, minor } => CompatibilityTag::Musllinux { major, minor },
-            PlatformTag::Linux => CompatibilityTag::Linux,
-        }
+        CompatibilityTag::Platform(value)
     }
 }
 
 impl fmt::Display for CompatibilityTag {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            CompatibilityTag::Manylinux { major, minor } => {
-                write!(f, "manylinux_{major}_{minor}")
-            }
-            CompatibilityTag::Musllinux { major, minor } => {
-                write!(f, "musllinux_{major}_{minor}")
-            }
-            CompatibilityTag::Linux => write!(f, "linux"),
+            CompatibilityTag::Platform(tag) => write!(f, "{tag}"),
             CompatibilityTag::Pypi => write!(f, "pypi"),
         }
     }
@@ -221,8 +193,18 @@ impl FromStr for CompatibilityTag {
         if value.eq_ignore_ascii_case("pypi") {
             Ok(CompatibilityTag::Pypi)
         } else {
-            PlatformTag::from_str(value).map(CompatibilityTag::from)
+            PlatformTag::from_str(value).map(CompatibilityTag::Platform)
         }
+    }
+}
+
+/// Serialize as the same string form used by CLI / TOML parsing.
+impl Serialize for CompatibilityTag {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
     }
 }
 
@@ -233,5 +215,64 @@ impl<'de> Deserialize<'de> for CompatibilityTag {
     {
         let s = String::deserialize(deserializer)?;
         FromStr::from_str(&s).map_err(serde::de::Error::custom)
+    }
+}
+
+#[cfg(feature = "schemars")]
+impl schemars::JsonSchema for CompatibilityTag {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "CompatibilityTag".into()
+    }
+
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        "maturin::CompatibilityTag".into()
+    }
+
+    fn json_schema(_generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        // TOML / CLI accept string values (e.g. "manylinux_2_17", "pypi"), not
+        // externally-tagged objects. Document the string form so the schema matches
+        // serde Deserialize and Serialize.
+        schemars::json_schema!({
+            "description": "Parsed `--compatibility` / `[tool.maturin] compatibility` value.\n\nAccepts platform tags such as `linux`, `manylinux2014`, `manylinux_2_17`, `musllinux_1_2`, or the `pypi` pseudo-option (PyPI filename validation; not a real platform tag).",
+            "type": "string"
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CompatibilityTag, PlatformTag};
+    use std::str::FromStr;
+
+    #[test]
+    fn compatibility_tag_serde_round_trips_as_string() {
+        for value in [
+            CompatibilityTag::Pypi,
+            CompatibilityTag::from(PlatformTag::Linux),
+            CompatibilityTag::from(PlatformTag::manylinux2014()),
+            CompatibilityTag::from(PlatformTag::Musllinux { major: 1, minor: 2 }),
+        ] {
+            let json = serde_json::to_string(&value).unwrap();
+            // String form, not an externally-tagged object.
+            assert!(
+                json.starts_with('"') && json.ends_with('"'),
+                "expected string JSON, got {json}"
+            );
+            let parsed: CompatibilityTag = serde_json::from_str(&json).unwrap();
+            assert_eq!(parsed, value);
+            assert_eq!(
+                CompatibilityTag::from_str(value.to_string().as_str()),
+                Ok(value)
+            );
+        }
+    }
+
+    #[test]
+    fn into_platform_tag_strips_pypi() {
+        assert_eq!(CompatibilityTag::Pypi.into_platform_tag(), None);
+        assert_eq!(
+            CompatibilityTag::from(PlatformTag::Linux).into_platform_tag(),
+            Some(PlatformTag::Linux)
+        );
     }
 }

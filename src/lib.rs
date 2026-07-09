@@ -48,7 +48,7 @@ pub use crate::source_distribution::{UnpackedSdist, find_path_deps, unpack_sdist
 #[cfg(feature = "upload")]
 pub use crate::upload::{PublishOpt, Registry, UploadError, upload, upload_ui};
 pub use auditwheel::{CompatibilityTag, PlatformTag};
-pub use target::Target;
+pub use target::{Target, WheelTag};
 
 mod archive_source;
 mod auditwheel;

@@ -145,15 +145,6 @@ impl StableAbi {
     }
 }
 
-impl std::fmt::Display for StableAbi {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self.kind {
-            StableAbiKind::Abi3 => write!(f, "abi3"),
-            StableAbiKind::Abi3t => write!(f, "abi3t"),
-        }
-    }
-}
-
 /// Python version to use as the abi3/abi3t target.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StableAbiVersion {
@@ -206,7 +197,7 @@ impl StableAbiKind {
 /// The name and version of the pyo3 bindings crate
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PyO3 {
-    /// The name of the bindings crate, `pyo3` or `uniffi`
+    /// The name of the bindings crate, `pyo3` or `pyo3-ffi`
     pub crate_name: PyO3Crate,
     /// pyo3 bindings crate version
     pub version: semver::Version,
@@ -352,8 +343,6 @@ impl BridgeModel {
 
     /// Returns the maximum PyPy minor version supported
     pub fn maximum_pypy_minor_version(&self) -> usize {
-        use crate::python_interpreter::MAXIMUM_PYPY_MINOR;
-
         match self.pyo3() {
             Some(bindings) => bindings.maximum_pypy_minor_version(),
             None => MAXIMUM_PYPY_MINOR,
@@ -435,12 +424,6 @@ mod tests {
         // abi3t wheels are also importable on abi3-capable interpreters, so the
         // wheel tag is the compressed form `abi3.abi3t`.
         assert_eq!(StableAbiKind::Abi3t.wheel_tag(), "abi3.abi3t");
-    }
-
-    #[test]
-    fn stable_abi_display() {
-        assert_eq!(StableAbi::from_abi3_version(3, 7).to_string(), "abi3");
-        assert_eq!(StableAbi::from_abi3t_version(3, 15).to_string(), "abi3t");
     }
 
     #[test]

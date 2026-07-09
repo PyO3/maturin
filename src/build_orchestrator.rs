@@ -4,8 +4,8 @@ use crate::binding_generator::{
     UniFfiBindingGenerator, generate_binding,
 };
 use crate::build_context::finalize_staged_artifacts;
-use crate::compile::warn_missing_py_init;
-use crate::module_writer::{ModuleWriter, WheelWriter, add_data, write_pth};
+use crate::compile::{missing_cdylib_error, missing_cdylib_message, warn_missing_py_init};
+use crate::module_writer::{WheelWriter, add_data, write_pth};
 use crate::pgo::{PgoContext, PgoPhase};
 use crate::sbom::SbomData;
 use crate::source_distribution::source_distribution;
@@ -23,7 +23,7 @@ use itertools::Itertools;
 use normpath::PathExt;
 use pyo3_introspection::{introspect_cdylib, module_stub_files};
 use std::collections::{HashMap, HashSet};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::rc::Rc;
 use tracing::instrument;
 
@@ -125,7 +125,7 @@ impl<'a> BuildOrchestrator<'a> {
         fs::create_dir_all(&self.context.artifact.out)
             .context("Failed to create the target directory for the wheels")?;
 
-        let sbom_data = self.generate_sbom_data()?;
+        let sbom_data = SbomData::generate(self.context)?;
         let mut wheels = Vec::new();
 
         for (i, python_interpreter) in self.context.python.interpreter.iter().enumerate() {
@@ -207,7 +207,7 @@ impl<'a> BuildOrchestrator<'a> {
 
         // Generate SBOM data once for all wheels (the Rust dependency graph
         // is the same regardless of the target Python interpreter).
-        let sbom_data = self.generate_sbom_data()?;
+        let sbom_data = SbomData::generate(self.context)?;
 
         let interpreters: Vec<_> = self.context.python.interpreter.iter().collect();
         let wheels = match self.context.project.bridge() {
@@ -278,7 +278,12 @@ impl<'a> BuildOrchestrator<'a> {
                     .context
                     .project
                     .get_platform_tag(&[PlatformTag::Linux])?;
-                let interp = &self.context.python.interpreter[0];
+                let interp = self
+                    .context
+                    .python
+                    .interpreter
+                    .first()
+                    .context("no python interpreter resolved for tag computation")?;
                 match bindings.stable_abi {
                     Some(stable_abi) => {
                         let min_version = stable_abi.version.min_version();
@@ -509,8 +514,9 @@ impl<'a> BuildOrchestrator<'a> {
             self.context.project.project_layout.data.as_deref(),
         )?;
 
-        self.write_sboms(
+        SbomData::write(
             sbom_data.as_ref(),
+            self.context,
             &mut writer,
             &self.context.project.metadata24.get_dist_info_dir(),
         )?;
@@ -678,14 +684,15 @@ impl<'a> BuildOrchestrator<'a> {
             &self.context.project.compile_targets,
         )
         .context("Failed to build a native library through cargo")?;
-        let error_msg = "Cargo didn't build a cdylib. Did you miss crate-type = [\"cdylib\"] \
-                 in the lib section of your Cargo.toml?";
-        let artifacts = result.artifacts.first().context(error_msg)?;
+        let artifacts = result
+            .artifacts
+            .first()
+            .with_context(|| missing_cdylib_message(None))?;
 
         let mut artifact = artifacts
             .get(&CrateType::CDyLib)
             .cloned()
-            .ok_or_else(|| anyhow!(error_msg,))?;
+            .ok_or_else(|| missing_cdylib_error(None))?;
 
         self.context.stage_artifact(&mut artifact)?;
 
@@ -835,8 +842,9 @@ impl<'a> BuildOrchestrator<'a> {
             self.context.project.project_layout.data.as_deref(),
         )?;
 
-        self.write_sboms(
+        SbomData::write(
             sbom_data.as_ref(),
+            self.context,
             &mut writer,
             &metadata24.get_dist_info_dir(),
         )?;
@@ -919,21 +927,6 @@ impl<'a> BuildOrchestrator<'a> {
         Ok(wheels)
     }
 
-    /// Generate Rust SBOMs once from the build context.
-    pub(crate) fn generate_sbom_data(&self) -> Result<Option<SbomData>> {
-        SbomData::generate(self.context)
-    }
-
-    /// Writes SBOMs into the wheel via the given writer.
-    pub(crate) fn write_sboms(
-        &self,
-        sbom_data: Option<&SbomData>,
-        writer: &mut impl ModuleWriter,
-        dist_info_dir: &Path,
-    ) -> Result<()> {
-        SbomData::write(sbom_data, self.context, writer, dist_info_dir)
-    }
-
     /// Generate stub files by building the project then extracting the stubs from the build output
     #[instrument(skip_all)]
     pub fn generate_stubs(&self) -> Result<HashMap<PathBuf, String>> {
@@ -946,7 +939,7 @@ impl<'a> BuildOrchestrator<'a> {
                 let module_introspection = introspect_cdylib(&artifact.path, extension_name).context("Failed to introspect the built libraries to generate type stubs, have you enabled the \"experimental-inspect\" PyO3 Cargo feature?")?;
                 Ok(module_stub_files(&module_introspection))
             }
-            _ => bail!("Stub generation  is only possible in PyO3 projects"),
+            _ => bail!("Stub generation is only possible in PyO3 projects"),
         }
     }
 }

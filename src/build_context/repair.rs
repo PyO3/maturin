@@ -284,12 +284,7 @@ impl BuildContext {
         // packages provided the grafted shared libraries.
         #[cfg(feature = "sbom")]
         {
-            let auditwheel_sbom_enabled = self
-                .artifact
-                .sbom
-                .as_ref()
-                .and_then(|c| c.auditwheel)
-                .unwrap_or(true);
+            let auditwheel_sbom_enabled = self.artifact.sbom.auditwheel.unwrap_or(true);
             if auditwheel_sbom_enabled {
                 // Obtain the sysroot so whichprovides can strip cross-compilation
                 // prefixes when querying the host package manager.

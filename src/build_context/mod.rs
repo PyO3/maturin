@@ -18,6 +18,7 @@ use crate::{
 use anyhow::Result;
 use cargo_metadata::Metadata;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 /// The input part of the build context.
 ///
@@ -45,7 +46,7 @@ pub struct ProjectContext {
     /// Directory for all generated artifacts
     pub target_dir: PathBuf,
     /// Cargo.toml as resolved by [cargo_metadata]
-    pub cargo_metadata: Metadata,
+    pub cargo_metadata: Arc<Metadata>,
     /// Whether to use universal2 or use the native macOS tag (off)
     pub universal2: bool,
     /// Build editable wheels
@@ -120,6 +121,8 @@ pub struct PythonContext {
     pub platform_tag: Vec<PlatformTag>,
     /// The available python interpreters
     pub interpreter: Vec<PythonInterpreter>,
+    /// Host Python to expose to PyO3 when target interpreters are not runnable.
+    pub host_python: Option<PathBuf>,
     /// Whether to validate wheels against PyPI platform tag rules
     pub pypi_validation: bool,
 }

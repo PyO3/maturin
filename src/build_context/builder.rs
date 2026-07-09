@@ -19,6 +19,7 @@ use anyhow::{Result, bail};
 use std::collections::HashSet;
 use std::env;
 use std::path::PathBuf;
+use std::sync::Arc;
 use tracing::{debug, instrument};
 
 /// Builder for constructing a [`BuildContext`] from [`BuildOptions`].
@@ -179,15 +180,6 @@ impl BuildContextBuilder {
             eprintln!("🔗 Found {bridge} bindings");
         }
 
-        // Set PYO3_PYTHON for cross-compilation so pyo3's build script
-        // can find the host interpreter.
-        if let Some(ref host_python) = host_python {
-            unsafe {
-                env::set_var("PYO3_PYTHON", host_python);
-                env::set_var("PYTHON_SYS_EXECUTABLE", host_python);
-            }
-        }
-
         if cargo_options.args.is_empty() {
             // if not supplied on command line, try pyproject.toml
             let tool_maturin = pyproject.and_then(|p| p.maturin());
@@ -289,7 +281,7 @@ impl BuildContextBuilder {
                 module_name,
                 manifest_path: cargo_toml_path,
                 target_dir,
-                cargo_metadata,
+                cargo_metadata: Arc::new(cargo_metadata),
                 universal2,
                 editable,
                 cargo_options,
@@ -313,6 +305,7 @@ impl BuildContextBuilder {
                 zig: build_options.platform.zig,
                 platform_tag: platform_tags,
                 interpreter,
+                host_python,
                 pypi_validation,
             },
         })
@@ -332,14 +325,18 @@ impl BuildContextBuilder {
             return Ok((Vec::new(), None));
         }
 
-        let mut user_interpreters = build_options.python.interpreter.clone();
-        if cfg!(test)
-            && user_interpreters.is_empty()
-            && !build_options.python.find_interpreter
-            && let Some(python) = env::var_os("MATURIN_TEST_PYTHON")
-        {
-            user_interpreters = vec![python.into()];
-        }
+        let user_interpreters = build_options.python.interpreter.clone();
+        #[cfg(test)]
+        let user_interpreters = {
+            let mut user_interpreters = user_interpreters;
+            if user_interpreters.is_empty()
+                && !build_options.python.find_interpreter
+                && let Some(python) = env::var_os("MATURIN_TEST_PYTHON")
+            {
+                user_interpreters = vec![python.into()];
+            }
+            user_interpreters
+        };
 
         let resolver = InterpreterResolver::new(
             target,

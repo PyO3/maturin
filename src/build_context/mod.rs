@@ -7,7 +7,6 @@ pub(crate) use repair::finalize_staged_artifacts;
 use crate::auditwheel::AuditWheelMode;
 use crate::auditwheel::PlatformTag;
 use crate::cargo_options::CargoOptions;
-use crate::compile::CompileTarget;
 use crate::compression::CompressionOptions;
 use crate::pgo::PgoPhase;
 use crate::project_layout::ProjectLayout;
@@ -27,6 +26,8 @@ use std::sync::Arc;
 /// is generally independent of the target Python interpreter.
 #[derive(Clone, Debug)]
 pub struct ProjectContext {
+    /// The bridge model used by this project
+    pub bridge: BridgeModel,
     /// The platform, i.e. os and pointer width
     pub target: Target,
     /// Whether this project is pure rust or rust mixed with python
@@ -56,14 +57,13 @@ pub struct ProjectContext {
     /// Cargo features conditionally enabled based on the target Python version/implementation
     pub conditional_features: Vec<ConditionalFeature>,
     /// List of Cargo targets to compile
-    pub compile_targets: Vec<CompileTarget>,
+    pub compile_targets: Vec<cargo_metadata::Target>,
 }
 
 impl ProjectContext {
     /// Bridge model
     pub fn bridge(&self) -> &BridgeModel {
-        // FIXME: currently we only allow multiple bin targets so bridges are all the same
-        &self.compile_targets[0].bridge_model
+        &self.bridge
     }
 
     /// Returns the platform part of the tag for the wheel name

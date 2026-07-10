@@ -48,15 +48,6 @@ pub(crate) fn missing_cdylib_error(arch: Option<&str>) -> anyhow::Error {
     anyhow!("{}", missing_cdylib_message(arch))
 }
 
-/// A cargo target to build
-#[derive(Debug, Clone)]
-pub struct CompileTarget {
-    /// The cargo target to build
-    pub target: cargo_metadata::Target,
-    /// The bridge model to use
-    pub bridge_model: BridgeModel,
-}
-
 /// A single-architecture thin binary artifact for universal2 builds.
 ///
 /// Used during macOS wheel repair to analyze dependencies per-architecture,
@@ -152,7 +143,7 @@ pub struct CompileResult {
 pub fn compile(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
-    targets: &[CompileTarget],
+    targets: &[cargo_metadata::Target],
 ) -> Result<CompileResult> {
     if context.project.universal2 {
         compile_universal2(context, python_interpreter, targets)
@@ -164,9 +155,9 @@ pub fn compile(
 /// Filter cargo targets based on bridge model and optional configuration.
 pub(crate) fn filter_cargo_targets(
     cargo_metadata: &cargo_metadata::Metadata,
-    bridge: BridgeModel,
+    bridge: &BridgeModel,
     config_targets: Option<&[crate::pyproject_toml::CargoTarget]>,
-) -> Result<Vec<CompileTarget>> {
+) -> Result<Vec<cargo_metadata::Target>> {
     let root_pkg = cargo_metadata
         .root_package()
         .ok_or_else(|| anyhow!("No root package found in cargo metadata"))?;
@@ -195,10 +186,7 @@ pub(crate) fn filter_cargo_targets(
             }
             _ => target.crate_types.contains(&CrateType::CDyLib),
         })
-        .map(|target| CompileTarget {
-            target: target.clone(),
-            bridge_model: bridge.clone(),
-        })
+        .cloned()
         .collect();
     if targets.is_empty() && !bridge.is_bin() {
         // No `crate-type = ["cdylib"]` in `Cargo.toml`
@@ -210,16 +198,13 @@ pub(crate) fn filter_cargo_targets(
                 .any(|crate_type| LIB_CRATE_TYPES.contains(crate_type))
         });
         if let Some(target) = lib_target {
-            targets.push(CompileTarget {
-                target: target.clone(),
-                bridge_model: bridge,
-            });
+            targets.push(target.clone());
         }
     }
 
     // Filter targets by config_targets
     if let Some(config_targets) = config_targets {
-        targets.retain(|CompileTarget { target, .. }| {
+        targets.retain(|target| {
             config_targets.iter().any(|config_target| {
                 let name_eq = config_target.name == target.name;
                 match &config_target.kind {
@@ -235,7 +220,7 @@ pub(crate) fn filter_cargo_targets(
         } else {
             let target_names = targets
                 .iter()
-                .map(|CompileTarget { target, .. }| target.name.as_str())
+                .map(|target| target.name.as_str())
                 .collect::<Vec<_>>();
             eprintln!(
                 "🎯 Found {} Cargo targets in `Cargo.toml`: {}",
@@ -252,7 +237,7 @@ pub(crate) fn filter_cargo_targets(
 fn compile_universal2(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
-    targets: &[CompileTarget],
+    targets: &[cargo_metadata::Target],
 ) -> Result<CompileResult> {
     let mut aarch64_context = context.clone();
     aarch64_context.project.target = Target::from_resolved_target_triple("aarch64-apple-darwin")?;
@@ -266,19 +251,16 @@ fn compile_universal2(
         .context("Failed to build a x86_64 library through cargo")?;
 
     let mut universal_artifacts = Vec::with_capacity(targets.len());
-    for (bridge_model, (aarch64_artifact, x86_64_artifact)) in
-        targets.iter().map(|target| &target.bridge_model).zip(
-            aarch64_result
-                .artifacts
-                .iter()
-                .zip(&x86_64_result.artifacts),
-        )
+    let build_type = if context.project.bridge().is_bin() {
+        CrateType::Bin
+    } else {
+        CrateType::CDyLib
+    };
+    for (aarch64_artifact, x86_64_artifact) in aarch64_result
+        .artifacts
+        .iter()
+        .zip(&x86_64_result.artifacts)
     {
-        let build_type = if bridge_model.is_bin() {
-            CrateType::Bin
-        } else {
-            CrateType::CDyLib
-        };
         let aarch64_artifact = aarch64_artifact.get(&build_type).cloned().ok_or_else(|| {
             if build_type == CrateType::CDyLib {
                 missing_cdylib_error(Some("aarch64"))
@@ -350,7 +332,7 @@ fn compile_universal2(
             thin_artifacts,
             staging: CargoOutputState::NotStaged,
         };
-        result.insert(build_type, universal_artifact);
+        result.insert(build_type.clone(), universal_artifact);
         universal_artifacts.push(result);
     }
     // Note: we use x86_64 OUT_DIR paths for universal2 builds.
@@ -366,12 +348,12 @@ fn compile_universal2(
 fn compile_targets(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
-    targets: &[CompileTarget],
+    targets: &[cargo_metadata::Target],
 ) -> Result<CompileResult> {
     let mut artifacts = Vec::with_capacity(targets.len());
     let mut out_dirs = HashMap::new();
-    for target in targets {
-        let build_command = cargo_build_command(context, python_interpreter, target)?;
+    for cargo_target in targets {
+        let build_command = cargo_build_command(context, python_interpreter, cargo_target)?;
         let (target_artifacts, target_out_dirs) = compile_target(context, build_command)?;
         artifacts.push(target_artifacts);
         out_dirs.extend(target_out_dirs);
@@ -385,7 +367,7 @@ fn compile_targets(
 fn cargo_build_command(
     context: &BuildContext,
     python_interpreter: Option<&PythonInterpreter>,
-    compile_target: &CompileTarget,
+    cargo_target: &cargo_metadata::Target,
 ) -> Result<Command> {
     use crate::pyproject_toml::{FeatureConditionEnv, FeatureSpec};
 
@@ -426,8 +408,7 @@ fn cargo_build_command(
     cargo_rustc.message_format = vec!["json-render-diagnostics".to_string()];
 
     // Add `--crate-type cdylib` if available
-    if compile_target
-        .target
+    if cargo_target
         .crate_types
         .iter()
         .any(|crate_type| LIB_CRATE_TYPES.contains(crate_type))
@@ -464,11 +445,11 @@ fn cargo_build_command(
         }
     }
 
-    let bridge_model = &compile_target.bridge_model;
+    let bridge_model = context.project.bridge();
     configure_bin_lib_flags(
         &mut cargo_rustc,
         &mut rustflags,
-        compile_target,
+        cargo_target,
         bridge_model,
         target,
     );
@@ -517,13 +498,13 @@ fn cargo_build_command(
 fn configure_bin_lib_flags(
     cargo_rustc: &mut cargo_options::Rustc,
     rustflags: &mut cargo_config2::Flags,
-    compile_target: &CompileTarget,
+    cargo_target: &cargo_metadata::Target,
     bridge_model: &BridgeModel,
     target: &Target,
 ) {
     match bridge_model {
         BridgeModel::Bin(..) => {
-            cargo_rustc.bin.push(compile_target.target.name.clone());
+            cargo_rustc.bin.push(cargo_target.name.clone());
         }
         BridgeModel::Cffi | BridgeModel::UniFfi | BridgeModel::PyO3 { .. } => {
             cargo_rustc.lib = true;

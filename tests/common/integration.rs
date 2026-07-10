@@ -356,6 +356,87 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
     Ok(())
 }
 
+pub fn test_integration_uv_multi_python(case: &IntegrationCase<'_>) -> Result<()> {
+    let package_path = prepare_case_package(case.id, case.package, case.package_copy)?;
+    let package = package_path.as_path();
+    let uv = which::which("uv").context("uv is required for this integration test")?;
+    let target = Target::from_target_triple(None)?;
+    let mut interpreters = Vec::new();
+
+    for minor in [10, 11] {
+        let env_dir = Path::new("test-crates")
+            .join("venvs")
+            .join(format!("{}-py3{minor}", case.id));
+        if env_dir.is_dir() {
+            fs_err::remove_dir_all(&env_dir)?;
+        }
+        let output = Command::new(&uv)
+            .args([
+                "venv",
+                "--seed",
+                "--managed-python",
+                "--python",
+                &format!("3.{minor}"),
+            ])
+            .arg(&env_dir)
+            .output()
+            .context("failed to create uv virtualenv")?;
+        if !output.status.success() {
+            bail!(
+                "uv failed to create a Python 3.{minor} environment: {}\n--- Stdout:\n{}\n--- Stderr:\n{}",
+                output.status,
+                str::from_utf8(&output.stdout)?.trim(),
+                str::from_utf8(&output.stderr)?.trim(),
+            );
+        }
+        interpreters.push((env_dir.clone(), target.get_venv_python(&env_dir)));
+    }
+
+    let mut cli: Vec<std::ffi::OsString> = vec![
+        "build".into(),
+        "--quiet".into(),
+        "--manifest-path".into(),
+        package.join("Cargo.toml").into_os_string(),
+        "--interpreter".into(),
+    ];
+    cli.extend(
+        interpreters
+            .iter()
+            .map(|(_, python)| python.as_os_str().to_owned()),
+    );
+    cli.push("--target-dir".into());
+    cli.push(case_target_dir(case.id).into_os_string());
+    cli.push("--out".into());
+    cli.push(case_wheel_dir(case.id).into_os_string());
+
+    let options = BuildOptions::try_parse_from(cli)?;
+    let build_context = options
+        .into_build_context()
+        .strip(Some(cfg!(feature = "faster-tests")))
+        .editable(false)
+        .pgo(case.pgo)
+        .build()?;
+    let wheels = BuildOrchestrator::new(&build_context).build_wheels()?;
+
+    let universal = wheels
+        .iter()
+        .all(|wheel| matches!(wheel.tag, BuiltArtifactTag::Universal));
+    if universal {
+        assert_eq!(wheels.len(), 1);
+        for (env_dir, python) in &interpreters {
+            install_and_check_wheel(package, &wheels[0].path, env_dir, python)?;
+        }
+    } else {
+        assert_eq!(wheels.len(), interpreters.len());
+        for (wheel, (env_dir, python)) in wheels.iter().zip(&interpreters) {
+            install_and_check_wheel(package, &wheel.path, env_dir, python)?;
+        }
+    }
+
+    cleanup_case(case.id);
+    Ok(())
+}
+
 pub fn test_integration_conda(
     package: impl AsRef<Path>,
     bindings: Option<&str>,

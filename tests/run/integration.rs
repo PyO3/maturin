@@ -3,7 +3,8 @@ use crate::common::other;
 use crate::common::{
     CFFI_MIXED_IMPLICIT_COPY, CFFI_MIXED_INCLUDE_EXCLUDE_COPY, CFFI_MIXED_PY_SUBDIR_COPY,
     CFFI_MIXED_SRC_COPY, CFFI_MIXED_SUBMODULE_COPY, CFFI_MIXED_WITH_PATH_DEP_COPY, handle_result,
-    has_conda, has_uniffi_bindgen, is_ci, test_python_implementation, test_python_supports_abi3t,
+    has_conda, has_uniffi_bindgen, has_uv, is_ci, test_python_implementation,
+    test_python_supports_abi3t,
 };
 use std::path::Path;
 
@@ -90,6 +91,18 @@ fn integration_pyo3_bin() {
 #[test]
 fn integration_cases(#[case] case: IntegrationCase<'_>) {
     handle_result(integration::test_integration(&case));
+}
+
+#[test]
+fn integration_pyo3_bin_uv_multi_python() {
+    if has_uv() {
+        handle_result(integration::test_integration_uv_multi_python(
+            &IntegrationCase::new(
+                "integration-pyo3-bin-uv-multi-python",
+                "test-crates/pyo3-bin",
+            ),
+        ));
+    }
 }
 
 #[test]

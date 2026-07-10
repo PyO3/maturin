@@ -1,6 +1,7 @@
 import os
 import platform
 import sys
+import sysconfig
 from subprocess import check_output
 
 
@@ -11,6 +12,11 @@ def main():
         path = os.environ["PATH"]
         path = path + os.pathsep + sys.base_prefix
         os.environ["PATH"] = path
+    else:
+        # similar for non-windows platforms
+        library_path = sysconfig.get_config_var("LIBDIR")
+        os.environ["LD_LIBRARY_PATH"] = library_path
+        os.environ["DYLD_LIBRARY_PATH"] = library_path
 
     output = check_output(["pyo3-bin"]).decode("utf-8").strip()
     if not output == "Hello, world!":

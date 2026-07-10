@@ -1,0 +1,10 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "pyo3-bin"
+version = "0.1.0"
+
+[tool.maturin]
+pgo-command = "python check_installed/check_installed.py"

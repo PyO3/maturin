@@ -1,5 +1,5 @@
-use crate::common::handle_result;
 use crate::common::integration::{self, IntegrationCase};
+use crate::common::{handle_result, has_uv};
 
 #[test]
 #[cfg_attr(
@@ -13,5 +13,25 @@ fn pgo_pyo3_mixed() {
     }
     handle_result(integration::test_integration(
         &IntegrationCase::new("pgo-pyo3-mixed", "test-crates/pyo3-mixed").pgo(),
+    ));
+}
+
+#[test]
+fn pgo_pyo3_bin_uv_multi_python() {
+    if std::env::var_os("MATURIN_TEST_SKIP_PGO").is_some() || !has_uv() {
+        return;
+    }
+    handle_result(integration::test_integration_uv_multi_python(
+        &IntegrationCase::new("pgo-pyo3-bin-uv-multi-python", "test-crates/pyo3-bin").pgo(),
+    ));
+}
+
+#[test]
+fn pgo_bin_uv_multi_python() {
+    if std::env::var_os("MATURIN_TEST_SKIP_PGO").is_some() || !has_uv() {
+        return;
+    }
+    handle_result(integration::test_integration_uv_multi_python(
+        &IntegrationCase::new("pgo-bin-uv-multi-python", "test-crates/hello-world").pgo(),
     ));
 }

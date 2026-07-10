@@ -94,20 +94,6 @@ impl<'a> BuildOrchestrator<'a> {
         )
     }
 
-    fn pgo_instrumentation_interpreter(&self) -> Result<Option<&PythonInterpreter>> {
-        if self.context.artifact.pgo_command.is_none() {
-            return Ok(None);
-        }
-        self.context
-            .python
-            .interpreter
-            .first()
-            .context(
-                "PGO builds require a Python interpreter. Please specify one with `--interpreter`.",
-            )
-            .map(Some)
-    }
-
     /// Runs the shared PGO cycle: instrumented build, instrumentation, then optimized build.
     ///
     /// `message_prefix` preserves user-visible indentation for per-interpreter PGO output.
@@ -164,7 +150,7 @@ impl<'a> BuildOrchestrator<'a> {
         let interpreters: Vec<_> = self.context.python.interpreter.iter().collect();
         let wheels = match self.context.project.bridge() {
             BridgeModel::Bin(None) => self
-                .build_single_unit(self.pgo_instrumentation_interpreter()?, |orchestrator| {
+                .build_single_unit(interpreters.first().copied(), |orchestrator| {
                     orchestrator.build_bin_wheel(None, &sbom_data)
                 })?,
             BridgeModel::Bin(Some(..)) => self.build_bin_wheels(&interpreters, &sbom_data)?,
@@ -177,7 +163,7 @@ impl<'a> BuildOrchestrator<'a> {
                     orchestrator.build_cffi_wheel(&sbom_data)
                 })?,
             BridgeModel::UniFfi => self
-                .build_single_unit(self.pgo_instrumentation_interpreter()?, |orchestrator| {
+                .build_single_unit(interpreters.first().copied(), |orchestrator| {
                     orchestrator.build_uniffi_wheel(&sbom_data)
                 })?,
         };

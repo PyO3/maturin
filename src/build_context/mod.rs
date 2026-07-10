@@ -7,7 +7,6 @@ pub(crate) use repair::finalize_staged_artifacts;
 use crate::auditwheel::AuditWheelMode;
 use crate::auditwheel::PlatformTag;
 use crate::cargo_options::CargoOptions;
-use crate::compile::CompileTarget;
 use crate::compression::CompressionOptions;
 use crate::pgo::PgoPhase;
 use crate::project_layout::ProjectLayout;
@@ -58,7 +57,7 @@ pub struct ProjectContext {
     /// Cargo features conditionally enabled based on the target Python version/implementation
     pub conditional_features: Vec<ConditionalFeature>,
     /// List of Cargo targets to compile
-    pub compile_targets: Vec<CompileTarget>,
+    pub compile_targets: Vec<cargo_metadata::Target>,
 }
 
 impl ProjectContext {

@@ -51,120 +51,75 @@ impl<'a> BuildOrchestrator<'a> {
     /// correct builder.
     #[instrument(skip_all)]
     pub fn build_wheels(&self) -> Result<Vec<BuiltWheel>> {
-        if let Some(pgo_command) = &self.context.artifact.pgo_command {
-            let needs_per_interpreter_pgo = matches!(
-                self.context.project.bridge(),
-                BridgeModel::PyO3(crate::PyO3 {
-                    stable_abi: None,
-                    ..
-                })
-            );
-
+        if self.context.artifact.pgo_command.is_some() {
             ui::status!("🚀 Starting PGO build...");
             PgoContext::find_llvm_profdata()?;
-
-            return if needs_per_interpreter_pgo {
-                self.build_wheels_pgo_per_interpreter(pgo_command.clone())
-            } else {
-                self.build_wheels_pgo_single_pass(pgo_command.clone())
-            };
         }
-        self.build_wheels_inner()
+        let wheels = self.build_wheels_inner()?;
+        if self.context.artifact.pgo_command.is_some() {
+            ui::status!("🎉 PGO build complete!");
+        }
+        Ok(wheels)
     }
 
-    /// Single-pass PGO for abi3, cffi, uniffi, and bin builds.
-    fn build_wheels_pgo_single_pass(&self, pgo_command: String) -> Result<Vec<BuiltWheel>> {
-        let instrumentation_python = self.context.python.interpreter.first().context(
-            "PGO builds require a Python interpreter. \
-                 Please specify one with `--interpreter`.",
+    /// Wrapper around a single wheel build that runs a PGO cycle if needed
+    fn build_single_unit<F>(
+        &self,
+        instrumentation_python: Option<&PythonInterpreter>,
+        build: F,
+    ) -> Result<Vec<BuiltWheel>>
+    where
+        F: for<'ctx> Fn(&BuildOrchestrator<'ctx>) -> Result<Vec<BuiltWheel>>,
+    {
+        let Some(pgo_command) = self.context.artifact.pgo_command.clone() else {
+            return build(self);
+        };
+        let instrumentation_python = instrumentation_python.context(
+            "PGO builds require a Python interpreter. Please specify one with `--interpreter`.",
         )?;
 
-        let wheels = self.run_pgo_cycle(
+        self.run_pgo_cycle(
             pgo_command,
             instrumentation_python,
             "",
-            |instrumented_ctx| {
-                instrumented_ctx.python.interpreter = vec![instrumentation_python.clone()];
-            },
-            |instrumented_orchestrator| {
-                let instrumented_wheels = instrumented_orchestrator.build_wheels_inner()?;
-                Ok(instrumented_wheels
+            |instrumented| {
+                let wheels = build(instrumented)?;
+                Ok(wheels
                     .first()
                     .context("No instrumented wheel was built")?
                     .path
                     .clone())
             },
-            |optimized_orchestrator| optimized_orchestrator.build_wheels_inner(),
-        )?;
-
-        ui::status!("🎉 PGO build complete!");
-        Ok(wheels)
+            |optimized| build(optimized),
+        )
     }
 
-    /// Per-interpreter PGO for non-abi3 PyO3 builds.
-    fn build_wheels_pgo_per_interpreter(&self, pgo_command: String) -> Result<Vec<BuiltWheel>> {
-        fs::create_dir_all(&self.context.artifact.out)
-            .context("Failed to create the target directory for the wheels")?;
-
-        let sbom_data = SbomData::generate(self.context)?;
-        let mut wheels = Vec::new();
-
-        for (i, python_interpreter) in self.context.python.interpreter.iter().enumerate() {
-            ui::status!(
-                "📊 [{}/{}] PGO cycle for {} {}.{}...",
-                i + 1,
-                self.context.python.interpreter.len(),
-                python_interpreter.interpreter_kind,
-                python_interpreter.major,
-                python_interpreter.minor,
-            );
-
-            let wheel = self.run_pgo_cycle(
-                pgo_command.clone(),
-                python_interpreter,
-                "  ",
-                |_| {},
-                |instrumented_orchestrator| {
-                    let instrumented_wheel = instrumented_orchestrator
-                        .build_single_pyo3_wheel(python_interpreter, &sbom_data)?;
-                    Ok(instrumented_wheel.path)
-                },
-                |optimized_orchestrator| {
-                    optimized_orchestrator.build_single_pyo3_wheel(python_interpreter, &sbom_data)
-                },
-            )?;
-
-            ui::status!(
-                "  📦 Built PGO-optimized wheel for {} {}.{}{} to {}",
-                python_interpreter.interpreter_kind,
-                python_interpreter.major,
-                python_interpreter.minor,
-                python_interpreter.abiflags,
-                wheel.path.display()
-            );
-            wheels.push(wheel);
+    fn pgo_instrumentation_interpreter(&self) -> Result<Option<&PythonInterpreter>> {
+        if self.context.artifact.pgo_command.is_none() {
+            return Ok(None);
         }
-
-        self.validate_wheels_for_pypi(&wheels)?;
-
-        ui::status!("🎉 PGO build complete!");
-        Ok(wheels)
+        self.context
+            .python
+            .interpreter
+            .first()
+            .context(
+                "PGO builds require a Python interpreter. Please specify one with `--interpreter`.",
+            )
+            .map(Some)
     }
 
     /// Runs the shared PGO cycle: instrumented build, instrumentation, then optimized build.
     ///
     /// `message_prefix` preserves user-visible indentation for per-interpreter PGO output.
-    fn run_pgo_cycle<T, ConfigureInstrumented, BuildInstrumented, BuildOptimized>(
+    fn run_pgo_cycle<T, BuildInstrumented, BuildOptimized>(
         &self,
         pgo_command: String,
         instrumentation_python: &PythonInterpreter,
         message_prefix: &str,
-        configure_instrumented_context: ConfigureInstrumented,
         build_instrumented_wheel: BuildInstrumented,
         build_optimized_wheels: BuildOptimized,
     ) -> Result<T>
     where
-        ConfigureInstrumented: FnOnce(&mut BuildContext),
         BuildInstrumented: for<'ctx> FnOnce(&BuildOrchestrator<'ctx>) -> Result<PathBuf>,
         BuildOptimized: for<'ctx> FnOnce(&BuildOrchestrator<'ctx>) -> Result<T>,
     {
@@ -174,7 +129,6 @@ impl<'a> BuildOrchestrator<'a> {
         let mut instrumented_ctx = self.clone_context_for_pgo(PgoPhase::Generate(
             pgo_ctx.profdata_dir_path().to_path_buf(),
         ));
-        configure_instrumented_context(&mut instrumented_ctx);
         let instrumented_out =
             tempfile::TempDir::new().context("Failed to create temp dir for instrumented wheel")?;
         instrumented_ctx.artifact.out = instrumented_out.path().to_path_buf();
@@ -209,14 +163,23 @@ impl<'a> BuildOrchestrator<'a> {
 
         let interpreters: Vec<_> = self.context.python.interpreter.iter().collect();
         let wheels = match self.context.project.bridge() {
-            BridgeModel::Bin(None) => self.build_bin_wheel(None, &sbom_data)?,
+            BridgeModel::Bin(None) => self
+                .build_single_unit(self.pgo_instrumentation_interpreter()?, |orchestrator| {
+                    orchestrator.build_bin_wheel(None, &sbom_data)
+                })?,
             BridgeModel::Bin(Some(..)) => self.build_bin_wheels(&interpreters, &sbom_data)?,
             BridgeModel::PyO3(crate::PyO3 { stable_abi, .. }) => match stable_abi {
                 Some(stable_abi) => self.build_stable_abi_wheels(stable_abi, &sbom_data)?,
                 None => self.build_pyo3_wheels(&interpreters, &sbom_data)?,
             },
-            BridgeModel::Cffi => self.build_cffi_wheel(&sbom_data)?,
-            BridgeModel::UniFfi => self.build_uniffi_wheel(&sbom_data)?,
+            BridgeModel::Cffi => self
+                .build_single_unit(self.context.python.interpreter.first(), |orchestrator| {
+                    orchestrator.build_cffi_wheel(&sbom_data)
+                })?,
+            BridgeModel::UniFfi => self
+                .build_single_unit(self.pgo_instrumentation_interpreter()?, |orchestrator| {
+                    orchestrator.build_uniffi_wheel(&sbom_data)
+                })?,
         };
 
         self.validate_wheels_for_pypi(&wheels)?;
@@ -451,13 +414,15 @@ impl<'a> BuildOrchestrator<'a> {
         let mut built_wheels = Vec::new();
         if let Some(first) = stable_abi_interps.first() {
             let (major, minor) = min_version.unwrap_or((first.major as u8, first.minor as u8));
-            built_wheels.extend(self.build_pyo3_wheel_stable_abi(
-                &stable_abi_interps,
-                *stable_abi,
-                major,
-                minor,
-                sbom_data,
-            )?);
+            built_wheels.extend(self.build_single_unit(Some(first), |orchestrator| {
+                orchestrator.build_pyo3_wheel_stable_abi(
+                    &stable_abi_interps,
+                    *stable_abi,
+                    major,
+                    minor,
+                    sbom_data,
+                )
+            })?);
         }
         if !version_specific_abi_interps.is_empty() {
             let interp_names: HashSet<_> = version_specific_abi_interps
@@ -676,16 +641,23 @@ impl<'a> BuildOrchestrator<'a> {
     ) -> Result<Vec<BuiltWheel>> {
         let mut wheels = Vec::new();
         for &python_interpreter in interpreters {
-            let wheel = self.build_single_pyo3_wheel(python_interpreter, sbom_data)?;
-            ui::status!(
-                "📦 Built wheel for {} {}.{}{} to {}",
-                python_interpreter.interpreter_kind,
-                python_interpreter.major,
-                python_interpreter.minor,
-                python_interpreter.abiflags,
-                wheel.path.display()
-            );
-            wheels.push(wheel);
+            let mut unit_wheels =
+                self.build_single_unit(Some(python_interpreter), |orchestrator| {
+                    Ok(vec![
+                        orchestrator.build_single_pyo3_wheel(python_interpreter, sbom_data)?,
+                    ])
+                })?;
+            for wheel in &unit_wheels {
+                ui::status!(
+                    "📦 Built wheel for {} {}.{}{} to {}",
+                    python_interpreter.interpreter_kind,
+                    python_interpreter.major,
+                    python_interpreter.minor,
+                    python_interpreter.abiflags,
+                    wheel.path.display()
+                );
+            }
+            wheels.append(&mut unit_wheels);
         }
 
         Ok(wheels)
@@ -946,7 +918,11 @@ impl<'a> BuildOrchestrator<'a> {
     ) -> Result<Vec<BuiltWheel>> {
         let mut wheels = Vec::new();
         for &python_interpreter in interpreters {
-            wheels.extend(self.build_bin_wheel(Some(python_interpreter), sbom_data)?);
+            wheels.extend(
+                self.build_single_unit(Some(python_interpreter), |orchestrator| {
+                    orchestrator.build_bin_wheel(Some(python_interpreter), sbom_data)
+                })?,
+            );
         }
         Ok(wheels)
     }

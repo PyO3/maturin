@@ -488,7 +488,6 @@ fn workspace_members_non_local_dep_sdist() {
         [dependencies]
         pyo3 = { version = "0.29.0", features = [
             "abi3-py39",
-            "generate-import-lib",
         ] }
 
         [lib]

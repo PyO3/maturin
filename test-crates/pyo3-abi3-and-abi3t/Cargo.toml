@@ -13,12 +13,10 @@ default = ["abi3-and-abi3t-py315"]
 abi3-and-abi3t-py315 = [
     "pyo3/abi3-py38",
     "pyo3/abi3t-py315",
-    "pyo3/generate-import-lib",
 ]
 abi3-and-current-abi3t = [
     "pyo3/abi3-py38",
     "pyo3/abi3t",
-    "pyo3/generate-import-lib",
 ]
 
 [lib]

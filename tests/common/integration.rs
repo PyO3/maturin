@@ -377,20 +377,28 @@ pub fn test_integration_uv_multi_python(case: &IntegrationCase<'_>) -> Result<()
     let target = Target::from_target_triple(None)?;
     let mut interpreters = Vec::new();
 
-    for minor in [10, 11] {
+    for minor in [12, 13] {
         let env_dir = Path::new("test-crates")
             .join("venvs")
             .join(format!("{}-py3{minor}", case.id));
         if env_dir.is_dir() {
             fs_err::remove_dir_all(&env_dir)?;
         }
+        let python_request = if cfg!(all(windows, target_arch = "aarch64")) {
+            // see https://github.com/astral-sh/uv/issues/19015
+            // for now uv prefers x64 python on windows aarch64, need
+            // to directly request aarch64 python
+            format!("3.{minor}-aarch64")
+        } else {
+            format!("3.{minor}")
+        };
         let output = Command::new(&uv)
             .args([
                 "venv",
                 "--seed",
                 "--managed-python",
                 "--python",
-                &format!("3.{minor}"),
+                &python_request,
             ])
             .arg(&env_dir)
             .output()

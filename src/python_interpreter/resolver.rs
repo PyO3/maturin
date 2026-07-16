@@ -224,7 +224,7 @@ impl<'a> InterpreterResolver<'a> {
         match self.bridge {
             BridgeModel::Cffi => self.resolve_single("cffi").map(|i| (vec![i], None)),
             BridgeModel::Bin(None) | BridgeModel::UniFfi => {
-                // A signle interpreter is required for PGO, if the user doesn't
+                // A single interpreter is required for PGO, if the user doesn't
                 // specify any, we don't care and can skip searching.
                 if self.user_interpreters.is_empty() {
                     Ok((vec![], None))

@@ -236,10 +236,25 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
         // modifies it at a time and that during that time, no other test reads it.
         let file = File::create(venvs_dir.join("cffi-provider.lock"))?;
         file.lock_exclusive()?;
-        let python = if !cffi_venv.is_dir() {
+
+        let target_triple = Target::from_target_triple(None)?;
+        let python = target_triple.get_venv_python(&cffi_venv);
+
+        // possible arch mismatch between the python interpreter and the cffi venv if e.g.
+        // testing in containers that on the host, clean up conservatively if so
+        if python.exists() {
+            let output = Command::new(&python)
+                .args(["-c", "import cffi"])
+                .output()
+                .with_context(|| format!("cffi import check failed with {python:?}"))?;
+            if !output.status.success() {
+                fs_err::remove_dir_all(&cffi_venv)?;
+            }
+        }
+
+        // ... and then create if needed
+        if !cffi_venv.is_dir() {
             create_named_virtualenv(cffi_provider, python_interp.clone().map(PathBuf::from))?;
-            let target_triple = Target::from_target_triple(None)?;
-            let python = target_triple.get_venv_python(&cffi_venv);
             assert!(python.is_file(), "cffi venv not created correctly");
             let pip_install_cffi = [
                 "-m",
@@ -263,10 +278,6 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
                     stderr
                 );
             }
-            python
-        } else {
-            let target_triple = Target::from_target_triple(None)?;
-            target_triple.get_venv_python(&cffi_venv)
         };
         file.unlock()?;
         cli.push("--interpreter".into());

@@ -19,4 +19,5 @@ test-crates/targets/
 test-crates/venvs/
 test-crates/wheels/
 test-crates/case-packages/
+test-targets/
 venv*/

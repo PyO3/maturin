@@ -238,7 +238,7 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
         file.lock_exclusive()?;
 
         let target_triple = Target::from_target_triple(None)?;
-        let python = target_triple.get_venv_python(&cffi_venv);
+        let mut python = target_triple.get_venv_python(&cffi_venv);
 
         // possible arch mismatch between the python interpreter and the cffi venv if e.g.
         // testing in containers that on the host, clean up conservatively if so
@@ -255,6 +255,9 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
         // ... and then create if needed
         if !cffi_venv.is_dir() {
             create_named_virtualenv(cffi_provider, python_interp.clone().map(PathBuf::from))?;
+            // re-resolve python because on windows `get_venv_python` depends on what's
+            // actually installed
+            python = target_triple.get_venv_python(&cffi_venv);
             assert!(python.is_file(), "cffi venv not created correctly");
             let pip_install_cffi = [
                 "-m",

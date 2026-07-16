@@ -203,8 +203,6 @@ pub fn pypi_compatibility_linux_tag() -> Result<()> {
         "test-crates/targets/pypi_compatibility_linux_tag",
         "--out",
         "test-crates/targets/pypi_compatibility_linux_tag",
-        "-i",
-        "python3.12", // Add interpreter to bypass interpreter detection
     ];
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
     let build_context = options

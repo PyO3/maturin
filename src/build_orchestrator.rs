@@ -374,7 +374,7 @@ impl<'a> BuildOrchestrator<'a> {
                 "{}{}{}-*.tar.gz",
                 self.context.artifact.out.display(),
                 std::path::MAIN_SEPARATOR,
-                &self.context.project.metadata24.get_distribution_escaped(),
+                self.context.project.metadata24.get_distribution_escaped(),
             );
             excludes.add(&glob_pattern)?;
         }

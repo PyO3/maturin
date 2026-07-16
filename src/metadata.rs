@@ -822,8 +822,8 @@ impl Metadata24 {
     pub fn get_dist_info_dir(&self) -> PathBuf {
         PathBuf::from(format!(
             "{}-{}.dist-info",
-            &self.get_distribution_escaped(),
-            &self.get_version_escaped()
+            self.get_distribution_escaped(),
+            self.get_version_escaped()
         ))
     }
 
@@ -831,8 +831,8 @@ impl Metadata24 {
     pub fn get_data_dir(&self) -> PathBuf {
         PathBuf::from(format!(
             "{}-{}.data",
-            &self.get_distribution_escaped(),
-            &self.get_version_escaped()
+            self.get_distribution_escaped(),
+            self.get_version_escaped()
         ))
     }
 
@@ -846,7 +846,7 @@ impl Metadata24 {
     ///
     /// See <https://github.com/pypa/auditwheel/pull/443>.
     pub fn get_scripts_platlib_dir(&self) -> PathBuf {
-        PathBuf::from(format!("{}.scripts", &self.get_distribution_escaped()))
+        PathBuf::from(format!("{}.scripts", self.get_distribution_escaped()))
     }
 }
 

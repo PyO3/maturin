@@ -125,10 +125,7 @@ pub(super) fn calculate_abi_tag(ext_suffix: &str) -> Option<String> {
         soabi_split.take(3).collect::<Vec<_>>().join("-")
     } else if !soabi.is_empty() {
         // pyston, ironpython, others?
-        match soabi_split.nth(1) {
-            Some(abi) => abi.to_string(),
-            None => return None,
-        }
+        soabi_split.nth(1)?.to_string()
     } else {
         return None;
     };

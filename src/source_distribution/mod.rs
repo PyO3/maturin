@@ -926,8 +926,8 @@ pub fn source_distribution(
     let mut writer = VirtualWriter::new(writer, excludes);
     let root_dir = PathBuf::from(format!(
         "{}-{}",
-        &metadata24.get_distribution_escaped(),
-        &metadata24.get_version_escaped()
+        metadata24.get_distribution_escaped(),
+        metadata24.get_version_escaped()
     ));
 
     let pyproject_dir = pyproject_toml_path.parent().unwrap();

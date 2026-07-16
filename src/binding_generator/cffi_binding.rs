@@ -117,7 +117,7 @@ where
     Command::new(python)
         .args(args)
         .output()
-        .context(format!("Failed to run python at {:?}", &python))
+        .context(format!("Failed to run python at {python:?}"))
 }
 
 /// Checks if user has provided their own header at `target/header.h`, otherwise
@@ -219,8 +219,7 @@ recompiler.make_py_source(ffi, "ffi", r"{ffi_py}")
                 "False" => false,
                 _ => {
                     eprintln!(
-                        "⚠️ Failed to determine whether python at {:?} is running inside a virtualenv",
-                        &python
+                        "⚠️ Failed to determine whether python at {python:?} is running inside a virtualenv",
                     );
                     false
                 }
@@ -252,8 +251,7 @@ recompiler.make_py_source(ffi, "ffi", r"{ffi_py}")
     )?;
     if !output.status.success() {
         bail!(
-            "Installing cffi with `{:?} -m pip install cffi` failed: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\nPlease install cffi yourself.",
-            &python,
+            "Installing cffi with `{python:?} -m pip install cffi` failed: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\nPlease install cffi yourself.",
             output.status,
             str::from_utf8(&output.stdout)?,
             str::from_utf8(&output.stderr)?

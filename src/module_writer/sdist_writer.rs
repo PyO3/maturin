@@ -99,8 +99,8 @@ impl SDistWriter {
             .normalize()?
             .join(format!(
                 "{}-{}.tar.gz",
-                &metadata24.get_distribution_escaped(),
-                &metadata24.get_version_escaped()
+                metadata24.get_distribution_escaped(),
+                metadata24.get_version_escaped()
             ))
             .into_path_buf();
 

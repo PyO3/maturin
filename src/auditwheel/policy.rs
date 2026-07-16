@@ -60,7 +60,7 @@ impl Display for Policy {
         } else {
             f.write_fmt(format_args!(
                 "{} (aka {})",
-                &self.name,
+                self.name,
                 self.aliases.join(",")
             ))
         }

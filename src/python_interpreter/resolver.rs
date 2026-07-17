@@ -223,7 +223,20 @@ impl<'a> InterpreterResolver<'a> {
     pub fn resolve(&self) -> Result<(Vec<PythonInterpreter>, Option<PathBuf>)> {
         match self.bridge {
             BridgeModel::Cffi => self.resolve_single("cffi").map(|i| (vec![i], None)),
-            BridgeModel::Bin(None) | BridgeModel::UniFfi => Ok((vec![], None)),
+            BridgeModel::Bin(None) | BridgeModel::UniFfi => {
+                // A single interpreter is required for PGO, if the user doesn't
+                // specify any, we don't care and can skip searching.
+                if self.user_interpreters.is_empty() {
+                    Ok((vec![], None))
+                } else {
+                    let bridge_name = match self.bridge {
+                        BridgeModel::Bin(None) => "bin",
+                        BridgeModel::UniFfi => "uniffi",
+                        _ => unreachable!(),
+                    };
+                    self.resolve_single(bridge_name).map(|i| (vec![i], None))
+                }
+            }
             BridgeModel::PyO3(pyo3) | BridgeModel::Bin(Some(pyo3)) => self.resolve_pyo3(pyo3),
         }
     }
@@ -873,7 +886,7 @@ impl<'a> InterpreterResolver<'a> {
             self.user_interpreters[0].clone()
         } else {
             bail!(
-                "You can only specify one python interpreter for {}",
+                "You can only specify one python interpreter for `{}` bindings",
                 bridge_name
             );
         };

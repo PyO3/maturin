@@ -236,10 +236,28 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
         // modifies it at a time and that during that time, no other test reads it.
         let file = File::create(venvs_dir.join("cffi-provider.lock"))?;
         file.lock_exclusive()?;
-        let python = if !cffi_venv.is_dir() {
+
+        let target_triple = Target::from_target_triple(None)?;
+        let mut python = target_triple.get_venv_python(&cffi_venv);
+
+        // possible arch mismatch between the python interpreter and the cffi venv if e.g.
+        // testing in containers that on the host, clean up conservatively if so
+        if python.exists() {
+            let output = Command::new(&python)
+                .args(["-c", "import cffi"])
+                .output()
+                .with_context(|| format!("cffi import check failed with {python:?}"))?;
+            if !output.status.success() {
+                fs_err::remove_dir_all(&cffi_venv)?;
+            }
+        }
+
+        // ... and then create if needed
+        if !cffi_venv.is_dir() {
             create_named_virtualenv(cffi_provider, python_interp.clone().map(PathBuf::from))?;
-            let target_triple = Target::from_target_triple(None)?;
-            let python = target_triple.get_venv_python(&cffi_venv);
+            // re-resolve python because on windows `get_venv_python` depends on what's
+            // actually installed
+            python = target_triple.get_venv_python(&cffi_venv);
             assert!(python.is_file(), "cffi venv not created correctly");
             let pip_install_cffi = [
                 "-m",
@@ -263,10 +281,6 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
                     stderr
                 );
             }
-            python
-        } else {
-            let target_triple = Target::from_target_triple(None)?;
-            target_triple.get_venv_python(&cffi_venv)
         };
         file.unlock()?;
         cli.push("--interpreter".into());
@@ -350,6 +364,95 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
         )?;
 
         install_and_check_wheel(package, filename, &venv_dir, &python)?;
+    }
+
+    cleanup_case(case.id);
+    Ok(())
+}
+
+pub fn test_integration_uv_multi_python(case: &IntegrationCase<'_>) -> Result<()> {
+    let package_path = prepare_case_package(case.id, case.package, case.package_copy)?;
+    let package = package_path.as_path();
+    let uv = which::which("uv").context("uv is required for this integration test")?;
+    let target = Target::from_target_triple(None)?;
+    let mut interpreters = Vec::new();
+
+    for minor in [12, 13] {
+        let env_dir = Path::new("test-crates")
+            .join("venvs")
+            .join(format!("{}-py3{minor}", case.id));
+        if env_dir.is_dir() {
+            fs_err::remove_dir_all(&env_dir)?;
+        }
+        let python_request = if cfg!(all(windows, target_arch = "aarch64")) {
+            // see https://github.com/astral-sh/uv/issues/19015
+            // for now uv prefers x64 python on windows aarch64, need
+            // to directly request aarch64 python
+            format!("3.{minor}-aarch64")
+        } else {
+            format!("3.{minor}")
+        };
+        let output = Command::new(&uv)
+            .args([
+                "venv",
+                "--seed",
+                "--managed-python",
+                "--python",
+                &python_request,
+            ])
+            .arg(&env_dir)
+            .output()
+            .context("failed to create uv virtualenv")?;
+        if !output.status.success() {
+            bail!(
+                "uv failed to create a Python 3.{minor} environment: {}\n--- Stdout:\n{}\n--- Stderr:\n{}",
+                output.status,
+                str::from_utf8(&output.stdout)?.trim(),
+                str::from_utf8(&output.stderr)?.trim(),
+            );
+        }
+        interpreters.push((env_dir.clone(), target.get_venv_python(&env_dir)));
+    }
+
+    let mut cli: Vec<std::ffi::OsString> = vec![
+        "build".into(),
+        "--quiet".into(),
+        "--manifest-path".into(),
+        package.join("Cargo.toml").into_os_string(),
+        "--interpreter".into(),
+    ];
+    cli.extend(
+        interpreters
+            .iter()
+            .map(|(_, python)| python.as_os_str().to_owned()),
+    );
+    cli.push("--target-dir".into());
+    cli.push(case_target_dir(case.id).into_os_string());
+    cli.push("--out".into());
+    cli.push(case_wheel_dir(case.id).into_os_string());
+
+    let options = BuildOptions::try_parse_from(cli)?;
+    let build_context = options
+        .into_build_context()
+        .strip(Some(cfg!(feature = "faster-tests")))
+        .editable(false)
+        .pgo(case.pgo)
+        .build()?;
+    let wheels = BuildOrchestrator::new(&build_context).build_wheels()?;
+
+    let universal = wheels
+        .iter()
+        .all(|wheel| matches!(wheel.tag, BuiltArtifactTag::Universal));
+    if universal {
+        assert_eq!(wheels.len(), 1);
+        for (env_dir, python) in &interpreters {
+            install_and_check_wheel(package, &wheels[0].path, env_dir, python)?;
+        }
+    } else {
+        assert_eq!(wheels.len(), interpreters.len());
+        for (wheel, (env_dir, python)) in wheels.iter().zip(&interpreters) {
+            install_and_check_wheel(package, &wheel.path, env_dir, python)?;
+        }
     }
 
     cleanup_case(case.id);

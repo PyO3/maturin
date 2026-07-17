@@ -10,6 +10,7 @@ build-backend = "maturin"
 
 [tool.maturin]
 bindings = "bin"
+pgo-command = "hello-world"
 exclude = [
   "benches/excluded_bench.rs",
   "examples/excluded_example.rs",

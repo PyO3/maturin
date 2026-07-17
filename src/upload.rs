@@ -657,7 +657,7 @@ pub fn upload_ui(items: &[PathBuf], publish: &PublishOpt) -> Result<()> {
                 }
                 let filesize = fs::metadata(i)
                     .map(|x| ByteSize(x.len()).to_string())
-                    .unwrap_or_else(|e| format!("Failed to get the filesize of {:?}: {}", &i, e));
+                    .unwrap_or_else(|e| format!("Failed to get the filesize of {i:?}: {e}"));
                 return Err(err).context(format!("💥 Failed to upload {filename:?} ({filesize})"));
             }
         }

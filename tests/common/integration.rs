@@ -157,7 +157,7 @@ fn install_and_check_wheel(
     if !output.stderr.is_empty() {
         bail!(
             "pip raised a warning running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
-            &command,
+            command,
             output.status,
             str::from_utf8(&output.stdout)?.trim(),
             str::from_utf8(&output.stderr)?.trim(),

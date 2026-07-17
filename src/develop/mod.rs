@@ -195,14 +195,14 @@ fn install_wheel(
             "{} install failed (ran {:?} with {:?})",
             install_backend.name(),
             cmd.get_program(),
-            &cmd.get_args().collect::<Vec<_>>(),
+            cmd.get_args().collect::<Vec<_>>(),
         ))?;
     if !output.status.success() {
         bail!(
             "{} install in {} failed running {:?}: {}\n--- Stdout:\n{}\n--- Stderr:\n{}\n---\n",
             install_backend.name(),
             venv_dir.display(),
-            &cmd.get_args().collect::<Vec<_>>(),
+            cmd.get_args().collect::<Vec<_>>(),
             output.status,
             String::from_utf8_lossy(&output.stdout).trim(),
             String::from_utf8_lossy(&output.stderr).trim(),
@@ -232,7 +232,7 @@ fn install_wheel(
             eprintln!(
                 "⚠️ Warning: {} raised a warning running {:?}:\n{}",
                 install_backend.name(),
-                &cmd.get_args().collect::<Vec<_>>(),
+                cmd.get_args().collect::<Vec<_>>(),
                 stderr,
             );
         }

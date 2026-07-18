@@ -1,0 +1,3 @@
+[workspace]
+members = ["bin", "python"]
+resolver = "2"

@@ -1,0 +1,10 @@
+[package]
+name = "pyo3-workspace-abi3-feature"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = "0.29.0"

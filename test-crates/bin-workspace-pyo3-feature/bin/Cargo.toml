@@ -1,0 +1,10 @@
+[package]
+name = "bin-workspace-pyo3-feature"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+python = ["shared/python"]
+
+[dependencies]
+shared = { path = "../shared" }

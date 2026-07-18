@@ -270,7 +270,7 @@ impl GenerateCI {
         let bridge = find_bridge(
             &cargo_metadata,
             pyproject.and_then(|x| x.bindings()),
-            Some(&cargo_options),
+            &cargo_options,
         )?;
         let project_name = pyproject
             .and_then(|project| project.project_name())

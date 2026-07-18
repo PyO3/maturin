@@ -123,7 +123,7 @@ impl BuildContextBuilder {
 
         // Detect bridge without conditional pyo3 features — those are
         // evaluated after interpreter resolution via upgrade_bridge_stable_abi.
-        let crate_deps = CrateDependencies::resolve(&cargo_metadata, Some(&cargo_options))?;
+        let crate_deps = CrateDependencies::resolve(&cargo_metadata, &cargo_options)?;
         let bridge = find_bridge_with_deps(&cargo_metadata, bindings, &crate_deps)?;
 
         if !bridge.is_bin() && project_layout.extension_name.contains('-') {

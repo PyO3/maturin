@@ -158,11 +158,11 @@ mod tests {
             .unwrap();
 
         assert!(matches!(
-            find_bridge(&pyo3_mixed, None, None),
+            find_bridge(&pyo3_mixed, None, &CargoOptions::default()),
             Ok(BridgeModel::PyO3 { .. })
         ));
         assert!(matches!(
-            find_bridge(&pyo3_mixed, Some("pyo3"), None),
+            find_bridge(&pyo3_mixed, Some("pyo3"), &CargoOptions::default()),
             Ok(BridgeModel::PyO3 { .. })
         ));
     }
@@ -191,8 +191,14 @@ mod tests {
                 },
             }),
         });
-        assert_eq!(find_bridge(&pyo3_pure, None, None).unwrap(), bridge);
-        assert_eq!(find_bridge(&pyo3_pure, Some("pyo3"), None).unwrap(), bridge);
+        assert_eq!(
+            find_bridge(&pyo3_pure, None, &CargoOptions::default()).unwrap(),
+            bridge
+        );
+        assert_eq!(
+            find_bridge(&pyo3_pure, Some("pyo3"), &CargoOptions::default()).unwrap(),
+            bridge
+        );
     }
 
     #[test]
@@ -209,7 +215,7 @@ mod tests {
             )
             .exec()
             .unwrap();
-        let bridge = find_bridge(&metadata, None, None).unwrap();
+        let bridge = find_bridge(&metadata, None, &CargoOptions::default()).unwrap();
         let BridgeModel::PyO3(pyo3) = bridge else {
             panic!("expected pyo3 bindings, got {bridge:?}");
         };
@@ -223,7 +229,7 @@ mod tests {
             .exec()
             .unwrap();
 
-        let bridge = find_bridge(&pyo3_abi3t, None, None).unwrap();
+        let bridge = find_bridge(&pyo3_abi3t, None, &CargoOptions::default()).unwrap();
         let pyo3 = match &bridge {
             BridgeModel::PyO3(pyo3) => pyo3,
             other => panic!("expected PyO3 bridge, got {other:?}"),
@@ -235,7 +241,8 @@ mod tests {
         );
         assert_eq!(pyo3.crate_name, PyO3Crate::PyO3);
 
-        let bridge_explicit = find_bridge(&pyo3_abi3t, Some("pyo3"), None).unwrap();
+        let bridge_explicit =
+            find_bridge(&pyo3_abi3t, Some("pyo3"), &CargoOptions::default()).unwrap();
         assert_eq!(bridge_explicit, bridge);
     }
 
@@ -246,7 +253,8 @@ mod tests {
             .exec()
             .unwrap();
 
-        let bridge = find_bridge(&pyo3_abi3t_without_version, None, None).unwrap();
+        let bridge =
+            find_bridge(&pyo3_abi3t_without_version, None, &CargoOptions::default()).unwrap();
         let pyo3 = match &bridge {
             BridgeModel::PyO3(pyo3) => pyo3,
             other => panic!("expected PyO3 bridge, got {other:?}"),
@@ -280,7 +288,7 @@ mod tests {
             }
             let metadata = command.exec().unwrap();
 
-            let bridge = find_bridge(&metadata, None, None).unwrap();
+            let bridge = find_bridge(&metadata, None, &CargoOptions::default()).unwrap();
             let pyo3 = match &bridge {
                 BridgeModel::PyO3(pyo3) => pyo3,
                 other => panic!("expected PyO3 bridge, got {other:?}"),
@@ -302,7 +310,7 @@ mod tests {
             .manifest_path(test_crate_path("pyo3-abi3-and-abi3t").join("Cargo.toml"))
             .exec()
             .unwrap();
-        let bridge = find_bridge(&metadata, None, None).unwrap();
+        let bridge = find_bridge(&metadata, None, &CargoOptions::default()).unwrap();
         let target = Target::from_resolved_target_triple("x86_64-unknown-linux-gnu").unwrap();
         let cpython = |minor, abiflags| {
             crate::PythonInterpreter::from_config(
@@ -343,7 +351,7 @@ mod tests {
             ),
         ];
 
-        let deps = CrateDependencies::resolve(&metadata, None).unwrap();
+        let deps = CrateDependencies::resolve(&metadata, &CargoOptions::default()).unwrap();
         for (name, interpreters, expected) in cases {
             let bridge =
                 upgrade_bridge_stable_abi(bridge.clone(), &deps, None, &interpreters).unwrap();
@@ -362,7 +370,7 @@ mod tests {
             .exec()
             .unwrap();
 
-        let bridge = find_bridge(&pyo3_ffi_abi3t, None, None).unwrap();
+        let bridge = find_bridge(&pyo3_ffi_abi3t, None, &CargoOptions::default()).unwrap();
         let pyo3 = match &bridge {
             BridgeModel::PyO3(pyo3) => pyo3,
             other => panic!("expected PyO3 bridge, got {other:?}"),
@@ -460,7 +468,7 @@ mod tests {
             .exec()
             .unwrap();
 
-        assert!(find_bridge(&pyo3_pure, None, None).is_err());
+        assert!(find_bridge(&pyo3_pure, None, &CargoOptions::default()).is_err());
 
         let pyo3_pure = MetadataCommand::new()
             .manifest_path(test_crate_path("pyo3-feature").join("Cargo.toml"))
@@ -469,7 +477,7 @@ mod tests {
             .unwrap();
 
         assert!(matches!(
-            find_bridge(&pyo3_pure, None, None).unwrap(),
+            find_bridge(&pyo3_pure, None, &CargoOptions::default()).unwrap(),
             BridgeModel::PyO3 { .. }
         ));
     }
@@ -482,15 +490,15 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            find_bridge(&cffi_pure, Some("cffi"), None).unwrap(),
+            find_bridge(&cffi_pure, Some("cffi"), &CargoOptions::default()).unwrap(),
             BridgeModel::Cffi
         );
         assert_eq!(
-            find_bridge(&cffi_pure, None, None).unwrap(),
+            find_bridge(&cffi_pure, None, &CargoOptions::default()).unwrap(),
             BridgeModel::Cffi
         );
 
-        assert!(find_bridge(&cffi_pure, Some("pyo3"), None).is_err());
+        assert!(find_bridge(&cffi_pure, Some("pyo3"), &CargoOptions::default()).is_err());
     }
 
     #[test]
@@ -501,26 +509,26 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            find_bridge(&hello_world, Some("bin"), None).unwrap(),
+            find_bridge(&hello_world, Some("bin"), &CargoOptions::default()).unwrap(),
             BridgeModel::Bin(None)
         );
         assert_eq!(
-            find_bridge(&hello_world, None, None).unwrap(),
+            find_bridge(&hello_world, None, &CargoOptions::default()).unwrap(),
             BridgeModel::Bin(None)
         );
 
-        assert!(find_bridge(&hello_world, Some("pyo3"), None).is_err());
+        assert!(find_bridge(&hello_world, Some("pyo3"), &CargoOptions::default()).is_err());
 
         let pyo3_bin = MetadataCommand::new()
             .manifest_path(test_crate_path("pyo3-bin").join("Cargo.toml"))
             .exec()
             .unwrap();
         assert!(matches!(
-            find_bridge(&pyo3_bin, Some("bin"), None).unwrap(),
+            find_bridge(&pyo3_bin, Some("bin"), &CargoOptions::default()).unwrap(),
             BridgeModel::Bin(Some(_))
         ));
         assert!(matches!(
-            find_bridge(&pyo3_bin, None, None).unwrap(),
+            find_bridge(&pyo3_bin, None, &CargoOptions::default()).unwrap(),
             BridgeModel::Bin(Some(_))
         ));
 
@@ -535,7 +543,7 @@ mod tests {
             .exec()
             .unwrap();
         assert_eq!(
-            find_bridge(&workspace_bin, Some("bin"), None).unwrap(),
+            find_bridge(&workspace_bin, Some("bin"), &CargoOptions::default()).unwrap(),
             BridgeModel::Bin(None)
         );
 
@@ -556,7 +564,7 @@ mod tests {
             ..Default::default()
         };
         assert!(matches!(
-            find_bridge(&workspace_bin_python, Some("bin"), Some(&cargo_options)).unwrap(),
+            find_bridge(&workspace_bin_python, Some("bin"), &cargo_options).unwrap(),
             BridgeModel::Bin(Some(_))
         ));
     }
@@ -589,7 +597,7 @@ mod tests {
         let target = Target::from_resolved_target_triple("x86_64-unknown-linux-gnu").unwrap();
 
         // find_bridge alone never includes conditional features → no abi3
-        let bridge = find_bridge(&metadata, None, None).unwrap();
+        let bridge = find_bridge(&metadata, None, &CargoOptions::default()).unwrap();
         assert!(
             !bridge.has_stable_abi(),
             "find_bridge should not infer abi3 from conditional features"
@@ -605,7 +613,7 @@ mod tests {
             )
             .unwrap(),
         );
-        let deps = CrateDependencies::resolve(&metadata, None).unwrap();
+        let deps = CrateDependencies::resolve(&metadata, &CargoOptions::default()).unwrap();
         let bridge = upgrade_bridge_stable_abi(
             bridge,
             &deps,
@@ -628,7 +636,7 @@ mod tests {
             )
             .unwrap(),
         );
-        let base_bridge = find_bridge(&metadata, None, None).unwrap();
+        let base_bridge = find_bridge(&metadata, None, &CargoOptions::default()).unwrap();
         let bridge = upgrade_bridge_stable_abi(
             base_bridge,
             &deps,
@@ -642,7 +650,7 @@ mod tests {
         // at least one interpreter (3.11) matches the condition. This is safe
         // because build_stable_abi_wheels splits interpreters by min_version:
         // 3.10 gets a version-specific wheel, 3.11+ gets the abi3 wheel.
-        let base_bridge = find_bridge(&metadata, None, None).unwrap();
+        let base_bridge = find_bridge(&metadata, None, &CargoOptions::default()).unwrap();
         let bridge =
             upgrade_bridge_stable_abi(base_bridge, &deps, Some(&pyproject), &[py310, py311])
                 .unwrap();

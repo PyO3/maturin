@@ -1,6 +1,9 @@
 mod detection;
 
-pub use detection::{find_bridge, has_windows_import_lib_support, upgrade_bridge_stable_abi};
+pub use detection::{
+    CrateDependencies, find_bridge, find_bridge_with_deps, has_windows_import_lib_support,
+    upgrade_bridge_stable_abi,
+};
 
 use std::{fmt, str::FromStr};
 

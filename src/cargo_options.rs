@@ -128,6 +128,45 @@ pub struct CargoOptions {
 impl CargoOptions {
     /// Extract `cargo metadata` extra arguments from the cargo options.
     pub fn cargo_metadata_args(&self) -> Result<Vec<String>> {
+        let platform_args = match &self.target {
+            Some(TargetTriple::Universal2) => vec![
+                "--filter-platform".to_string(),
+                "aarch64-apple-darwin".to_string(),
+                "--filter-platform".to_string(),
+                "x86_64-apple-darwin".to_string(),
+            ],
+            Some(TargetTriple::Regular(target)) => {
+                vec!["--filter-platform".to_string(), target.clone()]
+            }
+            None => vec![],
+        };
+        Ok(self.resolve_args(platform_args))
+    }
+
+    /// Extract `cargo tree` extra arguments from the cargo options.
+    ///
+    /// Mirrors [`CargoOptions::cargo_metadata_args`], except that platform
+    /// filtering uses `cargo tree`'s `--target` flag; without an explicit
+    /// target, `--target all` matches `cargo metadata`'s unfiltered resolve.
+    pub fn cargo_tree_args(&self) -> Vec<String> {
+        let platform_args = match &self.target {
+            Some(TargetTriple::Universal2) => vec![
+                "--target".to_string(),
+                "aarch64-apple-darwin".to_string(),
+                "--target".to_string(),
+                "x86_64-apple-darwin".to_string(),
+            ],
+            Some(TargetTriple::Regular(target)) => {
+                vec!["--target".to_string(), target.clone()]
+            }
+            None => vec!["--target".to_string(), "all".to_string()],
+        };
+        self.resolve_args(platform_args)
+    }
+
+    /// Dependency resolution arguments shared by `cargo metadata` and
+    /// `cargo tree`, with the command-specific platform arguments in between.
+    fn resolve_args(&self, platform_args: Vec<String>) -> Vec<String> {
         let mut args = vec![];
         if self.frozen {
             args.push("--frozen".to_string());
@@ -148,27 +187,12 @@ impl CargoOptions {
         if self.no_default_features {
             args.push("--no-default-features".to_string());
         }
-        if let Some(target) = &self.target {
-            match target {
-                TargetTriple::Universal2 => {
-                    args.extend([
-                        "--filter-platform".to_string(),
-                        "aarch64-apple-darwin".to_string(),
-                        "--filter-platform".to_string(),
-                        "x86_64-apple-darwin".to_string(),
-                    ]);
-                }
-                TargetTriple::Regular(target) => {
-                    args.push("--filter-platform".to_string());
-                    args.push(target.clone());
-                }
-            }
-        }
+        args.extend(platform_args);
         for opt in &self.unstable_flags {
             args.push("-Z".to_string());
             args.push(opt.clone());
         }
-        Ok(args)
+        args
     }
 
     /// Convert the Cargo options into a Cargo invocation.

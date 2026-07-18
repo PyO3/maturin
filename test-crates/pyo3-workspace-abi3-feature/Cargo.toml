@@ -1,0 +1,3 @@
+[workspace]
+members = ["extension", "abi3-user"]
+resolver = "2"

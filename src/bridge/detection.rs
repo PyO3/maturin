@@ -8,11 +8,12 @@ use super::{
     ABI3T_MINIMUM_PYTHON_MINOR, BridgeModel, PyO3, PyO3Crate, PyO3MetadataRaw, StableAbi,
     StableAbiKind, StableAbiVersion,
 };
-use crate::PyProjectToml;
 use crate::pyproject_toml::{FeatureConditionEnv, FeatureSpec};
+use crate::{CargoOptions, PyProjectToml};
 use anyhow::{Context, Result, bail};
 use cargo_metadata::{CrateType, Metadata, Node, PackageId, TargetKind};
 use std::collections::{HashMap, HashSet};
+use std::process::Command;
 
 // pyo3-ffi is ordered first because it is newer and more restrictive.
 const PYO3_BINDING_CRATES: [PyO3Crate; 2] = [PyO3Crate::PyO3Ffi, PyO3Crate::PyO3];
@@ -26,19 +27,29 @@ const PYO3_BINDING_CRATES: [PyO3Crate; 2] = [PyO3Crate::PyO3Ffi, PyO3Crate::PyO3
 /// Conditional pyo3/pyo3-ffi features from pyproject.toml are excluded from
 /// abi3 inference here. Use [`upgrade_bridge_stable_abi`] after interpreter resolution
 /// to evaluate them.
-pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<BridgeModel> {
+pub fn find_bridge(
+    cargo_metadata: &Metadata,
+    bridge: Option<&str>,
+    cargo_options: Option<&CargoOptions>,
+) -> Result<BridgeModel> {
+    let deps = CrateDependencies::resolve(cargo_metadata, cargo_options)?;
+    find_bridge_with_deps(cargo_metadata, bridge, &deps)
+}
+
+/// [`find_bridge`] with an already-resolved dependency graph, so callers that
+/// also need [`CrateDependencies`] elsewhere resolve it only once.
+pub fn find_bridge_with_deps(
+    cargo_metadata: &Metadata,
+    bridge: Option<&str>,
+    deps: &CrateDependencies,
+) -> Result<BridgeModel> {
     let no_extra_features = HashMap::new();
-    let deps = current_crate_dependencies(cargo_metadata)?;
     let packages: HashMap<&str, &cargo_metadata::Package> = cargo_metadata
         .packages
         .iter()
         .filter_map(|pkg| {
             let name = pkg.name.as_ref();
-            if name == "pyo3" || name == "pyo3-ffi" || name == "uniffi" {
-                Some((name, pkg))
-            } else {
-                None
-            }
+            BINDINGS_CRATES.contains(&name).then_some((name, pkg))
         })
         .collect();
     let root_package = cargo_metadata
@@ -68,14 +79,14 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
         } else if bindings == "uniffi" {
             BridgeModel::UniFfi
         } else if bindings == "bin" {
-            let bindings = find_pyo3_bindings(&deps, &packages)?;
+            let bindings = find_pyo3_bindings(deps, &packages)?;
             BridgeModel::Bin(bindings)
         } else {
-            let bindings = find_pyo3_bindings(&deps, &packages)?.context("unknown binding type")?;
+            let bindings = find_pyo3_bindings(deps, &packages)?.context("unknown binding type")?;
             BridgeModel::PyO3(bindings)
         }
     } else {
-        match find_pyo3_bindings(&deps, &packages)? {
+        match find_pyo3_bindings(deps, &packages)? {
             Some(bindings) => {
                 if !targets.contains(&CrateType::CDyLib) && targets.contains(&CrateType::Bin) {
                     BridgeModel::Bin(Some(bindings))
@@ -84,12 +95,12 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
                 }
             }
             _ => {
-                if deps.contains_key("uniffi") {
+                if deps.contains("uniffi") {
                     BridgeModel::UniFfi
                 } else if targets.contains(&CrateType::CDyLib) {
                     BridgeModel::Cffi
                 } else if targets.contains(&CrateType::Bin) {
-                    BridgeModel::Bin(find_pyo3_bindings(&deps, &packages)?)
+                    BridgeModel::Bin(find_pyo3_bindings(deps, &packages)?)
                 } else {
                     bail!(
                         "Couldn't detect the binding type; Please specify them with --bindings/-b"
@@ -106,13 +117,10 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
     for &lib in PYO3_BINDING_CRATES.iter() {
         if !bridge.is_bin() && bridge.is_pyo3_crate(lib) {
             let lib_name = lib.as_str();
-            let pyo3_node = deps[lib_name];
-            if !pyo3_node
-                .features
-                .iter()
-                .map(AsRef::as_ref)
-                .any(|f| f == "extension-module")
-            {
+            let pyo3_node = deps
+                .get(lib_name)
+                .expect("pyo3 bridge crate should be in the dependency graph");
+            if !deps.features(lib_name).contains(&"extension-module") {
                 let version = &cargo_metadata[&pyo3_node.id].version;
                 if (version.major, version.minor) < (0, 26) {
                     // pyo3 0.26+ will use the `PYO3_BUILD_EXTENSION_MODULE` env var instead
@@ -124,7 +132,7 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
                 }
             }
 
-            return if let Some(stable_abi) = has_stable_abi(&deps, &no_extra_features, &[])? {
+            return if let Some(stable_abi) = has_stable_abi(deps, &no_extra_features, &[])? {
                 let pyo3 = bridge.pyo3().expect("should be pyo3 bindings");
                 let bindings = PyO3 {
                     crate_name: lib,
@@ -151,7 +159,7 @@ pub fn find_bridge(cargo_metadata: &Metadata, bridge: Option<&str>) -> Result<Br
 /// should attempt.
 pub fn upgrade_bridge_stable_abi(
     bridge: BridgeModel,
-    cargo_metadata: &Metadata,
+    deps: &CrateDependencies,
     pyproject: Option<&PyProjectToml>,
     interpreters: &[crate::PythonInterpreter],
 ) -> Result<BridgeModel> {
@@ -160,9 +168,8 @@ pub fn upgrade_bridge_stable_abi(
         return Ok(bridge);
     };
 
-    let deps = current_crate_dependencies(cargo_metadata)?;
     let extra_pyo3_features = pyo3_features_from_conditional(pyproject, interpreters);
-    if let Some(stable_abi) = has_stable_abi(&deps, &extra_pyo3_features, interpreters)? {
+    if let Some(stable_abi) = has_stable_abi(deps, &extra_pyo3_features, interpreters)? {
         let upgraded = PyO3 {
             stable_abi: Some(stable_abi),
             ..pyo3.clone()
@@ -183,39 +190,29 @@ pub fn upgrade_bridge_stable_abi(
 /// for Windows when `generate-import-lib` feature is enabled.
 /// pyo3 0.29.0+ uses raw-dylib linking on Windows, so import library generation
 /// is no longer needed and this effectively always returns true.
-pub fn has_windows_import_lib_support(cargo_metadata: &Metadata) -> Result<bool> {
-    let resolve = cargo_metadata
-        .resolve
-        .as_ref()
-        .context("Expected cargo to return metadata with resolve")?;
+pub fn has_windows_import_lib_support(
+    cargo_metadata: &Metadata,
+    deps: &CrateDependencies,
+) -> Result<bool> {
     for &lib in PYO3_BINDING_CRATES.iter().rev() {
         let lib = lib.as_str();
-        let pyo3_packages = resolve
-            .nodes
-            .iter()
-            .filter(|package| cargo_metadata[&package.id].name.as_str() == lib)
-            .collect::<Vec<_>>();
-        match pyo3_packages.as_slice() {
-            &[pyo3_crate] => {
-                let pyo3_version = &cargo_metadata[&pyo3_crate.id].version;
-                if pyo3_version >= &semver::Version::new(0, 29, 0) {
-                    return Ok(true);
-                }
-                let generate_import_lib = pyo3_crate
-                    .features
-                    .iter()
-                    .map(AsRef::as_ref)
-                    .any(|x| x == "generate-import-lib" || x == "generate-abi3-import-lib");
-                return Ok(generate_import_lib);
+        if let Some(pyo3_crate) = deps.get(lib) {
+            let pyo3_version = &cargo_metadata[&pyo3_crate.id].version;
+            if pyo3_version >= &semver::Version::new(0, 29, 0) {
+                return Ok(true);
             }
-            _ => continue,
+            let generate_import_lib = deps
+                .features(lib)
+                .iter()
+                .any(|&x| x == "generate-import-lib" || x == "generate-abi3-import-lib");
+            return Ok(generate_import_lib);
         }
     }
     Ok(false)
 }
 
 fn has_stable_abi(
-    deps: &HashMap<&str, &Node>,
+    deps: &CrateDependencies,
     extra_features: &HashMap<&str, Vec<String>>,
     interpreters: &[crate::PythonInterpreter],
 ) -> Result<Option<StableAbi>> {
@@ -242,20 +239,19 @@ fn has_stable_abi(
 
 /// pyo3 supports building stable abi wheels if the unstable-api feature is not selected
 fn has_stable_abi_from_kind(
-    deps: &HashMap<&str, &Node>,
+    deps: &CrateDependencies,
     extra_features: &HashMap<&str, Vec<String>>,
     abi_kind: StableAbiKind,
 ) -> Result<Option<StableAbi>> {
     for &lib in PYO3_BINDING_CRATES.iter() {
         let lib = lib.as_str();
-        if let Some(&pyo3_crate) = deps.get(lib) {
+        if deps.contains(lib) {
             let extra = extra_features.get(lib);
             // Find the minimal stable abi python version. If there is none, stable abi hasn't been selected
             // This parses abi3-py{major}{minor} and returns the minimal (major, minor) tuple
-            let all_features: Vec<&str> = pyo3_crate
-                .features
-                .iter()
-                .map(AsRef::as_ref)
+            let all_features: Vec<&str> = deps
+                .features(lib)
+                .into_iter()
                 .chain(extra.into_iter().flatten().map(String::as_str))
                 .collect();
 
@@ -305,10 +301,10 @@ fn has_stable_abi_from_kind(
 
 /// Tries to determine the bindings type from dependency
 fn find_pyo3_bindings(
-    deps: &HashMap<&str, &Node>,
+    deps: &CrateDependencies,
     packages: &HashMap<&str, &cargo_metadata::Package>,
 ) -> anyhow::Result<Option<PyO3>> {
-    if deps.get("pyo3").is_some() {
+    if deps.contains("pyo3") {
         let pyo3_metadata = match packages.get("pyo3-ffi") {
             Some(pyo3_ffi) => pyo3_ffi.metadata.clone(),
             None => {
@@ -328,7 +324,7 @@ fn find_pyo3_bindings(
             stable_abi: None,
             metadata,
         }))
-    } else if deps.get("pyo3-ffi").is_some() {
+    } else if deps.contains("pyo3-ffi") {
         let package = &packages["pyo3-ffi"];
         let version = package.version.clone();
         let metadata =
@@ -384,6 +380,156 @@ fn current_crate_dependencies(cargo_metadata: &Metadata) -> Result<HashMap<&str,
                 .then_some((cargo_metadata[id].name.as_ref(), node))
         })
         .collect())
+}
+
+/// Names of the crates whose presence in the dependency graph drives bindings
+/// auto-detection.
+const BINDINGS_CRATES: [&str; 3] = ["pyo3", "pyo3-ffi", "uniffi"];
+
+/// The (transitive) dependencies of the current crate, with features resolved
+/// for the current crate only.
+///
+/// `cargo metadata` unifies features across all workspace members
+/// (rust-lang/cargo#7754), while `cargo build -p <root>` resolves features for
+/// the selected package only. In a multi-member workspace this makes the
+/// unified resolve graph over-report: an optional pyo3 dependency that only a
+/// sibling member enables shows up in the root package's graph (#3256), and a
+/// pyo3 feature like `abi3` that only a sibling enables shows up on the pyo3
+/// node (#876), even though a scoped build never enables either.
+///
+/// When that discrepancy is possible (multi-member workspace with a bindings
+/// crate in the unified graph), the resolver verifies against `cargo tree`,
+/// which resolves features the same way a scoped build does: bindings crates
+/// that aren't really in the graph are dropped, and [`Self::features`] prefers
+/// the scoped feature resolution over the unified one.
+pub struct CrateDependencies<'a> {
+    nodes: HashMap<&'a str, &'a Node>,
+    /// Bindings crate name -> features resolved for the current crate only
+    /// via `cargo tree`. Empty when verification didn't run.
+    scoped_features: HashMap<String, Vec<String>>,
+}
+
+impl<'a> CrateDependencies<'a> {
+    pub fn resolve(
+        cargo_metadata: &'a Metadata,
+        cargo_options: Option<&CargoOptions>,
+    ) -> Result<Self> {
+        let mut nodes = current_crate_dependencies(cargo_metadata)?;
+        let mut scoped_features = HashMap::new();
+        if cargo_metadata.workspace_members.len() > 1
+            && BINDINGS_CRATES.iter().any(|name| nodes.contains_key(name))
+        {
+            match scoped_dependency_features(cargo_metadata, cargo_options) {
+                Ok(scoped) => {
+                    for name in BINDINGS_CRATES {
+                        if !scoped.contains_key(name) {
+                            nodes.remove(name);
+                        }
+                    }
+                    scoped_features = scoped;
+                }
+                Err(err) => {
+                    eprintln!(
+                        "⚠️  Warning: Failed to verify the dependency graph with `cargo tree`, \
+                         bindings detection may mistake feature-gated dependencies of other \
+                         workspace members as enabled: {err:#}"
+                    );
+                }
+            }
+        }
+        Ok(Self {
+            nodes,
+            scoped_features,
+        })
+    }
+
+    fn contains(&self, name: &str) -> bool {
+        self.get(name).is_some()
+    }
+
+    fn get(&self, name: &str) -> Option<&'a Node> {
+        self.nodes.get(name).copied()
+    }
+
+    /// Features of `name` as resolved for the current crate: the scoped
+    /// `cargo tree` resolution when verification ran, the workspace-unified
+    /// `cargo metadata` resolution otherwise.
+    fn features(&self, name: &str) -> Vec<&str> {
+        if let Some(features) = self.scoped_features.get(name) {
+            features.iter().map(String::as_str).collect()
+        } else {
+            self.nodes
+                .get(name)
+                .map(|node| node.features.iter().map(AsRef::as_ref).collect())
+                .unwrap_or_default()
+        }
+    }
+}
+
+/// Collect the bindings crates in the root package's dependency graph and
+/// their active features as resolved by `cargo tree`, i.e. with features
+/// resolved for the root package only instead of unified across the workspace.
+fn scoped_dependency_features(
+    cargo_metadata: &Metadata,
+    cargo_options: Option<&CargoOptions>,
+) -> Result<HashMap<String, Vec<String>>> {
+    let root_package = cargo_metadata
+        .root_package()
+        .context("Expected cargo to return metadata with root_package")?;
+    let mut cmd = Command::new("cargo");
+    cmd.arg("tree")
+        .arg("--manifest-path")
+        .arg(root_package.manifest_path.as_std_path())
+        .args([
+            "--edges",
+            "normal,build,dev",
+            "--prefix",
+            "none",
+            "--format",
+            "{p}|{f}",
+            "--color",
+            "never",
+        ]);
+    match cargo_options {
+        Some(options) => cmd.args(options.cargo_tree_args()),
+        // Match `cargo metadata`'s platform-unfiltered resolve
+        None => cmd.args(["--target", "all"]),
+    };
+    let output = cmd
+        .output()
+        .context("Failed to run `cargo tree`. Do you have cargo in your PATH?")?;
+    if !output.status.success() {
+        bail!(
+            "`cargo tree` exited with {}:\n{}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr),
+        );
+    }
+    // With multiple `--target` flags (universal2) cargo tree prints one graph
+    // per target, so union the features per package across all of them, like
+    // `cargo metadata` does with multiple `--filter-platform` flags.
+    let mut scoped: HashMap<String, Vec<String>> = HashMap::new();
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        // A line looks like `pyo3 v0.29.0|abi3,default,macros`, with
+        // ` (*)` appended to de-duplicated repeats of a subtree.
+        let line = line.trim_end().trim_end_matches(" (*)");
+        let Some((package, features)) = line.split_once('|') else {
+            continue;
+        };
+        let Some(name) = package.split_whitespace().next() else {
+            continue;
+        };
+        if !BINDINGS_CRATES.contains(&name) {
+            continue;
+        }
+        let entry = scoped.entry(name.to_string()).or_default();
+        for feature in features.split(',').filter(|feature| !feature.is_empty()) {
+            if !entry.iter().any(|existing| existing == feature) {
+                entry.push(feature.to_string());
+            }
+        }
+    }
+    Ok(scoped)
 }
 
 /// Extract pyo3/pyo3-ffi feature names from conditional features in pyproject.toml.

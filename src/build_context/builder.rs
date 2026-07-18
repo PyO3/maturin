@@ -1,6 +1,7 @@
 use crate::auditwheel::{AuditWheelMode, CompatibilityTag, PlatformTag};
 use crate::bridge::{
-    StableAbiVersion, find_bridge, has_windows_import_lib_support, upgrade_bridge_stable_abi,
+    CrateDependencies, StableAbiVersion, find_bridge_with_deps, has_windows_import_lib_support,
+    upgrade_bridge_stable_abi,
 };
 use crate::build_options::{BuildOptions, TargetTriple};
 use crate::compile::filter_cargo_targets;
@@ -122,7 +123,8 @@ impl BuildContextBuilder {
 
         // Detect bridge without conditional pyo3 features — those are
         // evaluated after interpreter resolution via upgrade_bridge_stable_abi.
-        let bridge = find_bridge(&cargo_metadata, bindings)?;
+        let crate_deps = CrateDependencies::resolve(&cargo_metadata, Some(&cargo_options))?;
+        let bridge = find_bridge_with_deps(&cargo_metadata, bindings, &crate_deps)?;
 
         if !bridge.is_bin() && project_layout.extension_name.contains('-') {
             bail!(
@@ -149,17 +151,14 @@ impl BuildContextBuilder {
             &bridge,
             &metadata24,
             &cargo_metadata,
+            &crate_deps,
         )?;
 
         // Select the stable ABI after interpreter resolution. This allows
         // combined abi3/abi3t feature sets to choose the one stable ABI family
         // this build can actually produce.
-        let bridge = upgrade_bridge_stable_abi(
-            bridge,
-            &cargo_metadata,
-            pyproject_for_stable_abi,
-            &interpreter,
-        )?;
+        let bridge =
+            upgrade_bridge_stable_abi(bridge, &crate_deps, pyproject_for_stable_abi, &interpreter)?;
         debug!("Resolved bridge model: {:?}", bridge);
         if let Some(stable_abi) = bridge.pyo3().and_then(|p| p.stable_abi.as_ref()) {
             match stable_abi.version {
@@ -315,8 +314,9 @@ impl BuildContextBuilder {
         bridge: &BridgeModel,
         metadata24: &Metadata24,
         cargo_metadata: &cargo_metadata::Metadata,
+        crate_deps: &CrateDependencies,
     ) -> Result<(Vec<PythonInterpreter>, Option<PathBuf>)> {
-        let has_import_lib_support = has_windows_import_lib_support(cargo_metadata)?;
+        let has_import_lib_support = has_windows_import_lib_support(cargo_metadata, crate_deps)?;
         if sdist_only && env::var_os("MATURIN_TEST_PYTHON").is_none() {
             return Ok((Vec::new(), None));
         }

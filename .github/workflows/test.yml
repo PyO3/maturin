@@ -88,8 +88,11 @@ jobs:
           uv tool install virtualenv
           uv tool install twine
           uv tool install uniffi-bindgen==0.28.0
+      # The conda tests create their own conda environments independent of the
+      # matrix python, so exercising them once per OS (on the non-dev cells) is
+      # enough; skipping the slow miniconda setup on the -dev cells saves time.
       - uses: conda-incubator/setup-miniconda@fc2d68f6413eb2d87b895e92f8584b5b94a10167 # v3
-        if: ${{ matrix.os != 'windows-11-arm' }}
+        if: ${{ matrix.os != 'windows-11-arm' && !contains(matrix.python-version, '-dev') }}
         with:
           auto-activate-base: "false"
           activate-environment: ""
@@ -130,17 +133,20 @@ jobs:
       - name: Set MATURIN_TEST_PYTHON
         shell: bash
         run: echo "MATURIN_TEST_PYTHON=${{ steps.setup-python.outputs.python-path }}" >> "${GITHUB_ENV}"
-      # To save cache disk space
-      - name: Disable debuginfo on Windows
-        if: startsWith(matrix.os, 'windows')
+      # Saves cache disk space and speeds up linking and packing/installing the
+      # test wheels; the test suite doesn't need debuginfo in the artifacts.
+      - name: Disable debuginfo
         shell: bash
         run: echo "RUSTFLAGS=-C debuginfo=0" >> "${GITHUB_ENV}"
       - name: Install llvm-tools
         run: rustup component add llvm-tools-preview
       - name: cargo test
-        run: cargo nextest run --features password-storage
+        run: cargo nextest run --features password-storage,faster-tests
+      # Zig cross compilation mainly exercises host-OS-specific plumbing, so one
+      # python per OS is enough; macos-latest and windows-11-arm have no 3.9
+      # cell, so macos-latest falls back to pypy to keep coverage on arm macs.
       - name: test cross compiling with zig
-        if: ${{ !contains(matrix.python-version, '-dev') }}
+        if: ${{ matrix.python-version == '3.9' || (matrix.os == 'macos-latest' && matrix.python-version == 'pypy3.11') }}
         shell: bash
         run: |
           set -ex
@@ -326,7 +332,7 @@ jobs:
       - name: cargo test
         run: |
           # unset GITHUB_ACTIONS env var to disable zig related tests
-          env -u GITHUB_ACTIONS cargo nextest run --features password-storage
+          env -u GITHUB_ACTIONS cargo nextest run --features password-storage,faster-tests
 
   test-auditwheel:
     name: Test Auditwheel

@@ -3,6 +3,16 @@
 slow-timeout = { period = "60s", terminate-after = 30 }
 
 [[profile.default.overrides]]
-# See https://nexte.st/book/threads-required.html
+# Schedule the slowest tests first so they don't serialize at the tail of the
+# run: pgo tests build everything twice, conda tests create conda environments,
+# uniffi tests build a large dependency tree and uv_multi_python tests build
+# for two interpreters.
+filter = 'test(/pgo_|_conda|_uniffi_|uv_multi_python/)'
+priority = 100
+
+[[profile.default.overrides]]
+# uniffi builds are heavy, but claiming the whole machine serialized all uniffi
+# tests; two threads keeps them from crowding out other tests while still
+# allowing overlap. See https://nexte.st/book/threads-required.html
 filter = 'test(/_uniffi_/)'
-threads-required = "num-cpus"
+threads-required = 2

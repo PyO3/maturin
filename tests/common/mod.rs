@@ -85,6 +85,11 @@ pub const CFFI_MIXED_SRC_COPY: TestPackageCopy<'static> = TestPackageCopy {
     prune_copy_paths: &["test-crates/cffi-mixed-src/src/cffi_mixed_src/cffi_mixed_src"],
 };
 
+/// Test builds must not strip symbols: uniffi proc-macro bindings and pyo3
+/// stub generation read metadata from the compiled artifact, which
+/// `-C strip=symbols` would remove.
+pub const TEST_STRIP: Option<bool> = Some(false);
+
 pub fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
 }

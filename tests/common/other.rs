@@ -104,7 +104,7 @@ pub fn test_musl() -> Result<bool> {
 
     let build_context = options
         .into_build_context()
-        .strip(Some(cfg!(feature = "faster-tests")))
+        .strip(crate::common::TEST_STRIP)
         .editable(false)
         .build()?;
     let built_lib =
@@ -403,7 +403,7 @@ pub fn abi3_python_interpreter_args() -> Result<()> {
     ])?;
     let result = options
         .into_build_context()
-        .strip(Some(cfg!(feature = "faster-tests")))
+        .strip(crate::common::TEST_STRIP)
         .editable(false)
         .build();
     assert!(result.is_ok());
@@ -419,7 +419,7 @@ pub fn abi3_python_interpreter_args() -> Result<()> {
     ])?;
     let result = options
         .into_build_context()
-        .strip(Some(cfg!(feature = "faster-tests")))
+        .strip(crate::common::TEST_STRIP)
         .editable(false)
         .build();
     assert!(result.is_ok());
@@ -439,7 +439,7 @@ pub fn abi3_python_interpreter_args() -> Result<()> {
         ])?;
         let result = options
             .into_build_context()
-            .strip(Some(cfg!(feature = "faster-tests")))
+            .strip(crate::common::TEST_STRIP)
             .editable(false)
             .build();
         assert!(result.is_err());
@@ -455,7 +455,7 @@ pub fn abi3_python_interpreter_args() -> Result<()> {
         ])?;
         let result = options
             .into_build_context()
-            .strip(Some(cfg!(feature = "faster-tests")))
+            .strip(crate::common::TEST_STRIP)
             .editable(false)
             .build();
         assert!(result.is_err());
@@ -481,7 +481,7 @@ pub fn abi3_without_version() -> Result<()> {
     let options = BuildOptions::try_parse_from(cli)?;
     let result = options
         .into_build_context()
-        .strip(Some(cfg!(feature = "faster-tests")))
+        .strip(crate::common::TEST_STRIP)
         .editable(false)
         .build();
     assert!(result.is_ok());
@@ -513,7 +513,7 @@ pub fn pyo3_cffi_build_script() -> Result<()> {
     let options = BuildOptions::try_parse_from(cli)?;
     let build_context = options
         .into_build_context()
-        .strip(Some(cfg!(feature = "faster-tests")))
+        .strip(crate::common::TEST_STRIP)
         .editable(false)
         .build()?;
     // Actually build the wheel so the crate's build.rs runs.
@@ -540,7 +540,7 @@ pub fn abi3t_without_version() -> Result<()> {
     let options = BuildOptions::try_parse_from(cli)?;
     let result = options
         .into_build_context()
-        .strip(Some(cfg!(feature = "faster-tests")))
+        .strip(crate::common::TEST_STRIP)
         .editable(false)
         .build();
     assert!(result.is_ok());
@@ -595,7 +595,7 @@ pub fn combined_stable_abi_wheel_selection(unique_name: &str, features: &[&str])
     };
     let build_context = options
         .into_build_context()
-        .strip(Some(cfg!(feature = "faster-tests")))
+        .strip(crate::common::TEST_STRIP)
         .editable(false)
         .build()?;
     let python_interpreter = build_context
@@ -694,7 +694,7 @@ pub fn test_unreadable_dir() -> Result<()> {
 
     let wheel_context = wheel_options
         .into_build_context()
-        .strip(Some(cfg!(feature = "faster-tests")))
+        .strip(crate::common::TEST_STRIP)
         .editable(false)
         .build()?;
     let wheel_result = BuildOrchestrator::new(&wheel_context).build_wheels();
@@ -762,7 +762,7 @@ pub fn test_build_wheels_from_sdist(package: impl AsRef<Path>, unique_name: &str
     };
     let wheel_context = wheel_options
         .into_build_context()
-        .strip(Some(cfg!(feature = "faster-tests")))
+        .strip(crate::common::TEST_STRIP)
         .editable(false)
         .pyproject_toml_path(Some(pyproject_toml))
         .build()?;

@@ -9,6 +9,9 @@ use std::str;
 
 /// Check that you get a good error message if you forgot to set the extension-module feature
 pub fn pyo3_no_extension_module() -> Result<()> {
+    let target_dir = crate::common::shared_target_dir("test-crates/pyo3-no-extension-module")
+        .display()
+        .to_string();
     // The first argument is ignored by clap
     let cli = vec![
         "build",
@@ -16,7 +19,7 @@ pub fn pyo3_no_extension_module() -> Result<()> {
         "test-crates/pyo3-no-extension-module/Cargo.toml",
         "--quiet",
         "--target-dir",
-        "test-crates/targets/pyo3_no_extension_module",
+        target_dir.as_str(),
         "--out",
         "test-crates/targets/pyo3_no_extension_module",
         "--auditwheel",
@@ -29,6 +32,7 @@ pub fn pyo3_no_extension_module() -> Result<()> {
         .strip(crate::common::TEST_STRIP)
         .editable(false)
         .build()?;
+    let _fixture_lock = crate::common::lock_fixture("test-crates/pyo3-no-extension-module")?;
     let result = BuildOrchestrator::new(&build_context).build_wheels();
     if let Err(err) = result {
         if !(err
@@ -85,6 +89,9 @@ pub fn locked_doesnt_build_without_cargo_lock() -> Result<()> {
 ///
 /// https://github.com/PyO3/maturin/issues/739
 pub fn invalid_manylinux_does_not_panic() -> Result<()> {
+    let target_dir = crate::common::shared_target_dir("test-crates/pyo3-mixed")
+        .display()
+        .to_string();
     // The first argument is ignored by clap
     let cli = vec![
         "build",
@@ -93,7 +100,7 @@ pub fn invalid_manylinux_does_not_panic() -> Result<()> {
         "--compatibility",
         "manylinux_2_99",
         "--target-dir",
-        "test-crates/targets/invalid_manylinux_does_not_panic",
+        target_dir.as_str(),
         "--out",
         "test-crates/targets/invalid_manylinux_does_not_panic",
     ];
@@ -103,6 +110,7 @@ pub fn invalid_manylinux_does_not_panic() -> Result<()> {
         .strip(crate::common::TEST_STRIP)
         .editable(false)
         .build()?;
+    let _fixture_lock = crate::common::lock_fixture("test-crates/pyo3-mixed")?;
     let result = BuildOrchestrator::new(&build_context).build_wheels();
     if let Err(err) = result {
         assert_eq!(err.to_string(), "Error ensuring manylinux_2_99 compliance");
@@ -190,6 +198,9 @@ pub fn pypi_compatibility_unsupported_target() -> Result<()> {
 /// Test that `--compatibility pypi` cannot be used with the linux tag.
 #[cfg(target_os = "linux")]
 pub fn pypi_compatibility_linux_tag() -> Result<()> {
+    let target_dir = crate::common::shared_target_dir("test-crates/hello-world")
+        .display()
+        .to_string();
     // The first argument is ignored by clap
     let cli = vec![
         "build",
@@ -200,7 +211,7 @@ pub fn pypi_compatibility_linux_tag() -> Result<()> {
         "--compatibility",
         "linux", // Should fail when combined with pypi
         "--target-dir",
-        "test-crates/targets/pypi_compatibility_linux_tag",
+        target_dir.as_str(),
         "--out",
         "test-crates/targets/pypi_compatibility_linux_tag",
     ];
@@ -210,6 +221,7 @@ pub fn pypi_compatibility_linux_tag() -> Result<()> {
         .strip(crate::common::TEST_STRIP)
         .editable(false)
         .build()?;
+    let _fixture_lock = crate::common::lock_fixture("test-crates/hello-world")?;
     let result = BuildOrchestrator::new(&build_context).build_wheels();
 
     if let Err(err) = result {

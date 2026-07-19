@@ -102,6 +102,62 @@ pub fn case_target_dir(case_id: &str) -> PathBuf {
     repo_test_crates_dir().join("targets").join(case_id)
 }
 
+/// Cargo target directory shared by test cases that build the same dependency family.
+///
+/// Isolated per-case target directories mean every case recompiles its whole dependency tree
+/// from scratch, which dominates test time in CI. Cases with compatible build configurations
+/// share a per-family directory instead: dependencies compile once, cargo's build lock
+/// serializes concurrent builds within a directory, and artifacts for different crates and
+/// feature sets coexist keyed by cargo's fingerprint.
+///
+/// Cases must keep an isolated [`case_target_dir`] when they:
+/// - change compile flags per case (pgo, zig, explicit `--target`),
+/// - build against multiple or unusual interpreters (conda, uv multi-python), or
+/// - assert on target directory contents (pep517 profile checks, stable ABI selection
+///   which deletes the directory).
+pub fn shared_target_dir(package: impl AsRef<Path>) -> PathBuf {
+    let family = ["pyo3", "cffi", "uniffi"]
+        .into_iter()
+        .find(|family| fixture_name(package.as_ref()).starts_with(family))
+        .unwrap_or("misc");
+    repo_test_crates_dir()
+        .join("targets")
+        .join(format!("shared-{family}"))
+}
+
+/// The fixture directory name under `test-crates/` for a package path.
+fn fixture_name(package: &Path) -> String {
+    let mut components = package.components();
+    components
+        .find(|c| c.as_os_str() == "test-crates")
+        .and_then(|_| components.next())
+        .map(|c| c.as_os_str().to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
+/// Serialize builds of the same fixture across concurrently running tests.
+///
+/// Cargo's own build lock makes concurrent cargo invocations in a shared target directory safe,
+/// but maturin stages built artifacts under `target/maturin/` — moving them out of cargo's
+/// output path and back — so two concurrent maturin builds of the *same* crate race on the
+/// staged files. Tests that compile a fixture in a [`shared_target_dir`] must hold this lock
+/// from before the build starts until the wheel is packed; the lock is released when the
+/// returned guard is dropped. Builds of different fixtures proceed in parallel.
+pub struct FixtureLock {
+    _file: fs::File,
+}
+
+pub fn lock_fixture(package: impl AsRef<Path>) -> Result<FixtureLock> {
+    use fs4::fs_err3::FileExt as _;
+
+    let locks_dir = repo_test_crates_dir().join("targets").join("locks");
+    fs::create_dir_all(&locks_dir)?;
+    let lock_path = locks_dir.join(format!("{}.lock", fixture_name(package.as_ref())));
+    let file = fs::File::create(&lock_path)?;
+    file.lock_exclusive()?;
+    Ok(FixtureLock { _file: file })
+}
+
 pub fn case_wheel_dir(case_id: &str) -> PathBuf {
     repo_test_crates_dir().join("wheels").join(case_id)
 }

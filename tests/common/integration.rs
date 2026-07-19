@@ -317,7 +317,7 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
     let options: BuildOptions = BuildOptions::try_parse_from(cli)?;
     let build_context = options
         .into_build_context()
-        .strip(Some(cfg!(feature = "faster-tests")))
+        .strip(crate::common::TEST_STRIP)
         .editable(false)
         .pgo(case.pgo)
         .build()?;
@@ -434,7 +434,7 @@ pub fn test_integration_uv_multi_python(case: &IntegrationCase<'_>) -> Result<()
     let options = BuildOptions::try_parse_from(cli)?;
     let build_context = options
         .into_build_context()
-        .strip(Some(cfg!(feature = "faster-tests")))
+        .strip(crate::common::TEST_STRIP)
         .editable(false)
         .pgo(case.pgo)
         .build()?;
@@ -505,7 +505,7 @@ pub fn test_integration_conda(
 
     let build_context = options
         .into_build_context()
-        .strip(Some(cfg!(feature = "faster-tests")))
+        .strip(crate::common::TEST_STRIP)
         .editable(false)
         .build()?;
     let wheels = BuildOrchestrator::new(&build_context).build_wheels()?;

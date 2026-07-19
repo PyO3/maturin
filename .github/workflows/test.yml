@@ -90,13 +90,10 @@ jobs:
           uv tool install uniffi-bindgen==0.28.0
       # The conda tests create their own conda environments independent of the
       # matrix python, so exercising them once per OS (on the non-dev cells) is
-      # enough; skipping the slow miniconda setup on the -dev cells saves time.
-      - uses: conda-incubator/setup-miniconda@fc2d68f6413eb2d87b895e92f8584b5b94a10167 # v3
+      # enough. micromamba installs in seconds where miniconda took up to two
+      # minutes; the test harness falls back to micromamba when conda is absent.
+      - uses: mamba-org/setup-micromamba@add3a49764cedee8ee24e82dfde87f5bc2914462 # v2
         if: ${{ matrix.os != 'windows-11-arm' && !contains(matrix.python-version, '-dev') }}
-        with:
-          auto-activate-base: "false"
-          activate-environment: ""
-          miniconda-version: "latest"
       - id: setup-python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
@@ -154,11 +151,13 @@ jobs:
           rustup target add aarch64-unknown-linux-musl
           rustup target add aarch64-apple-darwin
 
+          # Use the maturin binary the `cargo test` step already built; `cargo run`
+          # would rebuild it with default features because the feature sets differ.
           # abi3
-          cargo run build -i $PYTHON_VERSION -m test-crates/pyo3-pure/Cargo.toml --target aarch64-unknown-linux-gnu --zig
-          cargo run build -i $PYTHON_VERSION -m test-crates/pyo3-pure/Cargo.toml --target aarch64-unknown-linux-musl --zig
+          target/debug/maturin build -i $PYTHON_VERSION -m test-crates/pyo3-pure/Cargo.toml --target aarch64-unknown-linux-gnu --zig
+          target/debug/maturin build -i $PYTHON_VERSION -m test-crates/pyo3-pure/Cargo.toml --target aarch64-unknown-linux-musl --zig
           if [[ "$PYTHON_VERSION" != "pypy"* ]]; then
-            cargo run build -i $PYTHON_VERSION -m test-crates/pyo3-pure/Cargo.toml --target aarch64-apple-darwin --zig
+            target/debug/maturin build -i $PYTHON_VERSION -m test-crates/pyo3-pure/Cargo.toml --target aarch64-apple-darwin --zig
           fi
 
           if [[ "$PYTHON_VERSION" == "3.1"* ]]; then
@@ -170,9 +169,9 @@ jobs:
           twine check --strict test-crates/pyo3-pure/target/wheels/*.whl
 
           # non-abi3
-          cargo run build -i $PYTHON_VERSION -m test-crates/pyo3-mixed/Cargo.toml --target aarch64-unknown-linux-gnu --zig
+          target/debug/maturin build -i $PYTHON_VERSION -m test-crates/pyo3-mixed/Cargo.toml --target aarch64-unknown-linux-gnu --zig
           if [[ "$PYTHON_VERSION" != "pypy"* ]]; then
-            cargo run build -i $PYTHON_VERSION -m test-crates/pyo3-mixed/Cargo.toml --target aarch64-apple-darwin --zig
+            target/debug/maturin build -i $PYTHON_VERSION -m test-crates/pyo3-mixed/Cargo.toml --target aarch64-apple-darwin --zig
           fi
           # Check wheels with twine
           twine check --strict test-crates/pyo3-mixed/target/wheels/*.whl

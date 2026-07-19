@@ -471,9 +471,10 @@ pub fn test_integration_conda(
     let package_string = package.as_ref().join("Cargo.toml").display().to_string();
 
     // Create environments to build against, prepended with "A" to ensure that integration
-    // tests are executed with these environments
+    // tests are executed with these environments. Conda env creation is slow, so only cover
+    // the oldest and newest supported versions instead of every minor release in between.
     let mut interpreters = Vec::new();
-    for minor in 10..=14 {
+    for minor in [10, 14] {
         let (_, venv_python) = create_conda_env(&format!("maturin-{case_id}-3{minor}"), 3, minor)?;
         interpreters.push(venv_python);
     }

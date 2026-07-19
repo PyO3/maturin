@@ -1,7 +1,7 @@
 use crate::common::{
     PreparedEnv, TestEnvKind, TestInstallBackend, TestPackageCopy, case_target_dir,
     check_installed, cleanup_case, has_uv, manifest_path_for_package, prepare_case_package,
-    prepare_test_env,
+    prepare_test_env, shared_target_dir,
 };
 use anyhow::Result;
 use maturin::{CargoOptions, DevelopOptions, develop};
@@ -93,6 +93,15 @@ pub fn test_develop(case: &DevelopCase<'_>) -> Result<()> {
         assert!(has_uv(), "uv backend requires uv binary on this platform");
     }
 
+    // Conda cases build against a different interpreter than everything else, which would
+    // invalidate pyo3 build script fingerprints back and forth in a shared target dir.
+    let (target_dir, fixture_lock) = match case.env_kind {
+        TestEnvKind::Venv => (
+            shared_target_dir(case.package),
+            Some(crate::common::lock_fixture(case.package)?),
+        ),
+        TestEnvKind::Conda { .. } => (case_target_dir(case.id), None),
+    };
     let develop_options = DevelopOptions {
         bindings: case.bindings.map(|binding| binding.to_owned()),
         release: false,
@@ -104,7 +113,7 @@ pub fn test_develop(case: &DevelopCase<'_>) -> Result<()> {
         cargo_options: CargoOptions {
             manifest_path: Some(manifest_path_for_package(package)),
             quiet: true,
-            target_dir: Some(case_target_dir(case.id)),
+            target_dir: Some(target_dir),
             ..Default::default()
         },
         uv,
@@ -112,6 +121,7 @@ pub fn test_develop(case: &DevelopCase<'_>) -> Result<()> {
         generate_stubs: false,
     };
     develop(develop_options, &venv_dir)?;
+    drop(fixture_lock);
 
     check_installed(package, &python)?;
     cleanup_case(case.id);

@@ -233,7 +233,6 @@ fn abi3_python_interpreter_args() {
 fn abi3_generate_stubs() {
     handle_result(other::generate_stubs(
         "test-crates/pyo3-stub-generation-pure",
-        "integration-pyo3-stub-generation-pure-generate-stubs",
         &[
             "pyo3_stub_generation_pure/__init__.pyi",
             "pyo3_stub_generation_pure/submodule.pyi",

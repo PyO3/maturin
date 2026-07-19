@@ -96,7 +96,7 @@ fn develop_uniffi_cases(#[case] case: DevelopCase<'_>) {
 }
 
 #[rstest]
-#[timeout(Duration::from_secs(120))]
+#[timeout(Duration::from_secs(600))]
 #[case::hello_world(DevelopCase::uv("develop-hello-world-uv", "test-crates/hello-world",))]
 #[case::pyo3_ffi_pure(DevelopCase::uv("develop-pyo3-ffi-pure-uv", "test-crates/pyo3-ffi-pure",))]
 #[test]
@@ -114,7 +114,7 @@ fn develop_uv_cases(#[case] case: DevelopCase<'_>) {
 }
 
 #[rstest]
-#[timeout(Duration::from_secs(120))]
+#[timeout(Duration::from_secs(600))]
 #[case::hello_world(DevelopCase::pip("develop-hello-world-pip", "test-crates/hello-world",))]
 #[case::pyo3_ffi_pure(DevelopCase::pip("develop-pyo3-ffi-pure-pip", "test-crates/pyo3-ffi-pure",))]
 #[test]

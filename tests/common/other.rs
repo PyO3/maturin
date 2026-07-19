@@ -285,7 +285,7 @@ fn build_wheel_files(package: impl AsRef<Path>, unique_name: &str) -> Result<Zip
         cargo: CargoOptions {
             manifest_path: Some(manifest_path),
             quiet: true,
-            target_dir: Some(PathBuf::from(format!("test-crates/targets/{unique_name}"))),
+            target_dir: Some(crate::common::shared_target_dir(&package)),
             ..Default::default()
         },
         platform: PlatformOptions {
@@ -300,9 +300,11 @@ fn build_wheel_files(package: impl AsRef<Path>, unique_name: &str) -> Result<Zip
         .strip(Some(false))
         .editable(false)
         .build()?;
+    let fixture_lock = crate::common::lock_fixture(&package)?;
     let wheels = BuildOrchestrator::new(&build_context)
         .build_wheels()
         .context("Failed to build wheels")?;
+    drop(fixture_lock);
     assert!(!wheels.is_empty());
     let wheel_path = &wheels[0].path;
 
@@ -709,7 +711,7 @@ pub fn test_unreadable_dir() -> Result<()> {
 /// Test that building wheels from an sdist works correctly.
 /// This simulates the `maturin build --sdist` workflow: build sdist first,
 /// unpack it, then build wheels from the unpacked sdist.
-pub fn test_build_wheels_from_sdist(package: impl AsRef<Path>, unique_name: &str) -> Result<()> {
+pub fn test_build_wheels_from_sdist(package: impl AsRef<Path>) -> Result<()> {
     let package = package.as_ref();
     let temp_dir = tempfile::tempdir()?;
     let sdist_dir = temp_dir.path().join("sdist");
@@ -724,7 +726,7 @@ pub fn test_build_wheels_from_sdist(package: impl AsRef<Path>, unique_name: &str
         cargo: CargoOptions {
             manifest_path: Some(package.join("Cargo.toml")),
             quiet: true,
-            target_dir: Some(PathBuf::from(format!("test-crates/targets/{unique_name}"))),
+            target_dir: Some(crate::common::shared_target_dir(package)),
             ..Default::default()
         },
         ..Default::default()
@@ -753,9 +755,9 @@ pub fn test_build_wheels_from_sdist(package: impl AsRef<Path>, unique_name: &str
         cargo: CargoOptions {
             manifest_path: Some(cargo_toml),
             quiet: true,
-            target_dir: Some(PathBuf::from(format!(
-                "test-crates/targets/{unique_name}_from_sdist"
-            ))),
+            // The unpacked sdist lives in a fresh temp dir each run, so only the dependency
+            // tree is reusable; share it with the package's family.
+            target_dir: Some(crate::common::shared_target_dir(package)),
             ..Default::default()
         },
         ..Default::default()
@@ -766,7 +768,10 @@ pub fn test_build_wheels_from_sdist(package: impl AsRef<Path>, unique_name: &str
         .editable(false)
         .pyproject_toml_path(Some(pyproject_toml))
         .build()?;
+    // The unpacked crate has the same name as the fixture, so builds share cargo output paths.
+    let fixture_lock = crate::common::lock_fixture(package)?;
     let wheels = BuildOrchestrator::new(&wheel_context).build_wheels()?;
+    drop(fixture_lock);
     assert!(
         !wheels.is_empty(),
         "Expected at least one wheel to be built"
@@ -775,25 +780,23 @@ pub fn test_build_wheels_from_sdist(package: impl AsRef<Path>, unique_name: &str
     Ok(())
 }
 
-pub fn generate_stubs(
-    package: impl AsRef<Path>,
-    unique_name: &str,
-    expected_files: &[&str],
-) -> Result<()> {
+pub fn generate_stubs(package: impl AsRef<Path>, expected_files: &[&str]) -> Result<()> {
     let package = package.as_ref();
     let output_dir = tempfile::tempdir()?;
+    let fixture_lock = crate::common::lock_fixture(package)?;
     assert!(
         Command::new(env!("CARGO_BIN_EXE_maturin"))
             .arg("generate-stubs")
             .arg("-m")
             .arg(package.join("Cargo.toml"))
             .arg("--target-dir")
-            .arg(format!("test-crates/targets/{unique_name}"))
+            .arg(crate::common::shared_target_dir(package))
             .arg("--out")
             .arg(output_dir.path())
             .status()?
             .success()
     );
+    drop(fixture_lock);
     let found_files = WalkDir::new(output_dir.path())
         .sort_by_file_name()
         .into_iter()

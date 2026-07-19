@@ -1,7 +1,7 @@
 use crate::common::{
     PreparedEnv, TestEnvKind, TestPackageCopy, case_target_dir, case_wheel_dir, check_installed,
     cleanup_case, create_named_virtualenv, prepare_case_package, prepare_test_env,
-    test_python_path,
+    shared_target_dir, test_python_path,
 };
 use anyhow::{Context, Result, bail};
 #[cfg(feature = "zig")]
@@ -175,7 +175,14 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
 
     // The first argument is ignored by clap
     let shed = case_wheel_dir(case.id);
-    let target_dir = case_target_dir(case.id);
+    // pgo and zig change compile flags and an explicit target changes the toolchain, so those
+    // cases keep an isolated target dir instead of the shared per-family one.
+    let isolated_target_dir = case.pgo || case.zig || case.target.is_some();
+    let target_dir = if isolated_target_dir {
+        case_target_dir(case.id)
+    } else {
+        shared_target_dir(case.package)
+    };
     let python_interp = test_python_path();
     let mut cli: Vec<std::ffi::OsString> = vec![
         "build".into(),
@@ -321,7 +328,13 @@ pub fn test_integration(case: &IntegrationCase<'_>) -> Result<()> {
         .editable(false)
         .pgo(case.pgo)
         .build()?;
+    let fixture_lock = if isolated_target_dir {
+        None
+    } else {
+        Some(crate::common::lock_fixture(case.package)?)
+    };
     let wheels = BuildOrchestrator::new(&build_context).build_wheels()?;
+    drop(fixture_lock);
 
     // For abi3 on unix, we didn't use a python interpreter, but we need one here
     let interpreter = if build_context.python.interpreter.is_empty() {

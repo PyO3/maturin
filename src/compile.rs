@@ -931,9 +931,18 @@ fn configure_pyo3_env(
             // trigger a rebuild of the project every time
             let existing_pyo3_config = fs::read_to_string(&config_file).unwrap_or_default();
             if pyo3_config != existing_pyo3_config {
-                fs::write(&config_file, pyo3_config).with_context(|| {
+                // Write via a per-process temp file and rename so concurrent maturin builds
+                // sharing a target directory never observe a partially written config.
+                let tmp_file = config_file.with_extension(format!("txt.tmp{}", std::process::id()));
+                fs::write(&tmp_file, pyo3_config).with_context(|| {
                     format!(
                         "Failed to create pyo3 config file at '{}'",
+                        tmp_file.display()
+                    )
+                })?;
+                fs::rename(&tmp_file, &config_file).with_context(|| {
+                    format!(
+                        "Failed to move pyo3 config file to '{}'",
                         config_file.display()
                     )
                 })?;

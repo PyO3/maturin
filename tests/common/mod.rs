@@ -189,7 +189,7 @@ pub fn is_ci() -> bool {
 }
 
 pub fn has_conda() -> bool {
-    which::which("conda").is_ok()
+    which::which("conda").is_ok() || which::which("micromamba").is_ok()
 }
 
 pub fn has_uv() -> bool {
@@ -396,7 +396,18 @@ pub fn create_conda_env(name: &str, major: usize, minor: usize) -> Result<(PathB
         success: bool,
     }
 
-    let mut cmd = if cfg!(windows) {
+    // conda and micromamba share the same `create` CLI and --json output fields we need
+    // (top-level `prefix` and `success`). micromamba is preferred because it is much faster;
+    // on Windows `conda` is a batch file and needs to go through cmd.exe.
+    let mut cmd = if let Ok(micromamba) = which::which("micromamba") {
+        let mut cmd = Command::new(micromamba);
+        if env::var_os("MAMBA_ROOT_PREFIX").is_none() {
+            // micromamba errors without a root prefix; keep envs under test-crates
+            cmd.arg("--root-prefix")
+                .arg(repo_test_crates_dir().join("venvs").join("mamba-root"));
+        }
+        cmd
+    } else if cfg!(windows) {
         let mut cmd = Command::new("cmd.exe");
         cmd.arg("/c").arg("conda");
         cmd

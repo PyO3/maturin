@@ -30,7 +30,7 @@ const PYO3_BINDING_CRATES: [PyO3Crate; 2] = [PyO3Crate::PyO3Ffi, PyO3Crate::PyO3
 pub fn find_bridge(
     cargo_metadata: &Metadata,
     bridge: Option<&str>,
-    cargo_options: Option<&CargoOptions>,
+    cargo_options: &CargoOptions,
 ) -> Result<BridgeModel> {
     let deps = CrateDependencies::resolve(cargo_metadata, cargo_options)?;
     find_bridge_with_deps(cargo_metadata, bridge, &deps)
@@ -44,14 +44,6 @@ pub fn find_bridge_with_deps(
     deps: &CrateDependencies,
 ) -> Result<BridgeModel> {
     let no_extra_features = HashMap::new();
-    let packages: HashMap<&str, &cargo_metadata::Package> = cargo_metadata
-        .packages
-        .iter()
-        .filter_map(|pkg| {
-            let name = pkg.name.as_ref();
-            BINDINGS_CRATES.contains(&name).then_some((name, pkg))
-        })
-        .collect();
     let root_package = cargo_metadata
         .root_package()
         .context("Expected cargo to return metadata with root_package")?;
@@ -79,14 +71,15 @@ pub fn find_bridge_with_deps(
         } else if bindings == "uniffi" {
             BridgeModel::UniFfi
         } else if bindings == "bin" {
-            let bindings = find_pyo3_bindings(deps, &packages)?;
+            let bindings = find_pyo3_bindings(cargo_metadata, deps)?;
             BridgeModel::Bin(bindings)
         } else {
-            let bindings = find_pyo3_bindings(deps, &packages)?.context("unknown binding type")?;
+            let bindings =
+                find_pyo3_bindings(cargo_metadata, deps)?.context("unknown binding type")?;
             BridgeModel::PyO3(bindings)
         }
     } else {
-        match find_pyo3_bindings(deps, &packages)? {
+        match find_pyo3_bindings(cargo_metadata, deps)? {
             Some(bindings) => {
                 if !targets.contains(&CrateType::CDyLib) && targets.contains(&CrateType::Bin) {
                     BridgeModel::Bin(Some(bindings))
@@ -100,7 +93,7 @@ pub fn find_bridge_with_deps(
                 } else if targets.contains(&CrateType::CDyLib) {
                     BridgeModel::Cffi
                 } else if targets.contains(&CrateType::Bin) {
-                    BridgeModel::Bin(find_pyo3_bindings(deps, &packages)?)
+                    BridgeModel::Bin(find_pyo3_bindings(cargo_metadata, deps)?)
                 } else {
                     bail!(
                         "Couldn't detect the binding type; Please specify them with --bindings/-b"
@@ -117,11 +110,9 @@ pub fn find_bridge_with_deps(
     for &lib in PYO3_BINDING_CRATES.iter() {
         if !bridge.is_bin() && bridge.is_pyo3_crate(lib) {
             let lib_name = lib.as_str();
-            let pyo3_node = deps
-                .get(lib_name)
-                .expect("pyo3 bridge crate should be in the dependency graph");
+            let pyo3 = bridge.pyo3().expect("should be pyo3 bindings");
             if !deps.features(lib_name).contains(&"extension-module") {
-                let version = &cargo_metadata[&pyo3_node.id].version;
+                let version = &pyo3.version;
                 if (version.major, version.minor) < (0, 26) {
                     // pyo3 0.26+ will use the `PYO3_BUILD_EXTENSION_MODULE` env var instead
                     eprintln!(
@@ -133,7 +124,6 @@ pub fn find_bridge_with_deps(
             }
 
             return if let Some(stable_abi) = has_stable_abi(deps, &no_extra_features, &[])? {
-                let pyo3 = bridge.pyo3().expect("should be pyo3 bindings");
                 let bindings = PyO3 {
                     crate_name: lib,
                     version: pyo3.version.clone(),
@@ -194,21 +184,44 @@ pub fn has_windows_import_lib_support(
     cargo_metadata: &Metadata,
     deps: &CrateDependencies,
 ) -> Result<bool> {
-    for &lib in PYO3_BINDING_CRATES.iter().rev() {
-        let lib = lib.as_str();
-        if let Some(pyo3_crate) = deps.get(lib) {
-            let pyo3_version = &cargo_metadata[&pyo3_crate.id].version;
-            if pyo3_version >= &semver::Version::new(0, 29, 0) {
-                return Ok(true);
-            }
-            let generate_import_lib = deps
-                .features(lib)
-                .iter()
-                .any(|&x| x == "generate-import-lib" || x == "generate-abi3-import-lib");
-            return Ok(generate_import_lib);
-        }
+    // Prefer pyo3 over pyo3-ffi. If pyo3 is present but multi-version, do not
+    // fall through to a modern pyo3-ffi and claim support the old pyo3 build
+    // script may still lack.
+    if deps.contains("pyo3") {
+        let Some(pyo3_crate) = deps.get_unambiguous("pyo3") else {
+            return Ok(false);
+        };
+        return Ok(import_lib_support_for(
+            cargo_metadata,
+            deps,
+            "pyo3",
+            pyo3_crate,
+        ));
+    }
+    if let Some(pyo3_crate) = deps.get_unambiguous("pyo3-ffi") {
+        return Ok(import_lib_support_for(
+            cargo_metadata,
+            deps,
+            "pyo3-ffi",
+            pyo3_crate,
+        ));
     }
     Ok(false)
+}
+
+fn import_lib_support_for(
+    cargo_metadata: &Metadata,
+    deps: &CrateDependencies,
+    lib: &str,
+    pyo3_crate: &Node,
+) -> bool {
+    let pyo3_version = &cargo_metadata[&pyo3_crate.id].version;
+    if pyo3_version >= &semver::Version::new(0, 29, 0) {
+        return true;
+    }
+    deps.features(lib)
+        .iter()
+        .any(|&x| x == "generate-import-lib" || x == "generate-abi3-import-lib")
 }
 
 fn has_stable_abi(
@@ -299,34 +312,45 @@ fn has_stable_abi_from_kind(
     Ok(None)
 }
 
-/// Tries to determine the bindings type from dependency
+/// Tries to determine the bindings type from dependency.
+///
+/// Version and package metadata are taken from a single unambiguous dependency
+/// node. Multiple remaining versions of `pyo3`/`pyo3-ffi` are an error: a
+/// [`PyO3`] value can only represent one package identity.
 fn find_pyo3_bindings(
+    cargo_metadata: &Metadata,
     deps: &CrateDependencies,
-    packages: &HashMap<&str, &cargo_metadata::Package>,
 ) -> anyhow::Result<Option<PyO3>> {
     if deps.contains("pyo3") {
-        let pyo3_metadata = match packages.get("pyo3-ffi") {
-            Some(pyo3_ffi) => pyo3_ffi.metadata.clone(),
-            None => {
-                // Old versions of pyo3 does not depend on pyo3-ffi,
-                // thus does not have the metadata
-                serde_json::Value::Null
-            }
+        let node = deps
+            .get_unambiguous("pyo3")
+            .with_context(|| ambiguous_bindings_crate_msg("pyo3"))?;
+        let package = &cargo_metadata[&node.id];
+        let pyo3_metadata = if deps.contains("pyo3-ffi") {
+            let pyo3_ffi = deps
+                .get_unambiguous("pyo3-ffi")
+                .with_context(|| ambiguous_bindings_crate_msg("pyo3-ffi"))?;
+            cargo_metadata[&pyo3_ffi.id].metadata.clone()
+        } else {
+            // Old versions of pyo3 does not depend on pyo3-ffi,
+            // thus does not have the metadata
+            serde_json::Value::Null
         };
         let metadata = match serde_json::from_value::<Option<PyO3MetadataRaw>>(pyo3_metadata) {
             Ok(Some(metadata)) => Some(metadata.try_into()?),
             Ok(None) | Err(_) => None,
         };
-        let version = packages["pyo3"].version.clone();
         Ok(Some(PyO3 {
             crate_name: PyO3Crate::PyO3,
-            version,
+            version: package.version.clone(),
             stable_abi: None,
             metadata,
         }))
     } else if deps.contains("pyo3-ffi") {
-        let package = &packages["pyo3-ffi"];
-        let version = package.version.clone();
+        let node = deps
+            .get_unambiguous("pyo3-ffi")
+            .with_context(|| ambiguous_bindings_crate_msg("pyo3-ffi"))?;
+        let package = &cargo_metadata[&node.id];
         let metadata =
             match serde_json::from_value::<Option<PyO3MetadataRaw>>(package.metadata.clone()) {
                 Ok(Some(metadata)) => Some(metadata.try_into()?),
@@ -334,7 +358,7 @@ fn find_pyo3_bindings(
             };
         Ok(Some(PyO3 {
             crate_name: PyO3Crate::PyO3Ffi,
-            version,
+            version: package.version.clone(),
             stable_abi: None,
             metadata,
         }))
@@ -343,11 +367,21 @@ fn find_pyo3_bindings(
     }
 }
 
-/// Return a map with all (transitive) dependencies of the *current* crate.
+fn ambiguous_bindings_crate_msg(name: &str) -> String {
+    format!(
+        "multiple versions of `{name}` remain in the dependency graph after feature resolution; \
+         maturin cannot determine a single bindings version. Ensure the package depends on only \
+         one version of `{name}`"
+    )
+}
+
+/// Return all (transitive) dependency nodes of the *current* crate, keyed by
+/// package name. A name maps to several nodes when multiple versions (or
+/// source-distinct packages at the same version) are reachable.
 ///
 /// This is different from `metadata.resolve`, which also includes packages
 /// that are used in the same workspace, but on which the current crate does not depend.
-fn current_crate_dependencies(cargo_metadata: &Metadata) -> Result<HashMap<&str, &Node>> {
+fn current_crate_dependencies(cargo_metadata: &Metadata) -> Result<HashMap<&str, Vec<&Node>>> {
     let resolve = cargo_metadata
         .resolve
         .as_ref()
@@ -372,14 +406,15 @@ fn current_crate_dependencies(cargo_metadata: &Metadata) -> Result<HashMap<&str,
         }
     }
 
-    Ok(nodes
-        .into_iter()
-        .filter_map(|(id, node)| {
-            dep_ids
-                .contains(&id)
-                .then_some((cargo_metadata[id].name.as_ref(), node))
-        })
-        .collect())
+    let mut deps: HashMap<&str, Vec<&Node>> = HashMap::with_capacity(dep_ids.len());
+    for (&id, node) in &nodes {
+        if !dep_ids.contains(&id) {
+            continue;
+        }
+        let name = cargo_metadata[id].name.as_ref();
+        deps.entry(name).or_default().push(node);
+    }
+    Ok(deps)
 }
 
 /// Names of the crates whose presence in the dependency graph drives bindings
@@ -402,18 +437,21 @@ const BINDINGS_CRATES: [&str; 3] = ["pyo3", "pyo3-ffi", "uniffi"];
 /// which resolves features the same way a scoped build does: bindings crates
 /// that aren't really in the graph are dropped, and [`Self::features`] prefers
 /// the scoped feature resolution over the unified one.
+///
+/// Multi-version ambiguity is represented directly: each name maps to every
+/// matching resolve node, so callers never need a parallel "is this name
+/// ambiguous?" set.
 pub struct CrateDependencies<'a> {
-    nodes: HashMap<&'a str, &'a Node>,
-    /// Bindings crate name -> features resolved for the current crate only
-    /// via `cargo tree`. Empty when verification didn't run.
-    scoped_features: HashMap<String, Vec<String>>,
+    /// Package name -> all root-reachable resolve nodes with that name.
+    nodes: HashMap<&'a str, Vec<&'a Node>>,
+    /// (Bindings crate name, version) -> features resolved for the current
+    /// crate only via `cargo tree`. Empty when verification didn't run.
+    scoped_features: HashMap<(String, semver::Version), Vec<String>>,
+    cargo_metadata: &'a Metadata,
 }
 
 impl<'a> CrateDependencies<'a> {
-    pub fn resolve(
-        cargo_metadata: &'a Metadata,
-        cargo_options: Option<&CargoOptions>,
-    ) -> Result<Self> {
+    pub fn resolve(cargo_metadata: &'a Metadata, cargo_options: &CargoOptions) -> Result<Self> {
         let mut nodes = current_crate_dependencies(cargo_metadata)?;
         let mut scoped_features = HashMap::new();
         if cargo_metadata.workspace_members.len() > 1
@@ -422,8 +460,33 @@ impl<'a> CrateDependencies<'a> {
             match scoped_dependency_features(cargo_metadata, cargo_options) {
                 Ok(scoped) => {
                     for name in BINDINGS_CRATES {
-                        if !scoped.contains_key(name) {
-                            nodes.remove(name);
+                        let mut scoped_versions =
+                            scoped.keys().filter_map(|(scoped_name, version)| {
+                                (scoped_name == name).then_some(version)
+                            });
+                        match (scoped_versions.next(), scoped_versions.next()) {
+                            (None, _) => {
+                                // Not actually in the root package's graph.
+                                nodes.remove(name);
+                            }
+                            (Some(version), None) => {
+                                // A single scoped version is authoritative only
+                                // when exactly one already-retained package id
+                                // matches (same name+version from two sources
+                                // stays multi-node / ambiguous).
+                                if let Some(node) = unique_node_by_version(
+                                    cargo_metadata,
+                                    nodes.get(name).map(Vec::as_slice).unwrap_or(&[]),
+                                    version,
+                                ) {
+                                    nodes.insert(name, vec![node]);
+                                }
+                                // else: leave the multi-node entry as-is.
+                            }
+                            (Some(_), Some(_)) => {
+                                // Still several versions after scoping: keep
+                                // every metadata node so ambiguity stays visible.
+                            }
                         }
                     }
                     scoped_features = scoped;
@@ -440,29 +503,84 @@ impl<'a> CrateDependencies<'a> {
         Ok(Self {
             nodes,
             scoped_features,
+            cargo_metadata,
         })
     }
 
     fn contains(&self, name: &str) -> bool {
-        self.get(name).is_some()
+        self.nodes.get(name).is_some_and(|nodes| !nodes.is_empty())
     }
 
-    fn get(&self, name: &str) -> Option<&'a Node> {
-        self.nodes.get(name).copied()
+    /// The single resolve node for `name`, or `None` when absent or when
+    /// several packages share that name.
+    fn get_unambiguous(&self, name: &str) -> Option<&'a Node> {
+        match self.nodes.get(name).map(Vec::as_slice)? {
+            [node] => Some(*node),
+            _ => None,
+        }
     }
 
     /// Features of `name` as resolved for the current crate: the scoped
     /// `cargo tree` resolution when verification ran, the workspace-unified
     /// `cargo metadata` resolution otherwise.
+    ///
+    /// With several packages of `name`, only features common to every scoped
+    /// version are returned (and none if verification didn't run), so abi3 /
+    /// extension-module / import-lib checks never trust an arbitrary winner.
     fn features(&self, name: &str) -> Vec<&str> {
-        if let Some(features) = self.scoped_features.get(name) {
-            features.iter().map(String::as_str).collect()
-        } else {
-            self.nodes
-                .get(name)
-                .map(|node| node.features.iter().map(AsRef::as_ref).collect())
-                .unwrap_or_default()
+        match self.nodes.get(name).map(Vec::as_slice) {
+            Some([node]) => {
+                if let Some(features) = self.scoped_for(name, node) {
+                    features.iter().map(String::as_str).collect()
+                } else {
+                    node.features.iter().map(AsRef::as_ref).collect()
+                }
+            }
+            Some(nodes) if nodes.len() > 1 => self.common_scoped_features(name),
+            _ => Vec::new(),
         }
+    }
+
+    /// Intersection of scoped feature sets across every version of `name`.
+    fn common_scoped_features(&self, name: &str) -> Vec<&str> {
+        let mut versions = self
+            .scoped_features
+            .iter()
+            .filter(|((scoped_name, _), _)| scoped_name == name)
+            .map(|(_, features)| features);
+        let Some(first) = versions.next() else {
+            return Vec::new();
+        };
+        let mut common: Vec<&str> = first.iter().map(String::as_str).collect();
+        for features in versions {
+            common.retain(|feature| features.iter().any(|existing| existing == feature));
+        }
+        common
+    }
+
+    /// Scoped features of a specific resolve node, keyed by its package
+    /// version so features of another version are never trusted.
+    fn scoped_for(&self, name: &str, node: &Node) -> Option<&Vec<String>> {
+        let version = &self.cargo_metadata[&node.id].version;
+        self.scoped_features
+            .get(&(name.to_string(), version.clone()))
+    }
+}
+
+/// Among `candidates`, return the unique node whose package version equals
+/// `version`. `None` when zero or several match.
+fn unique_node_by_version<'a>(
+    cargo_metadata: &Metadata,
+    candidates: &[&'a Node],
+    version: &semver::Version,
+) -> Option<&'a Node> {
+    let mut matches = candidates
+        .iter()
+        .copied()
+        .filter(|node| &cargo_metadata[&node.id].version == version);
+    match (matches.next(), matches.next()) {
+        (Some(node), None) => Some(node),
+        _ => None,
     }
 }
 
@@ -471,8 +589,8 @@ impl<'a> CrateDependencies<'a> {
 /// resolved for the root package only instead of unified across the workspace.
 fn scoped_dependency_features(
     cargo_metadata: &Metadata,
-    cargo_options: Option<&CargoOptions>,
-) -> Result<HashMap<String, Vec<String>>> {
+    cargo_options: &CargoOptions,
+) -> Result<HashMap<(String, semver::Version), Vec<String>>> {
     let root_package = cargo_metadata
         .root_package()
         .context("Expected cargo to return metadata with root_package")?;
@@ -490,11 +608,7 @@ fn scoped_dependency_features(
             "--color",
             "never",
         ]);
-    match cargo_options {
-        Some(options) => cmd.args(options.cargo_tree_args()),
-        // Match `cargo metadata`'s platform-unfiltered resolve
-        None => cmd.args(["--target", "all"]),
-    };
+    cmd.args(cargo_options.cargo_tree_args());
     let output = cmd
         .output()
         .context("Failed to run `cargo tree`. Do you have cargo in your PATH?")?;
@@ -508,21 +622,33 @@ fn scoped_dependency_features(
     // With multiple `--target` flags (universal2) cargo tree prints one graph
     // per target, so union the features per package across all of them, like
     // `cargo metadata` does with multiple `--filter-platform` flags.
-    let mut scoped: HashMap<String, Vec<String>> = HashMap::new();
+    let mut scoped: HashMap<(String, semver::Version), Vec<String>> = HashMap::new();
     for line in String::from_utf8_lossy(&output.stdout).lines() {
-        // A line looks like `pyo3 v0.29.0|abi3,default,macros`, with
-        // ` (*)` appended to de-duplicated repeats of a subtree.
+        // A line looks like `pyo3 v0.29.0|abi3,default,macros` (path/git
+        // dependencies append their source in parentheses), with ` (*)`
+        // appended to de-duplicated repeats of a subtree.
         let line = line.trim_end().trim_end_matches(" (*)");
         let Some((package, features)) = line.split_once('|') else {
             continue;
         };
-        let Some(name) = package.split_whitespace().next() else {
+        let mut package_parts = package.split_whitespace();
+        let Some(name) = package_parts.next() else {
             continue;
         };
         if !BINDINGS_CRATES.contains(&name) {
             continue;
         }
-        let entry = scoped.entry(name.to_string()).or_default();
+        // Key by version so that two versions of the same crate don't get
+        // their feature sets unioned into one. A bindings crate line whose
+        // version doesn't parse means the `{p}` format changed; erroring makes
+        // the caller fall back to the unified resolution instead of treating
+        // the crate as absent.
+        let version = package_parts
+            .next()
+            .and_then(|v| v.strip_prefix('v'))
+            .and_then(|v| semver::Version::parse(v).ok())
+            .with_context(|| format!("unexpected `cargo tree` output line: {line}"))?;
+        let entry = scoped.entry((name.to_string(), version)).or_default();
         for feature in features.split(',').filter(|feature| !feature.is_empty()) {
             if !entry.iter().any(|existing| existing == feature) {
                 entry.push(feature.to_string());

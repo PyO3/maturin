@@ -854,12 +854,10 @@ fn configure_pyo3_env(
     target: &Target,
     target_triple: &str,
 ) -> Result<()> {
-    let pyo3_ver = if bridge_model.is_pyo3() {
-        pyo3_version(&context.project.cargo_metadata)
-            .context("Failed to get pyo3 version from cargo metadata")?
-    } else {
-        (0, 0, 0)
-    };
+    let pyo3_ver = bridge_model
+        .pyo3()
+        .map(|pyo3| (pyo3.version.major, pyo3.version.minor, pyo3.version.patch))
+        .unwrap_or((0, 0, 0));
     let stable_abi = python_interpreter.and_then(|i| bridge_model.stable_abi_for_interpreter(i));
     let use_target_abi = pyo3_ver >= PYO3_TARGET_ABI_PARAMETER_VERSION;
     let force_target_abi = stable_abi.is_some() && use_target_abi;
@@ -1243,25 +1241,6 @@ pub(crate) fn ensure_target_maturin_dir(target_dir: &Path) -> PathBuf {
     let dir = target_dir.join(env!("CARGO_PKG_NAME"));
     let _ = fs::create_dir_all(&dir);
     dir
-}
-
-fn pyo3_version(cargo_metadata: &cargo_metadata::Metadata) -> Option<(u64, u64, u64)> {
-    let packages: HashMap<&str, &cargo_metadata::Package> = cargo_metadata
-        .packages
-        .iter()
-        .filter_map(|pkg| {
-            let name = pkg.name.as_ref();
-            if name == "pyo3" || name == "pyo3-ffi" {
-                Some((name, pkg))
-            } else {
-                None
-            }
-        })
-        .collect();
-    packages
-        .get("pyo3")
-        .or_else(|| packages.get("pyo3-ffi"))
-        .map(|pkg| (pkg.version.major, pkg.version.minor, pkg.version.patch))
 }
 
 #[cfg(test)]

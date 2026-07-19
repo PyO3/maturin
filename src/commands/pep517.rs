@@ -26,6 +26,9 @@ pub enum Pep517Command {
         metadata_directory: PathBuf,
         #[command(flatten)]
         strip_opt: StripOption,
+        /// Build with Profile-Guided Optimization (PGO)
+        #[arg(long, env = "MATURIN_PGO", value_parser = clap::builder::FalseyValueParser::new())]
+        pgo: bool,
     },
     #[command(name = "build-wheel")]
     /// Implementation of build_wheel
@@ -34,6 +37,9 @@ pub enum Pep517Command {
         build_options: BuildOptions,
         #[command(flatten)]
         strip_opt: StripOption,
+        /// Build with Profile-Guided Optimization (PGO)
+        #[arg(long, env = "MATURIN_PGO", value_parser = clap::builder::FalseyValueParser::new())]
+        pgo: bool,
         /// Build editable wheels
         #[arg(long)]
         editable: bool,
@@ -86,12 +92,14 @@ pub fn pep517(subcommand: Pep517Command) -> Result<()> {
             mut build_options,
             metadata_directory,
             strip_opt,
+            pgo,
         } => {
             require_single_interpreter(&mut build_options, "write-dist-info")?;
             let mut context = build_options
                 .into_build_context()
                 .strip(strip_opt.strip)
                 .editable(false)
+                .pgo(pgo)
                 .build()?;
             ensure_release_profile(&mut context);
 
@@ -111,6 +119,7 @@ pub fn pep517(subcommand: Pep517Command) -> Result<()> {
         Pep517Command::BuildWheel {
             mut build_options,
             strip_opt,
+            pgo,
             editable,
         } => {
             require_single_interpreter(&mut build_options, "build-wheel")?;
@@ -118,6 +127,7 @@ pub fn pep517(subcommand: Pep517Command) -> Result<()> {
                 .into_build_context()
                 .strip(strip_opt.strip)
                 .editable(editable)
+                .pgo(pgo)
                 .build()?;
             ensure_release_profile(&mut build_context);
 

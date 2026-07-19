@@ -25,6 +25,10 @@ Options:
           
           Requires `pgo-command` to be set in `[tool.maturin]` in pyproject.toml. This performs a
           three-phase build: instrumented build, profile training, and optimized rebuild.
+          
+          Can also be enabled via the MATURIN_PGO environment variable.
+          
+          [env: MATURIN_PGO=]
 
   -i, --interpreter [<INTERPRETER>...]
           The python versions to build wheels for, given as the executables of interpreters such as

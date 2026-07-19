@@ -39,6 +39,15 @@ pub struct DevelopOptions {
     /// Pass --release to cargo
     #[arg(short = 'r', long, help_heading = heading::COMPILATION_OPTIONS, conflicts_with = "profile")]
     pub release: bool,
+    /// Build with Profile-Guided Optimization (PGO).
+    ///
+    /// Requires `pgo-command` to be set in `[tool.maturin]` in pyproject.toml.
+    /// This performs a three-phase build: instrumented build, profile training,
+    /// and optimized rebuild.
+    ///
+    /// Implies `--release` unless `--profile` is specified.
+    #[arg(long)]
+    pub pgo: bool,
     /// Strip the library for minimum file size
     #[arg(long)]
     pub strip: bool,
@@ -324,6 +333,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
     let DevelopOptions {
         bindings,
         release,
+        pgo,
         strip,
         extras,
         group,
@@ -338,6 +348,11 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
 
     // set profile to release if specified; `--release` and `--profile` are mutually exclusive
     if release {
+        cargo_options.profile = Some("release".to_string());
+    }
+    // PGO-optimizing a debug build makes no sense, so `--pgo` implies the
+    // release profile unless another profile was requested explicitly
+    if pgo && cargo_options.profile.is_none() {
         cargo_options.profile = Some("release".to_string());
     }
 
@@ -385,6 +400,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
         .into_build_context()
         .strip(if strip { Some(true) } else { None })
         .editable(true)
+        .pgo(pgo)
         .build()?;
 
     // Ensure that version information is present, https://github.com/PyO3/maturin/issues/2416

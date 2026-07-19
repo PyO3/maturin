@@ -105,6 +105,7 @@ pub fn test_develop(case: &DevelopCase<'_>) -> Result<()> {
     let develop_options = DevelopOptions {
         bindings: case.bindings.map(|binding| binding.to_owned()),
         release: false,
+        pgo: false,
         strip: false,
         extras: Vec::new(),
         group: Vec::new(),

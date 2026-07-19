@@ -20,6 +20,13 @@ Options:
 
           [possible values: pyo3, pyo3-ffi, cffi, uniffi, bin]
 
+      --pgo
+          Build with Profile-Guided Optimization (PGO).
+
+          Requires `pgo-command` to be set in `[tool.maturin]` in pyproject.toml. This performs a three-phase build: instrumented build, profile training, and optimized rebuild.
+
+          Implies `--release` unless `--profile` is specified.
+
       --strip
           Strip the library for minimum file size
 

@@ -46,7 +46,9 @@ pub struct DevelopOptions {
     /// and optimized rebuild.
     ///
     /// Implies `--release` unless `--profile` is specified.
-    #[arg(long)]
+    ///
+    /// Can also be enabled via the MATURIN_PGO environment variable.
+    #[arg(long, env = "MATURIN_PGO", value_parser = clap::builder::FalseyValueParser::new())]
     pub pgo: bool,
     /// Strip the library for minimum file size
     #[arg(long)]

@@ -73,6 +73,7 @@ Config-settings take priority over `MATURIN_PEP517_ARGS`; the environment variab
   `MATURIN_PYODIDE_ABI_VERSION` when possible — wheels built with the legacy
   tag are not installable on PEP 783-compliant runtimes.
 * `MATURIN_STRIP`: Strip the library for minimum file size
+* `MATURIN_PGO`: Build with Profile-Guided Optimization (same as `--pgo`), works with `maturin build`, `maturin develop` and PEP 517 builds (e.g. `pip install .`). Set to `0`, `false`, `no` or `off` to disable, any other value enables it
 * `MATURIN_NO_MISSING_BUILD_BACKEND_WARNING`: Suppress missing build backend warning
 * `MATURIN_USE_XWIN`: Set to `1` to force to use `xwin` for cross compiling even on Windows that supports native compilation
 * `ANDROID_API_LEVEL`: The Android API level to target when cross compiling for Android

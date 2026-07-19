@@ -27,6 +27,10 @@ Options:
 
           Implies `--release` unless `--profile` is specified.
 
+          Can also be enabled via the MATURIN_PGO environment variable.
+
+          [env: MATURIN_PGO=]
+
       --strip
           Strip the library for minimum file size
 

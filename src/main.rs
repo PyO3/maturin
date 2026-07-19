@@ -77,7 +77,9 @@ enum Command {
         /// Requires `pgo-command` to be set in `[tool.maturin]` in pyproject.toml.
         /// This performs a three-phase build: instrumented build, profile training,
         /// and optimized rebuild.
-        #[arg(long)]
+        ///
+        /// Can also be enabled via the MATURIN_PGO environment variable.
+        #[arg(long, env = "MATURIN_PGO", value_parser = clap::builder::FalseyValueParser::new())]
         pgo: bool,
         #[command(flatten)]
         build: BuildOptions,
@@ -98,7 +100,9 @@ enum Command {
         /// Build with Profile-Guided Optimization (PGO).
         ///
         /// Requires `pgo-command` to be set in `[tool.maturin]` in pyproject.toml.
-        #[arg(long)]
+        ///
+        /// Can also be enabled via the MATURIN_PGO environment variable.
+        #[arg(long, env = "MATURIN_PGO", value_parser = clap::builder::FalseyValueParser::new())]
         pgo: bool,
         #[command(flatten)]
         publish: PublishOpt,

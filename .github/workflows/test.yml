@@ -138,7 +138,7 @@ jobs:
       - name: Install llvm-tools
         run: rustup component add llvm-tools-preview
       - name: cargo test
-        run: cargo nextest run --features password-storage,faster-tests
+        run: cargo nextest run --features password-storage,faster-tests,schemars
       # Zig cross compilation mainly exercises host-OS-specific plumbing, so one
       # python per OS is enough; macos-latest and windows-11-arm have no 3.9
       # cell, so macos-latest falls back to pypy to keep coverage on arm macs.
@@ -331,7 +331,7 @@ jobs:
       - name: cargo test
         run: |
           # unset GITHUB_ACTIONS env var to disable zig related tests
-          env -u GITHUB_ACTIONS cargo nextest run --features password-storage,faster-tests
+          env -u GITHUB_ACTIONS cargo nextest run --features password-storage,faster-tests,schemars
 
   test-auditwheel:
     name: Test Auditwheel

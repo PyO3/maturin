@@ -389,13 +389,37 @@ impl BuildContextBuilder {
             .and_then(|x| x.maturin())
             .and_then(|x| x.sbom.clone())
             .unwrap_or_default();
-        if !build_options.output.sbom_include.is_empty() {
-            let includes = config.include.get_or_insert_with(Vec::new);
-            includes.extend(build_options.output.sbom_include.iter().cloned());
-            includes.dedup();
-        }
+        let had_includes = config.include.is_some();
+        let pyproject_includes = config.include.take().unwrap_or_default();
+        let merged =
+            merge_and_dedup_sbom_includes(&pyproject_includes, &build_options.output.sbom_include);
+        config.include = if merged.is_empty() && !had_includes {
+            None
+        } else {
+            Some(merged)
+        };
         config
     }
+}
+
+/// Merge SBOM include paths from `pyproject.toml` and the CLI, removing
+/// duplicates across the full merged list while preserving first-seen
+/// order (pyproject entries first, then CLI entries).
+///
+/// Equality is based on the configured path spelling as written (i.e.
+/// plain `PathBuf` equality) — paths are intentionally *not* canonicalized
+/// here. Canonicalization and duplicate-output-filename validation happen
+/// later in [`crate::sbom::SbomData::write`], which must still reject
+/// distinct paths that resolve to the same output filename.
+fn merge_and_dedup_sbom_includes(pyproject: &[PathBuf], cli: &[PathBuf]) -> Vec<PathBuf> {
+    let mut seen = HashSet::new();
+    let mut merged = Vec::with_capacity(pyproject.len() + cli.len());
+    for path in pyproject.iter().chain(cli.iter()) {
+        if seen.insert(path.clone()) {
+            merged.push(path.clone());
+        }
+    }
+    merged
 }
 
 /// Resolve the build target and universal2 flag from the user-specified
@@ -673,5 +697,87 @@ mod tests {
             err.to_string(),
             "Rust target riscv32gc-unknown-linux-gnu is not supported by PyPI"
         );
+    }
+
+    #[test]
+    fn merge_and_dedup_sbom_includes_removes_non_adjacent_duplicates() {
+        let pyproject = vec![
+            PathBuf::from("a.json"),
+            PathBuf::from("b.json"),
+            PathBuf::from("a.json"),
+        ];
+        let cli: Vec<PathBuf> = Vec::new();
+
+        let merged = merge_and_dedup_sbom_includes(&pyproject, &cli);
+
+        assert_eq!(
+            merged,
+            vec![PathBuf::from("a.json"), PathBuf::from("b.json")]
+        );
+    }
+
+    #[test]
+    fn merge_and_dedup_sbom_includes_preserves_pyproject_then_cli_order() {
+        let pyproject = vec![PathBuf::from("a.json"), PathBuf::from("b.json")];
+        let cli = vec![
+            PathBuf::from("b.json"),
+            PathBuf::from("c.json"),
+            PathBuf::from("a.json"),
+        ];
+
+        let merged = merge_and_dedup_sbom_includes(&pyproject, &cli);
+
+        assert_eq!(
+            merged,
+            vec![
+                PathBuf::from("a.json"),
+                PathBuf::from("b.json"),
+                PathBuf::from("c.json"),
+            ]
+        );
+    }
+
+    #[test]
+    fn merge_and_dedup_sbom_includes_dedups_pyproject_only() {
+        let pyproject = vec![
+            PathBuf::from("a.json"),
+            PathBuf::from("a.json"),
+            PathBuf::from("c.json"),
+            PathBuf::from("a.json"),
+        ];
+        let cli: Vec<PathBuf> = Vec::new();
+
+        let merged = merge_and_dedup_sbom_includes(&pyproject, &cli);
+
+        assert_eq!(
+            merged,
+            vec![PathBuf::from("a.json"), PathBuf::from("c.json")]
+        );
+    }
+
+    #[test]
+    fn resolve_sbom_config_preserves_explicit_empty_include() {
+        // An explicitly configured `include = []` in pyproject.toml must stay
+        // `Some(vec![])` after resolution, not collapse to `None`. `SbomConfig`
+        // is publicly exposed via `BuildContext.artifact.sbom` and derives
+        // `Serialize`, so `Some([])` vs `None` is an observable difference
+        // (`[]` vs `null`) and also changes whether `SbomData::write` enters
+        // its include-handling branch at all.
+        let pyproject: PyProjectToml = toml::from_str(
+            r#"
+            [build-system]
+            requires = ["maturin"]
+            build-backend = "maturin"
+
+            [tool.maturin.sbom]
+            include = []
+            "#,
+        )
+        .unwrap();
+        let build_options = BuildOptions::default();
+
+        let config = BuildContextBuilder::resolve_sbom_config(&build_options, Some(&pyproject));
+
+        assert_eq!(config.include, Some(Vec::new()));
     }
 }

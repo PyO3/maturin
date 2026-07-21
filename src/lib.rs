@@ -5,21 +5,40 @@
 //!
 //! # Cargo features
 //!
-//! Default features: log, upload, rustls
+//! Default features: full, rustls
 //!
-//! - log: Configures pretty-env-logger, even though maturin doesn't use logging itself.
+//! - full: Bundles cli-completion, cross-compile, scaffolding, upload, sbom and auditwheel.
 //!
-//! - upload: Uses ureq to add the upload command.
+//! - upload: Uses ureq to add the upload and publish commands.
 //!
-//! - rustls: Makes ureq use the rustls stack so that we can build maturin in a CentOS 6
-//!   docker container and which maturin itself manylinux compliant.
+//! - rustls: Makes ureq (and cargo-xwin) use the rustls stack so that we can build maturin in
+//!   a CentOS 6 docker container and which maturin itself manylinux compliant.
 //!
-//! - native-tls: Makes ureq use the platform native tls stack
+//! - native-tls: Makes ureq (and cargo-xwin) use the platform-native tls stack.
 //!
-//! - password-storage (off by default): Uses the keyring package to store the password. keyring
-//!   pulls in a lot of shared libraries and outdated dependencies, so this is off by default, except
-//!   for the build on the github releases page.
-//!   (https://github.com/hwchen/secret-service-rs/issues/9)
+//! - sbom: Generates a CycloneDX software bill of materials for the built wheel.
+//!
+//! - auditwheel: Enables dependency auditing and wheel repair for macOS (install-name/rpath
+//!   rewriting) and Windows (PE import patching and DLL bundling); Linux auditing and
+//!   patchelf-based repair work without it. Includes pure-Rust ad-hoc code signing for macOS
+//!   wheels when cross-compiling from a non-macOS host (native builds use Apple's codesign).
+//!
+//! - scaffolding: Enables the `maturin new`/`init`/`generate-ci` project scaffolding commands.
+//!
+//! - cross-compile: Enables cross compilation support via zig (cargo-zigbuild) and xwin. The
+//!   zig and xwin sub-features can also be enabled individually.
+//!
+//! - cli-completion: Enables shell completion generation for the CLI.
+//!
+//! - schemars: Enables generating the JSON schema for maturin's configuration.
+//!
+//! - static (off by default): Statically links liblzma via xz2/static.
+//!
+//! - password-storage (off by default, implies upload): Uses the keyring package to store the
+//!   password. maturin only enables keyring's native macOS/Windows/Linux backends, so there is
+//!   no BSD backend; most builds on the github releases page enable this.
+//!
+//! - log, human-panic (deprecated): No longer do anything and are kept only for compatibility.
 
 #![deny(missing_docs)]
 

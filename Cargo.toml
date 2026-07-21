@@ -189,7 +189,8 @@ schemars = ["dep:schemars", "dep:pretty_assertions"]
 
 sbom = ["dep:cargo-cyclonedx", "dep:which"]
 
-# keyring doesn't support *BSD so it's not enabled in `full` by default
+# we only enable keyring's native macOS/Windows/Linux backends (no BSD backend),
+# so it's not enabled in `full` by default
 password-storage = ["upload", "keyring"]
 
 rustls = [

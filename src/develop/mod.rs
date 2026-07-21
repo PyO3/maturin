@@ -330,7 +330,6 @@ fn parse_direct_url_path(pip_show_output: &str) -> Result<Option<PathBuf>> {
 /// Also adds the dist-info directory to make sure pip and other tools detect the library
 ///
 /// Works only in a virtualenv.
-#[allow(clippy::too_many_arguments)]
 pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
     let DevelopOptions {
         bindings,

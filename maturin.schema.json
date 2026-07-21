@@ -24,9 +24,13 @@
     },
     "bindings": {
       "description": "Bindings type",
-      "type": [
-        "string",
-        "null"
+      "anyOf": [
+        {
+          "$ref": "#/$defs/Bindings"
+        },
+        {
+          "type": "null"
+        }
       ]
     },
     "compatibility": {
@@ -269,6 +273,36 @@
           "description": "Don't check for manylinux compliance",
           "type": "string",
           "const": "skip"
+        }
+      ]
+    },
+    "Bindings": {
+      "description": "The kind of bindings to use.",
+      "oneOf": [
+        {
+          "description": "PyO3 bindings",
+          "type": "string",
+          "const": "pyo3"
+        },
+        {
+          "description": "pyo3-ffi (raw FFI) bindings",
+          "type": "string",
+          "const": "pyo3-ffi"
+        },
+        {
+          "description": "CFFI bindings",
+          "type": "string",
+          "const": "cffi"
+        },
+        {
+          "description": "UniFFI bindings",
+          "type": "string",
+          "const": "uniffi"
+        },
+        {
+          "description": "Rust binary",
+          "type": "string",
+          "const": "bin"
         }
       ]
     },

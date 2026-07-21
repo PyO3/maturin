@@ -2,6 +2,7 @@
 
 use crate::CompatibilityTag;
 use crate::auditwheel::AuditWheelMode;
+use crate::bridge::Bindings;
 use anyhow::{Context, Result};
 use fs_err as fs;
 use pep440_rs::{Version, VersionSpecifiers};
@@ -366,7 +367,7 @@ pub struct ToolMaturin {
     /// Patterns are resolved relative to the directory containing `pyproject.toml`.
     pub exclude: Option<Vec<GlobPattern>>,
     /// Bindings type
-    pub bindings: Option<String>,
+    pub bindings: Option<Bindings>,
     /// Platform compatibility
     #[serde(alias = "manylinux")]
     pub compatibility: Option<CompatibilityTag>,
@@ -590,8 +591,8 @@ impl PyProjectToml {
     }
 
     /// Returns the value of `[tool.maturin.bindings]` in pyproject.toml
-    pub fn bindings(&self) -> Option<&str> {
-        self.maturin()?.bindings.as_deref()
+    pub fn bindings(&self) -> Option<Bindings> {
+        self.maturin()?.bindings
     }
 
     /// Returns the PGO training command from `[tool.maturin]`
@@ -779,7 +780,7 @@ impl PyProjectToml {
 #[cfg(test)]
 mod tests {
     use crate::{
-        CompatibilityTag, PyProjectToml,
+        Bindings, CompatibilityTag, PyProjectToml,
         pyproject_toml::{
             FeatureConditionEnv, FeatureSpec, Format, Formats, GlobPattern, ToolMaturin,
         },
@@ -1166,6 +1167,31 @@ mod tests {
         "#;
         let maturin: ToolMaturin = toml::from_str(toml_str).unwrap();
         assert_eq!(maturin.compatibility, Some(CompatibilityTag::Pypi));
+    }
+
+    #[test]
+    fn test_bindings_deserializes_every_spelling() {
+        for binding in Bindings::ALL {
+            let toml_str = format!("bindings = {:?}\n", binding.as_str());
+            let maturin: ToolMaturin = toml::from_str(&toml_str).unwrap();
+            assert_eq!(maturin.bindings, Some(binding));
+        }
+
+        // Omitting `bindings` keeps auto-detection (None).
+        let maturin: ToolMaturin = toml::from_str("").unwrap();
+        assert_eq!(maturin.bindings, None);
+    }
+
+    #[test]
+    fn test_bindings_rejects_unknown() {
+        let err = toml::from_str::<ToolMaturin>("bindings = \"foo\"\n").unwrap_err();
+        // serde's default unknown-variant message names every accepted spelling.
+        assert!(
+            err.to_string().contains(
+                "unknown variant `foo`, expected one of `pyo3`, `pyo3-ffi`, `cffi`, `uniffi`, `bin`"
+            ),
+            "unexpected error: {err}"
+        );
     }
 
     #[test]

@@ -103,7 +103,9 @@ pub fn test_develop(case: &DevelopCase<'_>) -> Result<()> {
         TestEnvKind::Conda { .. } => (case_target_dir(case.id), None),
     };
     let develop_options = DevelopOptions {
-        bindings: case.bindings.map(|binding| binding.to_owned()),
+        bindings: case
+            .bindings
+            .map(|binding| binding.parse().expect("valid bindings spelling")),
         release: false,
         pgo: false,
         strip: false,

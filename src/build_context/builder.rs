@@ -104,7 +104,7 @@ impl BuildContextBuilder {
         )?;
         let pyproject = pyproject_toml.as_ref();
 
-        let bindings = build_options.python.bindings.as_deref().or_else(|| {
+        let bindings = build_options.python.bindings.or_else(|| {
             pyproject.and_then(|x| {
                 if x.bindings().is_some() {
                     pyproject_toml_maturin_options.push("bindings");

@@ -559,10 +559,7 @@ fn configure_platform_linker_args(
     if zig
         && target.is_windows()
         && !target.is_msvc()
-        && matches!(
-            bridge_model,
-            BridgeModel::PyO3 { .. } | BridgeModel::Cffi | BridgeModel::UniFfi
-        )
+        && matches!(bridge_model, BridgeModel::PyO3 { .. } | BridgeModel::Cffi)
     {
         let py_init = format!("PyInit_{module_name}");
         let maturin_dir = ensure_target_maturin_dir(target_dir);

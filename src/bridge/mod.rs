@@ -8,7 +8,7 @@ pub use detection::{
 use std::{fmt, str::FromStr};
 
 use anyhow::Context;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::python_interpreter::{
     MAXIMUM_PYPY_MINOR, MAXIMUM_PYTHON_MINOR, MINIMUM_PYPY_MINOR, MINIMUM_PYTHON_MINOR,
@@ -58,6 +58,178 @@ impl FromStr for PyO3Crate {
             "pyo3-ffi" => Ok(PyO3Crate::PyO3Ffi),
             _ => anyhow::bail!("unknown binding crate: {}", s),
         }
+    }
+}
+
+/// The `bindings` input spelling accepted on the CLI (`--bindings`) and in
+/// `[tool.maturin] bindings`.
+///
+/// This is the raw, user-facing choice of binding model, kept deliberately
+/// distinct from the resolved [`BridgeModel`]: auto-detection and resolved PyO3
+/// metadata are semantic build states, whereas this enum only names the
+/// accepted input spellings. [`find_bridge`] converts it into a [`BridgeModel`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Bindings {
+    /// pyo3
+    PyO3,
+    /// pyo3-ffi
+    PyO3Ffi,
+    /// cffi
+    Cffi,
+    /// uniffi
+    UniFfi,
+    /// bin
+    Bin,
+}
+
+impl Bindings {
+    /// All accepted bindings, in declaration order.
+    pub const ALL: [Bindings; 5] = [
+        Bindings::PyO3,
+        Bindings::PyO3Ffi,
+        Bindings::Cffi,
+        Bindings::UniFfi,
+        Bindings::Bin,
+    ];
+
+    /// The accepted spellings as strings, derived from [`Bindings::as_str`].
+    ///
+    /// This is the single list handed to serde, clap and schemars when they
+    /// need to enumerate or reject variants.
+    pub const VARIANTS: [&'static str; 5] = [
+        Bindings::PyO3.as_str(),
+        Bindings::PyO3Ffi.as_str(),
+        Bindings::Cffi.as_str(),
+        Bindings::UniFfi.as_str(),
+        Bindings::Bin.as_str(),
+    ];
+
+    /// Returns the canonical spelling of this bindings type.
+    ///
+    /// This is the one place each spelling is written; `FromStr`, `Display`,
+    /// serde, clap and schemars all derive from it.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Bindings::PyO3 => "pyo3",
+            Bindings::PyO3Ffi => "pyo3-ffi",
+            Bindings::Cffi => "cffi",
+            Bindings::UniFfi => "uniffi",
+            Bindings::Bin => "bin",
+        }
+    }
+
+    /// A one-line human description of this bindings type, used as the
+    /// per-variant documentation in the generated JSON schema.
+    pub const fn description(self) -> &'static str {
+        match self {
+            Bindings::PyO3 => "PyO3 bindings",
+            Bindings::PyO3Ffi => "pyo3-ffi (raw FFI) bindings",
+            Bindings::Cffi => "CFFI bindings",
+            Bindings::UniFfi => "UniFFI bindings",
+            Bindings::Bin => "Rust binary",
+        }
+    }
+}
+
+impl fmt::Display for Bindings {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl FromStr for Bindings {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Bindings::ALL
+            .into_iter()
+            .find(|binding| binding.as_str() == s)
+            .with_context(|| {
+                format!(
+                    "unknown bindings type `{s}`, expected one of {}",
+                    Bindings::VARIANTS.join(", ")
+                )
+            })
+    }
+}
+
+impl Serialize for Bindings {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for Bindings {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct BindingsVisitor;
+
+        impl serde::de::Visitor<'_> for BindingsVisitor {
+            type Value = Bindings;
+
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str("a bindings type")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Bindings, E>
+            where
+                E: serde::de::Error,
+            {
+                Bindings::ALL
+                    .into_iter()
+                    .find(|binding| binding.as_str() == value)
+                    .ok_or_else(|| E::unknown_variant(value, &Bindings::VARIANTS))
+            }
+        }
+
+        deserializer.deserialize_str(BindingsVisitor)
+    }
+}
+
+impl clap::ValueEnum for Bindings {
+    fn value_variants<'a>() -> &'a [Self] {
+        &Bindings::ALL
+    }
+
+    fn to_possible_value(&self) -> Option<clap::builder::PossibleValue> {
+        Some(clap::builder::PossibleValue::new(self.as_str()))
+    }
+}
+
+#[cfg(feature = "schemars")]
+impl schemars::JsonSchema for Bindings {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        "Bindings".into()
+    }
+
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        "maturin::Bindings".into()
+    }
+
+    fn json_schema(_generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        // Document the string form (e.g. "pyo3", "cffi") so the schema matches
+        // serde Deserialize/Serialize rather than an externally-tagged object.
+        // Emit one `const` per variant with a description, mirroring the house
+        // style of the other documented string enums (e.g. `CargoCrateType`).
+        let one_of: Vec<serde_json::Value> = Bindings::ALL
+            .iter()
+            .map(|binding| {
+                serde_json::json!({
+                    "description": binding.description(),
+                    "type": "string",
+                    "const": binding.as_str(),
+                })
+            })
+            .collect();
+        schemars::json_schema!({
+            "description": "The kind of bindings to use.",
+            "oneOf": one_of,
+        })
     }
 }
 
@@ -438,5 +610,35 @@ mod tests {
         let abi3t = StableAbi::from_abi3t_version(3, 15);
         assert_eq!(abi3t.kind, StableAbiKind::Abi3t);
         assert_eq!(abi3t.version, StableAbiVersion::Version(3, 15));
+    }
+
+    #[test]
+    fn bindings_spellings_roundtrip() {
+        // The exact accepted spellings, in the historical order. These are a
+        // public contract (CLI values, `[tool.maturin] bindings`, JSON schema)
+        // and are not something the type can guarantee: only pinning the
+        // literals catches an accidental edit to `as_str`. Hardcoded here (not
+        // derived from `as_str`/`VARIANTS`) so the round-trip is meaningful.
+        let spellings = [
+            (Bindings::PyO3, "pyo3"),
+            (Bindings::PyO3Ffi, "pyo3-ffi"),
+            (Bindings::Cffi, "cffi"),
+            (Bindings::UniFfi, "uniffi"),
+            (Bindings::Bin, "bin"),
+        ];
+        for (binding, spelling) in spellings {
+            assert_eq!(binding.as_str(), spelling);
+            assert_eq!(spelling.parse::<Bindings>().unwrap(), binding);
+        }
+        assert_eq!(Bindings::VARIANTS, spellings.map(|(_, spelling)| spelling));
+    }
+
+    #[test]
+    fn bindings_fromstr_rejects_unknown() {
+        let err = "foo".parse::<Bindings>().unwrap_err().to_string();
+        assert_eq!(
+            err,
+            "unknown bindings type `foo`, expected one of pyo3, pyo3-ffi, cffi, uniffi, bin"
+        );
     }
 }

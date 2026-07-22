@@ -1,4 +1,5 @@
 use crate::auditwheel::{AuditWheelMode, CompatibilityTag};
+use crate::bridge::Bindings;
 use crate::build_context::BuildContextBuilder;
 pub use crate::cargo_options::{CargoOptions, TargetTriple};
 use crate::compression::CompressionOptions;
@@ -22,8 +23,8 @@ pub struct PythonOptions {
     pub find_interpreter: bool,
 
     /// Which kind of bindings to use.
-    #[arg(short, long, value_parser = ["pyo3", "pyo3-ffi", "cffi", "uniffi", "bin"])]
-    pub bindings: Option<String>,
+    #[arg(short, long)]
+    pub bindings: Option<Bindings>,
 }
 
 /// Options for configuring platform tags and binary compatibility.
@@ -141,7 +142,8 @@ impl BuildOptions {
 mod tests {
     use super::*;
     use crate::bridge::{
-        CrateDependencies, PyO3, PyO3Crate, StableAbi, StableAbiKind, StableAbiVersion, find_bridge,
+        Bindings, CrateDependencies, PyO3, PyO3Crate, StableAbi, StableAbiKind, StableAbiVersion,
+        find_bridge,
     };
     use crate::python_interpreter::InterpreterResolver;
     use crate::test_utils::test_crate_path;
@@ -149,6 +151,41 @@ mod tests {
     use cargo_metadata::{CargoOpt, MetadataCommand};
     use insta::assert_snapshot;
     use pretty_assertions::assert_eq;
+
+    #[test]
+    fn test_cli_bindings_parses_every_spelling() {
+        use clap::Parser;
+
+        // `--bindings <value>` accepts each valid spelling and maps it to the
+        // matching `Bindings` variant.
+        for binding in Bindings::ALL {
+            let opts =
+                PythonOptions::try_parse_from(["prog", "--bindings", binding.as_str()]).unwrap();
+            assert_eq!(opts.bindings, Some(binding));
+        }
+
+        // Omitting `--bindings` leaves auto-detection untouched (None).
+        let opts = PythonOptions::try_parse_from(["prog"]).unwrap();
+        assert_eq!(opts.bindings, None);
+    }
+
+    #[test]
+    fn test_cli_bindings_rejects_unknown() {
+        use clap::Parser;
+
+        let err = PythonOptions::try_parse_from(["prog", "--bindings", "foo"]).unwrap_err();
+        let rendered = err.to_string();
+        // Same diagnostic quality as the previous `value_parser = [...]`: the
+        // invalid value plus the list of accepted spellings.
+        assert!(
+            rendered.contains("invalid value 'foo' for '--bindings <BINDINGS>'"),
+            "unexpected error: {rendered}"
+        );
+        assert!(
+            rendered.contains("[possible values: pyo3, pyo3-ffi, cffi, uniffi, bin]"),
+            "unexpected error: {rendered}"
+        );
+    }
 
     #[test]
     fn test_find_bridge_pyo3() {
@@ -162,7 +199,7 @@ mod tests {
             Ok(BridgeModel::PyO3 { .. })
         ));
         assert!(matches!(
-            find_bridge(&pyo3_mixed, Some("pyo3"), &CargoOptions::default()),
+            find_bridge(&pyo3_mixed, Some(Bindings::PyO3), &CargoOptions::default()),
             Ok(BridgeModel::PyO3 { .. })
         ));
     }
@@ -196,7 +233,7 @@ mod tests {
             bridge
         );
         assert_eq!(
-            find_bridge(&pyo3_pure, Some("pyo3"), &CargoOptions::default()).unwrap(),
+            find_bridge(&pyo3_pure, Some(Bindings::PyO3), &CargoOptions::default()).unwrap(),
             bridge
         );
     }
@@ -242,7 +279,7 @@ mod tests {
         assert_eq!(pyo3.crate_name, PyO3Crate::PyO3);
 
         let bridge_explicit =
-            find_bridge(&pyo3_abi3t, Some("pyo3"), &CargoOptions::default()).unwrap();
+            find_bridge(&pyo3_abi3t, Some(Bindings::PyO3), &CargoOptions::default()).unwrap();
         assert_eq!(bridge_explicit, bridge);
     }
 
@@ -490,7 +527,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            find_bridge(&cffi_pure, Some("cffi"), &CargoOptions::default()).unwrap(),
+            find_bridge(&cffi_pure, Some(Bindings::Cffi), &CargoOptions::default()).unwrap(),
             BridgeModel::Cffi
         );
         assert_eq!(
@@ -498,7 +535,7 @@ mod tests {
             BridgeModel::Cffi
         );
 
-        assert!(find_bridge(&cffi_pure, Some("pyo3"), &CargoOptions::default()).is_err());
+        assert!(find_bridge(&cffi_pure, Some(Bindings::PyO3), &CargoOptions::default()).is_err());
     }
 
     #[test]
@@ -509,7 +546,7 @@ mod tests {
             .unwrap();
 
         assert_eq!(
-            find_bridge(&hello_world, Some("bin"), &CargoOptions::default()).unwrap(),
+            find_bridge(&hello_world, Some(Bindings::Bin), &CargoOptions::default()).unwrap(),
             BridgeModel::Bin(None)
         );
         assert_eq!(
@@ -517,14 +554,14 @@ mod tests {
             BridgeModel::Bin(None)
         );
 
-        assert!(find_bridge(&hello_world, Some("pyo3"), &CargoOptions::default()).is_err());
+        assert!(find_bridge(&hello_world, Some(Bindings::PyO3), &CargoOptions::default()).is_err());
 
         let pyo3_bin = MetadataCommand::new()
             .manifest_path(test_crate_path("pyo3-bin").join("Cargo.toml"))
             .exec()
             .unwrap();
         assert!(matches!(
-            find_bridge(&pyo3_bin, Some("bin"), &CargoOptions::default()).unwrap(),
+            find_bridge(&pyo3_bin, Some(Bindings::Bin), &CargoOptions::default()).unwrap(),
             BridgeModel::Bin(Some(_))
         ));
         assert!(matches!(
@@ -543,7 +580,12 @@ mod tests {
             .exec()
             .unwrap();
         assert_eq!(
-            find_bridge(&workspace_bin, Some("bin"), &CargoOptions::default()).unwrap(),
+            find_bridge(
+                &workspace_bin,
+                Some(Bindings::Bin),
+                &CargoOptions::default()
+            )
+            .unwrap(),
             BridgeModel::Bin(None)
         );
 
@@ -564,7 +606,7 @@ mod tests {
             ..Default::default()
         };
         assert!(matches!(
-            find_bridge(&workspace_bin_python, Some("bin"), &cargo_options).unwrap(),
+            find_bridge(&workspace_bin_python, Some(Bindings::Bin), &cargo_options).unwrap(),
             BridgeModel::Bin(Some(_))
         ));
     }

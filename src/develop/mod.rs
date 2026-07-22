@@ -4,6 +4,7 @@ use crate::PlatformTag;
 use crate::PythonInterpreter;
 use crate::Target;
 use crate::auditwheel::AuditWheelMode;
+use crate::bridge::Bindings;
 use crate::build_options::CargoOptions;
 use crate::compression::CompressionOptions;
 use crate::target::detect_arch_from_python;
@@ -29,13 +30,8 @@ use url::Url;
 #[derive(Debug, clap::Parser)]
 pub struct DevelopOptions {
     /// Which kind of bindings to use
-    #[arg(
-        short = 'b',
-        long = "bindings",
-        alias = "binding-crate",
-        value_parser = ["pyo3", "pyo3-ffi", "cffi", "uniffi", "bin"]
-    )]
-    pub bindings: Option<String>,
+    #[arg(short = 'b', long = "bindings", alias = "binding-crate")]
+    pub bindings: Option<Bindings>,
     /// Pass --release to cargo
     #[arg(short = 'r', long, help_heading = heading::COMPILATION_OPTIONS, conflicts_with = "profile")]
     pub release: bool,

@@ -5,7 +5,7 @@
 //! whether abi3 is enabled, and whether `generate-import-lib` is active.
 
 use super::{
-    ABI3T_MINIMUM_PYTHON_MINOR, BridgeModel, PyO3, PyO3Crate, PyO3MetadataRaw, StableAbi,
+    ABI3T_MINIMUM_PYTHON_MINOR, Bindings, BridgeModel, PyO3, PyO3Crate, PyO3MetadataRaw, StableAbi,
     StableAbiKind, StableAbiVersion,
 };
 use crate::pyproject_toml::{FeatureConditionEnv, FeatureSpec};
@@ -29,7 +29,7 @@ const PYO3_BINDING_CRATES: [PyO3Crate; 2] = [PyO3Crate::PyO3Ffi, PyO3Crate::PyO3
 /// to evaluate them.
 pub fn find_bridge(
     cargo_metadata: &Metadata,
-    bridge: Option<&str>,
+    bridge: Option<Bindings>,
     cargo_options: &CargoOptions,
 ) -> Result<BridgeModel> {
     let deps = CrateDependencies::resolve(cargo_metadata, cargo_options)?;
@@ -40,7 +40,7 @@ pub fn find_bridge(
 /// also need [`CrateDependencies`] elsewhere resolve it only once.
 pub fn find_bridge_with_deps(
     cargo_metadata: &Metadata,
-    bridge: Option<&str>,
+    bridge: Option<Bindings>,
     deps: &CrateDependencies,
 ) -> Result<BridgeModel> {
     let no_extra_features = HashMap::new();
@@ -66,17 +66,18 @@ pub fn find_bridge_with_deps(
         .collect();
 
     let bridge = if let Some(bindings) = bridge {
-        if bindings == "cffi" {
-            BridgeModel::Cffi
-        } else if bindings == "uniffi" {
-            BridgeModel::UniFfi
-        } else if bindings == "bin" {
-            let bindings = find_pyo3_bindings(cargo_metadata, deps)?;
-            BridgeModel::Bin(bindings)
-        } else {
-            let bindings =
-                find_pyo3_bindings(cargo_metadata, deps)?.context("unknown binding type")?;
-            BridgeModel::PyO3(bindings)
+        match bindings {
+            Bindings::Cffi => BridgeModel::Cffi,
+            Bindings::UniFfi => BridgeModel::UniFfi,
+            Bindings::Bin => {
+                let bindings = find_pyo3_bindings(cargo_metadata, deps)?;
+                BridgeModel::Bin(bindings)
+            }
+            Bindings::PyO3 | Bindings::PyO3Ffi => {
+                let bindings =
+                    find_pyo3_bindings(cargo_metadata, deps)?.context("unknown binding type")?;
+                BridgeModel::PyO3(bindings)
+            }
         }
     } else {
         match find_pyo3_bindings(cargo_metadata, deps)? {

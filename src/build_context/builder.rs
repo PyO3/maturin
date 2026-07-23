@@ -340,6 +340,7 @@ impl BuildContextBuilder {
             metadata24.requires_python.as_ref(),
             &user_interpreters,
             build_options.python.find_interpreter,
+            build_options.python.allow_prereleases,
             has_import_lib_support,
         );
         resolver.resolve()

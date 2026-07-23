@@ -105,6 +105,9 @@ pub struct PythonInterpreter {
     pub implementation_name: String,
     /// Comes from sysconfig var `SOABI`
     pub soabi: Option<String>,
+    /// Whether this is a prerelease (alpha/beta/rc) interpreter, from
+    /// `sys.version_info.releaselevel`; `false` for non-probed placeholders
+    pub is_prerelease: bool,
 }
 
 impl Deref for PythonInterpreter {
@@ -318,6 +321,7 @@ impl PythonInterpreter {
             runnable: false,
             implementation_name,
             soabi: None,
+            is_prerelease: false,
         }
     }
 
@@ -346,6 +350,7 @@ impl PythonInterpreter {
             runnable: false,
             implementation_name: "cpython".to_string(),
             soabi: None,
+            is_prerelease: false,
         }
     }
 
@@ -551,6 +556,7 @@ mod tests {
             runnable: false,
             implementation_name: kind.to_string().to_ascii_lowercase(),
             soabi: None,
+            is_prerelease: false,
         }
     }
 

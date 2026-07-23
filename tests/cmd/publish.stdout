@@ -71,6 +71,10 @@ Options:
   -f, --find-interpreter
           Find interpreters from the host machine
 
+      --allow-prereleases
+          Also build for prerelease (alpha/beta/rc) interpreters found by `--find-interpreter`,
+          which are skipped by default
+
   -b, --bindings <BINDINGS>
           Which kind of bindings to use
           

@@ -34,6 +34,7 @@ pub(super) struct InterpreterMetadataMessage {
     pub executable: Option<String>,
     pub major: usize,
     pub minor: usize,
+    pub releaselevel: String,
     pub abiflags: Option<String>,
     pub interpreter: String,
     pub ext_suffix: Option<String>,
@@ -680,6 +681,7 @@ fn from_metadata_message(
         runnable: true,
         implementation_name: message.implementation_name,
         soabi: message.soabi,
+        is_prerelease: message.releaselevel != "final",
     }))
 }
 
@@ -877,6 +879,7 @@ mod tests {
         let message = |major, minor, platform: &str| InterpreterMetadataMessage {
             major,
             minor,
+            releaselevel: "final".to_string(),
             interpreter: "cpython".to_string(),
             implementation_name: "CPython".to_string(),
             abiflags: None,
@@ -939,6 +942,7 @@ mod tests {
                     runnable: true,
                     implementation_name: "CPython".to_string(),
                     soabi: None,
+                    is_prerelease: false,
                 }
             );
         }
@@ -984,6 +988,7 @@ mod tests {
                 runnable: true,
                 implementation_name: "CPython".to_string(),
                 soabi: None,
+                is_prerelease: false,
             }
         );
     }
@@ -1004,6 +1009,7 @@ mod tests {
         let message_314 = InterpreterMetadataMessage {
             major: 3,
             minor: 14,
+            releaselevel: "final".to_string(),
             interpreter: "cpython".to_string(),
             implementation_name: "CPython".to_string(),
             abiflags: Some("".to_string()),
@@ -1025,6 +1031,7 @@ mod tests {
         let message_314t = InterpreterMetadataMessage {
             major: 3,
             minor: 14,
+            releaselevel: "final".to_string(),
             interpreter: "cpython".to_string(),
             implementation_name: "CPython".to_string(),
             abiflags: Some("t".to_string()),
@@ -1042,6 +1049,43 @@ mod tests {
         assert_eq!(interp.minor, 14);
         assert_eq!(interp.abiflags, "t");
         assert!(interp.gil_disabled);
+    }
+
+    #[test]
+    fn test_interpreter_releaselevel_marks_prerelease() {
+        let target = Target::from_resolved_target_triple("x86_64-unknown-linux-gnu").unwrap();
+        let bridge = BridgeModel::PyO3(PyO3 {
+            crate_name: PyO3Crate::PyO3,
+            version: semver::Version::new(0, 26, 0),
+            stable_abi: None,
+            metadata: None,
+        });
+        let message = |releaselevel: &str| InterpreterMetadataMessage {
+            major: 3,
+            minor: 14,
+            releaselevel: releaselevel.to_string(),
+            interpreter: "cpython".to_string(),
+            implementation_name: "CPython".to_string(),
+            abiflags: Some("".to_string()),
+            ext_suffix: Some(".cpython-314-x86_64-linux-gnu.so".to_string()),
+            platform: "linux-x86_64".to_string(),
+            executable: None,
+            soabi: None,
+            gil_disabled: false,
+            system: "linux".to_string(),
+        };
+
+        for level in ["alpha", "beta", "candidate"] {
+            let interp = from_metadata_message("python3.14", &target, &bridge, message(level))
+                .unwrap()
+                .unwrap();
+            assert!(interp.is_prerelease, "{level} should be a prerelease");
+        }
+
+        let interp = from_metadata_message("python3.14", &target, &bridge, message("final"))
+            .unwrap()
+            .unwrap();
+        assert!(!interp.is_prerelease, "final should not be a prerelease");
     }
 
     #[test]

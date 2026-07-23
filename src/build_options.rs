@@ -22,6 +22,11 @@ pub struct PythonOptions {
     #[arg(short = 'f', long, conflicts_with = "interpreter")]
     pub find_interpreter: bool,
 
+    /// Also build for prerelease (alpha/beta/rc) interpreters found by
+    /// `--find-interpreter`, which are skipped by default.
+    #[arg(long)]
+    pub allow_prereleases: bool,
+
     /// Which kind of bindings to use.
     #[arg(short, long)]
     pub bindings: Option<Bindings>,
@@ -708,7 +713,8 @@ mod tests {
         let bridge = BridgeModel::Cffi;
         let interpreter = vec![PathBuf::from("nonexistent-python-xyz")];
 
-        let resolver = InterpreterResolver::new(&target, &bridge, None, &interpreter, false, false);
+        let resolver =
+            InterpreterResolver::new(&target, &bridge, None, &interpreter, false, false, false);
         let result = resolver.resolve();
         let err_msg = result.unwrap_err().to_string();
         assert_snapshot!(err_msg, @"Failed to find a python interpreter from `nonexistent-python-xyz`");

@@ -371,6 +371,7 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
         python: PythonOptions {
             interpreter: vec![python.clone()],
             find_interpreter: false,
+            allow_prereleases: false,
             bindings,
         },
         platform: PlatformOptions {

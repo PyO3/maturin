@@ -398,6 +398,32 @@ impl ProjectResolver {
 }
 
 impl ProjectLayout {
+    /// Directory the wheel's contents are resolved against, for a mixed python/rust project.
+    ///
+    /// `None` for a pure Rust project, where there is no python source tree to be relative to.
+    pub fn base_path(&self) -> Option<PathBuf> {
+        self.python_module
+            .as_ref()
+            .map(|python_module| python_module.parent().unwrap().to_path_buf())
+    }
+
+    /// Directory holding the extension module, relative to the root of the wheel.
+    ///
+    /// For `module-name = "a.b.c"` in a mixed project this is `a/b`, so that anything placed
+    /// alongside the extension — the `.so`, its type stubs — lands in the same package the
+    /// extension is imported from. For a pure Rust project it is the extension name, which is the
+    /// package maturin generates around it.
+    pub fn module_dir(&self) -> PathBuf {
+        match self.base_path() {
+            Some(base_path) => self
+                .rust_module
+                .strip_prefix(base_path)
+                .unwrap()
+                .to_path_buf(),
+            None => PathBuf::from(&self.extension_name),
+        }
+    }
+
     /// Checks whether a python module exists besides Cargo.toml with the right name
     fn determine(
         project_root: &Path,

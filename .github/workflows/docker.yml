@@ -19,7 +19,7 @@ jobs:
             manylinux: manylinux2014
           - name: musllinux
             tag-suffix: '-musllinux'
-            manylinux: musllinux_1_1
+            manylinux: musllinux_1_2
     environment:
       name: Docker Hub
       url: https://ghcr.io/pyo3/maturin

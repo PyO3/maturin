@@ -239,3 +239,13 @@ fn abi3_generate_stubs() {
         ],
     ));
 }
+
+/// `module-name` places the extension inside a python package, and the stubs have to follow it
+/// there — writing `_pyo3_mixed.pyi` to the root of `--out` puts it where nothing will look for it.
+#[test]
+fn abi3_generate_stubs_mixed_py_subdir() {
+    handle_result(other::generate_stubs(
+        "test-crates/pyo3-stub-generation-mixed-py-subdir",
+        &["pyo3_stub_generation_mixed_py_subdir/_pyo3_mixed.pyi"],
+    ));
+}

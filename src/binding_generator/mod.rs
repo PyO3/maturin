@@ -390,23 +390,8 @@ where
         .context("Failed to add the python module to the package")?;
     }
 
-    let base_path = context
-        .project
-        .project_layout
-        .python_module
-        .as_ref()
-        .map(|python_module| python_module.parent().unwrap().to_path_buf());
-
-    let module = match &base_path {
-        Some(base_path) => context
-            .project
-            .project_layout
-            .rust_module
-            .strip_prefix(base_path)
-            .unwrap()
-            .to_path_buf(),
-        None => PathBuf::from(&context.project.project_layout.extension_name),
-    };
+    let base_path = context.project.project_layout.base_path();
+    let module = context.project.project_layout.module_dir();
 
     {
         let mut dest = InstallDest::new(writer, context.project.editable, base_path.as_deref());

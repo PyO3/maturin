@@ -50,6 +50,14 @@ use std::time::Duration;
     "develop-bin-with-python-module",
     "test-crates/bin-with-python-module",
 ))]
+// Test that dependency groups are resolved from the project's pyproject.toml even when
+// `--manifest-path` points into a subdirectory, while being backward compatible
+// when the user explicitly provided the path already.
+// groups work (regression test for https://github.com/PyO3/maturin/issues/3283).
+#[case::pyo3_pure_with_dependency_group(DevelopCase::pip(
+    "develop-pyo3-pure-dependency-group",
+    "test-crates/pyo3-pure",
+).with_groups(&["dev", "test-crates/pyo3-pure/pyproject.toml:dev2"]))]
 #[test]
 fn develop_pip_cases(#[case] case: DevelopCase<'_>) {
     handle_result(develop::test_develop(&case));
@@ -99,6 +107,12 @@ fn develop_uniffi_cases(#[case] case: DevelopCase<'_>) {
 #[timeout(Duration::from_secs(600))]
 #[case::hello_world(DevelopCase::uv("develop-hello-world-uv", "test-crates/hello-world",))]
 #[case::pyo3_ffi_pure(DevelopCase::uv("develop-pyo3-ffi-pure-uv", "test-crates/pyo3-ffi-pure",))]
+// Test that dependency groups are resolved from the project's pyproject.toml even when
+// `--manifest-path` points into a subdirectory to it.
+#[case::pyo3_pure_with_dependency_group(DevelopCase::uv(
+    "develop-pyo3-pure-dependency-group-uv",
+    "test-crates/pyo3-pure",
+))]
 #[test]
 fn develop_uv_cases(#[case] case: DevelopCase<'_>) {
     // Only run uv tests on platforms that have wheels on PyPI or when a uv binary is found.

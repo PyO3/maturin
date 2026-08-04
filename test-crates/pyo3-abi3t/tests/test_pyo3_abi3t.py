@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import pyo3_abi3t
-
 import pytest
 
 

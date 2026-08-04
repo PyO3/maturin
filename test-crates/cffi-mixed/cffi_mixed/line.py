@@ -14,4 +14,4 @@ class Line:
         return math.sqrt((self.end.x - self.start.x) ** 2 + (self.end.y - self.start.y) ** 2)
 
     def __str__(self) -> str:
-        return "Line from ({},{}) to ({},{})".format(self.start.x, self.start.y, self.end.x, self.end.y)
+        return f"Line from ({self.start.x},{self.start.y}) to ({self.end.x},{self.end.y})"

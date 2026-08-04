@@ -16,7 +16,7 @@ import shutil
 from typing import Any
 
 # noinspection PyUnresolvedReferences
-from setuptools.build_meta import *  # noqa:F403
+from setuptools.build_meta import *
 
 
 def get_requires_for_build_wheel(config_settings: dict[str, Any] | None = None) -> list[str]:

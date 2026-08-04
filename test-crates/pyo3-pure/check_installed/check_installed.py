@@ -12,6 +12,6 @@ assert os.path.exists(os.path.join(install_path, "__init__.pyi"))
 assert os.path.exists(os.path.join(install_path, "py.typed"))
 
 # Check entrypoints
-assert subprocess.run(["get_42"]).returncode == 42
+assert subprocess.run(["get_42"], check=False).returncode == 42
 
 print("SUCCESS")

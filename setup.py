@@ -18,7 +18,6 @@ try:
 except ModuleNotFoundError:
     import tomli as tomllib
 from setuptools import setup
-
 from setuptools_rust import RustBin
 
 # Force the wheel to be platform specific

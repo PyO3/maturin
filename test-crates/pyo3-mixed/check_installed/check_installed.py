@@ -6,9 +6,8 @@ import sys
 from pathlib import Path
 from subprocess import check_output
 
-from boltons.strutils import slugify
-
 import pyo3_mixed
+from boltons.strutils import slugify
 
 assert pyo3_mixed.get_42() == 42
 assert slugify("First post! Hi!!!!~1    ") == "first_post_hi_1"

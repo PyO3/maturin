@@ -18,10 +18,10 @@ import struct
 import subprocess
 import sys
 from subprocess import SubprocessError
-from typing import Any, Dict, Mapping, List, Optional
+from typing import Any, Mapping
 
 
-def get_config() -> Dict[str, str]:
+def get_config() -> dict[str, str]:
     try:
         import tomllib
     except ModuleNotFoundError:
@@ -32,7 +32,7 @@ def get_config() -> Dict[str, str]:
     return pyproject_toml.get("tool", {}).get("maturin", {})
 
 
-def get_maturin_pep517_args(config_settings: Optional[Mapping[str, Any]] = None) -> List[str]:
+def get_maturin_pep517_args(config_settings: Mapping[str, Any] | None = None) -> list[str]:
     build_args = None
     if config_settings:
         # TODO: Deprecate and remove build-args in favor of maturin.build-args in maturin 2.0
@@ -52,13 +52,13 @@ def _get_sys_executable() -> str:
     if os.getenv("MATURIN_PEP517_USE_BASE_PYTHON") in {"1", "true"} or get_config().get("use-base-python"):
         # Use the base interpreter path when running inside a venv to avoid recompilation
         # when switching between venvs
-        base_executable = getattr(sys, "_base_executable")
+        base_executable = sys._base_executable  # type: ignore[attr-defined]
         if base_executable and os.path.exists(base_executable):
             executable = os.path.realpath(base_executable)
     return executable
 
 
-def _additional_pep517_args() -> List[str]:
+def _additional_pep517_args() -> list[str]:
     # Support building for 32-bit Python on x64 Windows
     if platform.system().lower() == "windows" and platform.machine().lower() == "amd64":
         pointer_width = struct.calcsize("P") * 8
@@ -67,7 +67,7 @@ def _additional_pep517_args() -> List[str]:
     return []
 
 
-def _has_interpreter_arg(args: List[str]) -> bool:
+def _has_interpreter_arg(args: list[str]) -> bool:
     """Return True if `args` already contains a `--interpreter`/`-i` flag."""
     for arg in args:
         if arg in ("--interpreter", "-i") or arg.startswith("--interpreter="):
@@ -75,7 +75,7 @@ def _has_interpreter_arg(args: List[str]) -> bool:
     return False
 
 
-def _get_env() -> Optional[Dict[str, str]]:
+def _get_env() -> dict[str, str] | None:
     if not os.environ.get("MATURIN_NO_INSTALL_RUST") and not shutil.which("cargo"):
         from puccinialin import setup_rust
 
@@ -89,8 +89,8 @@ def _get_env() -> Optional[Dict[str, str]]:
 # noinspection PyUnusedLocal
 def _build_wheel(
     wheel_directory: str,
-    config_settings: Optional[Mapping[str, Any]] = None,
-    metadata_directory: Optional[str] = None,
+    config_settings: Mapping[str, Any] | None = None,
+    metadata_directory: str | None = None,
     editable: bool = False,
 ) -> str:
     # PEP 517 specifies that only `sys.executable` points to the correct
@@ -123,7 +123,7 @@ def _build_wheel(
 
     print("Running `{}`".format(" ".join(command)))
     sys.stdout.flush()
-    result = subprocess.run(command, stdout=subprocess.PIPE, env=env)
+    result = subprocess.run(command, stdout=subprocess.PIPE, env=env, check=False)
     sys.stdout.buffer.write(result.stdout)
     sys.stdout.flush()
     if result.returncode != 0:
@@ -139,19 +139,19 @@ def _build_wheel(
 # noinspection PyUnusedLocal
 def build_wheel(
     wheel_directory: str,
-    config_settings: Optional[Mapping[str, Any]] = None,
-    metadata_directory: Optional[str] = None,
+    config_settings: Mapping[str, Any] | None = None,
+    metadata_directory: str | None = None,
 ) -> str:
     return _build_wheel(wheel_directory, config_settings, metadata_directory)
 
 
 # noinspection PyUnusedLocal
-def build_sdist(sdist_directory: str, config_settings: Optional[Mapping[str, Any]] = None) -> str:
+def build_sdist(sdist_directory: str, config_settings: Mapping[str, Any] | None = None) -> str:
     command = ["maturin", "pep517", "write-sdist", "--sdist-directory", sdist_directory]
 
     print("Running `{}`".format(" ".join(command)))
     sys.stdout.flush()
-    result = subprocess.run(command, stdout=subprocess.PIPE, env=_get_env())
+    result = subprocess.run(command, stdout=subprocess.PIPE, env=_get_env(), check=False)
     sys.stdout.buffer.write(result.stdout)
     sys.stdout.flush()
     if result.returncode != 0:
@@ -162,7 +162,7 @@ def build_sdist(sdist_directory: str, config_settings: Optional[Mapping[str, Any
 
 
 # noinspection PyUnusedLocal
-def get_requires_for_build_wheel(config_settings: Optional[Mapping[str, Any]] = None) -> List[str]:
+def get_requires_for_build_wheel(config_settings: Mapping[str, Any] | None = None) -> list[str]:
     if get_config().get("bindings") == "cffi" and platform.python_implementation() != "PyPy":
         requirements = ["cffi"]
     else:
@@ -175,8 +175,8 @@ def get_requires_for_build_wheel(config_settings: Optional[Mapping[str, Any]] = 
 # noinspection PyUnusedLocal
 def build_editable(
     wheel_directory: str,
-    config_settings: Optional[Mapping[str, Any]] = None,
-    metadata_directory: Optional[str] = None,
+    config_settings: Mapping[str, Any] | None = None,
+    metadata_directory: str | None = None,
 ) -> str:
     return _build_wheel(wheel_directory, config_settings, metadata_directory, editable=True)
 
@@ -186,7 +186,7 @@ get_requires_for_build_editable = get_requires_for_build_wheel
 
 
 # noinspection PyUnusedLocal
-def get_requires_for_build_sdist(config_settings: Optional[Mapping[str, Any]] = None) -> List[str]:
+def get_requires_for_build_sdist(config_settings: Mapping[str, Any] | None = None) -> list[str]:
     requirements = []
     if not os.environ.get("MATURIN_NO_INSTALL_RUST") and not shutil.which("cargo"):
         requirements += ["puccinialin"]
@@ -194,9 +194,7 @@ def get_requires_for_build_sdist(config_settings: Optional[Mapping[str, Any]] = 
 
 
 # noinspection PyUnusedLocal
-def prepare_metadata_for_build_wheel(
-    metadata_directory: str, config_settings: Optional[Mapping[str, Any]] = None
-) -> str:
+def prepare_metadata_for_build_wheel(metadata_directory: str, config_settings: Mapping[str, Any] | None = None) -> str:
     print("Checking for Rust toolchain....")
     is_cargo_installed = False
     env = _get_env()

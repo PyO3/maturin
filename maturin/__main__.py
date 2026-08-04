@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import os
 import sys
-from pathlib import Path
 import sysconfig
-from typing import Optional
+from pathlib import Path
 
 
-def get_maturin_path() -> Optional[Path]:
+def get_maturin_path() -> Path | None:
     SCRIPT_NAME = "maturin"
 
     def script_dir(scheme: str) -> str:
@@ -39,7 +38,7 @@ if __name__ == "__main__":
     maturin = get_maturin_path()
     if maturin is None:
         print("Unable to find `maturin` script")
-        exit(1)
+        sys.exit(1)
 
     if sys.platform == "win32":
         import subprocess

@@ -4,16 +4,15 @@
 #     "nox",
 # ]
 # ///
-import os
 import json
+import os
+import re
 import sys
+import urllib.request
 from pathlib import Path
-import tomllib
 
 import nox
-
-import urllib.request
-import re
+import tomllib
 
 PYODIDE_VERSION = os.getenv("PYODIDE_VERSION", "0.29.0")
 GITHUB_ACTIONS = os.getenv("GITHUB_ACTIONS")

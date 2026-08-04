@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import cffi_mixed
-
 from cffi_mixed import Line
 
 point = cffi_mixed.lib.get_origin()

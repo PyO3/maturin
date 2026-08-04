@@ -15,26 +15,27 @@ def main():
 
     version = get_version()
     if version != "0.1.0":
-        raise Exception(f"Expected version '0.1.0', got '{version}'")
+        raise RuntimeError(f"Expected version '0.1.0', got '{version}'")
 
     # Test 2: Check that the binary is installed and works
     # The binary should be in PATH in the venv bin dir after editable install
     bin = shutil.which("bin-with-python-module")
     if not os.path.realpath(bin).startswith(os.path.realpath(sys.prefix)):
-        raise Exception(f"Binary '{os.path.realpath(bin)}' not in venv at '{os.path.realpath(sys.prefix)}'")
+        raise RuntimeError(f"Binary '{os.path.realpath(bin)}' not in venv at '{os.path.realpath(sys.prefix)}'")
     result = subprocess.run(
         ["bin-with-python-module"],
         capture_output=True,
         text=True,
+        check=False,
     )
     if result.returncode != 0:
-        raise Exception(
+        raise RuntimeError(
             f"Binary failed with code {result.returncode}: stdout={result.stdout!r}, stderr={result.stderr!r}"
         )
 
     expected_output = "bin-with-python-module 0.1.0"
     if expected_output not in result.stdout:
-        raise Exception(f"Expected output containing '{expected_output}', got '{result.stdout}'")
+        raise RuntimeError(f"Expected output containing '{expected_output}', got '{result.stdout}'")
 
     print("SUCCESS")
 

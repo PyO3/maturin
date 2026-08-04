@@ -1,1 +1,1 @@
-from .uniffi_mixed import *  # NOQA
+from .uniffi_mixed import *

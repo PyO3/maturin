@@ -3,7 +3,6 @@ import re
 import subprocess
 from pathlib import Path
 
-
 FILES = [
     "README.md",
     "guide/src/local_development.md",

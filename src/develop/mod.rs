@@ -163,9 +163,22 @@ fn install_dependencies(
     };
     if !effective_groups.is_empty() {
         let mut args = vec!["install".to_string()];
+        // pip and uv resolve a bare `--group` against `pyproject.toml` in the current working
+        // directory, which breaks when `--manifest-path` points into a subdirectory. Pass the
+        // resolved pyproject.toml path explicitly using the `--group <path>:<group>` syntax
+        // supported by both backends.
+        let pyproject_path = dunce::simplified(&build_context.project.pyproject_toml_path)
+            .display()
+            .to_string();
         for group in &effective_groups {
             args.push("--group".to_string());
-            args.push(group.clone());
+            if group.contains(':') {
+                // The user already supplied a `<path>:<group>` form (e.g. for a pyproject.toml in
+                // another directory); pass it through unchanged instead of prepending our own path.
+                args.push(group.clone());
+            } else {
+                args.push(format!("{pyproject_path}:{group}"));
+            }
         }
         let status = install_backend
             .make_command(python)

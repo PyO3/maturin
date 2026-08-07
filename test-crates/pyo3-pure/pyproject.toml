@@ -34,6 +34,14 @@ test = [
     "boltons; sys_platform == 'win32'"
 ]
 
+[dependency-groups]
+dev = [
+    "attrs",
+]
+dev2 = [
+    "attrs",
+]
+
 [project.scripts]
 get_42 = "pyo3_pure:DummyClass.get_42"
 

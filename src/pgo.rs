@@ -215,15 +215,13 @@ impl PgoContext {
                 .and_then(|p| p.dependency_groups.as_ref())
                 .is_some_and(|dg| dg.0.contains_key("dev"));
             if has_dev_group {
-                let project_dir = build_context
-                    .project
-                    .pyproject_toml_path
-                    .parent()
-                    .context("Failed to get project directory")?;
+                let pyproject_group = format!(
+                    "{}:dev",
+                    dunce::simplified(&build_context.project.pyproject_toml_path).display()
+                );
                 debug!("Installing dev dependency group");
                 let status = Command::new(&venv_python)
-                    .args(["-m", "pip", "install", "--group", "dev"])
-                    .current_dir(project_dir)
+                    .args(["-m", "pip", "install", "--group", &pyproject_group])
                     .status()
                     .context("Failed to install dev dependency group")?;
                 if !status.success() {

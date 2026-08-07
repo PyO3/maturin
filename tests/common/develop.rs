@@ -26,6 +26,9 @@ pub struct DevelopCase<'a> {
     pub backend: TestInstallBackend,
     /// Extra Python packages that must be installed into the test environment first.
     pub prereq_packages: &'a [&'a str],
+    /// Dependency groups passed to `maturin develop` as `--group` (e.g. `dev` or
+    /// `<path-to-pyproject.toml>:<group>`).
+    pub group: &'a [&'a str],
 }
 
 impl<'a> DevelopCase<'a> {
@@ -38,6 +41,7 @@ impl<'a> DevelopCase<'a> {
             env_kind: TestEnvKind::Venv,
             backend: TestInstallBackend::Pip,
             prereq_packages: &[],
+            group: &[],
         }
     }
 
@@ -56,6 +60,12 @@ impl<'a> DevelopCase<'a> {
 
     pub fn prereqs(mut self, packages: &'a [&'a str]) -> Self {
         self.prereq_packages = packages;
+        self
+    }
+
+    /// Pass explicit dependency groups to `maturin develop` as `--group` arguments.
+    pub fn with_groups(mut self, groups: &'a [&'a str]) -> Self {
+        self.group = groups;
         self
     }
 
@@ -110,7 +120,7 @@ pub fn test_develop(case: &DevelopCase<'_>) -> Result<()> {
         pgo: false,
         strip: false,
         extras: Vec::new(),
-        group: Vec::new(),
+        group: case.group.iter().map(|s| s.to_string()).collect(),
         skip_install: false,
         pip_path: None,
         cargo_options: CargoOptions {

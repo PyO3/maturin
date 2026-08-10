@@ -49,6 +49,11 @@ These are `cargo` build options, refer Cargo documentation [here](https://doc.ru
 
 ```toml
 [tool.maturin]
+# Python import name of the built extension module.
+# Accepts dotted names like "my_package._native" so the Rust extension is
+# installed as a submodule (useful for mixed Python/Rust projects).
+# See the project layout docs for a full example.
+module-name = "my_package._native"
 # Include additional files
 include = []
 # Exclude files
@@ -65,6 +70,10 @@ skip-auditwheel = false
 python-source = "src"
 # Python packages to include
 python-packages = ["foo", "bar"]
+# Path to the wheel data directory (see the Data section of the project layout
+# docs). Defaults to looking for `<module-name>.data` next to the project root
+# when that directory exists. Relative paths are resolved from the project root.
+data = "my_package.data"
 # Strip the library for minimum file size
 strip = true
 # Source distribution generator,
@@ -81,7 +90,124 @@ include-import-lib = false
 # in venv. This can also be set with the `MATURIN_PEP517_USE_BASE_PYTHON` environment
 # variable.
 use-base-python = false
+# Shell command run during Profile-Guided Optimization (PGO) profile generation.
+# Required when building with `--pgo` / `MATURIN_PGO`. Executed in a temporary
+# virtualenv with the instrumented wheel installed.
+# Example: "python -m pytest tests/benchmarks"
+pgo-command = "python -m pytest tests/benchmarks"
+# Select which Cargo compile targets to build when the crate defines more than
+# one matching target. Each entry is an object with a required `name` (as in
+# Cargo.toml) and an optional `kind` (`bin`, `cdylib`, `dylib`, `lib`, `rlib`,
+# or `staticlib`). This is unrelated to `[tool.maturin.target.<triple>]` below.
+# targets = [
+#   { name = "my_extension", kind = "cdylib" },
+# ]
 ```
+
+#### `module-name`
+
+By default maturin derives the extension module name from the Cargo package
+name. Set `module-name` to override that, including with a dotted import path
+such as `my_package._native`. That places the compiled extension inside a
+Python package, which is the usual layout for mixed Python/Rust projects.
+
+See [Import Rust as a submodule of your project](./project_layout.md#import-rust-as-a-submodule-of-your-project)
+for a complete example (including matching `#[pymodule]` / `#[pyo3(name = ...)]`
+changes).
+
+#### `data`
+
+Path to a wheel [data directory](https://packaging.python.org/en/latest/specifications/binary-distribution-format/#the-data-directory)
+whose contents are installed into the corresponding wheel install schemes
+(`data`, `scripts`, `headers`, `purelib`, `platlib`).
+
+If unset, maturin uses `<module-name>.data` at the project root when that
+directory exists. Relative paths are resolved from the project root.
+
+See [Data](./project_layout.md#data) for the expected subdirectory layout.
+
+#### `targets`
+
+`targets` filters which Cargo compile targets maturin builds when a crate
+exposes several candidates (for example multiple `cdylib` or `bin` targets).
+It is **not** the same as `[tool.maturin.target.<triple>]`, which configures
+per-architecture options such as the macOS deployment target.
+
+```toml
+[tool.maturin]
+# Only build these Cargo targets (name must match Cargo.toml)
+targets = [
+  { name = "my_extension", kind = "cdylib" },
+  { name = "my_cli", kind = "bin" },
+]
+```
+
+`name` is required. `kind` is optional; when set it must match one of
+`bin`, `cdylib`, `dylib`, `lib`, `rlib`, or `staticlib`.
+
+#### `pgo-command`
+
+Command used for the profile-training step of Profile-Guided Optimization.
+Required when you pass `--pgo` (or set `MATURIN_PGO`). Maturin runs the command
+in a temporary virtualenv after installing the instrumented wheel.
+
+```toml
+[tool.maturin]
+pgo-command = "python -m pytest tests/benchmarks"
+```
+
+See the `--pgo` option under [Build](./distribution.md) for the overall
+three-phase flow.
+
+#### `generate-ci`
+
+Defaults for `maturin generate-ci` (currently GitHub Actions). CLI flags that
+overlap with this table are deprecated in favor of pyproject configuration.
+
+```toml
+[tool.maturin.generate-ci.github]
+# Enable a pytest job in the generated workflow
+pytest = true
+# Use zig for manylinux cross compilation
+zig = true
+# Skip artifact attestation steps
+skip-attestation = false
+# Publish with PyPI trusted publishing (OIDC) instead of an API token
+trusted-publishing = true
+# Optional GitHub Actions environment name for the release job
+publishing-environment = "release"
+# Extra arguments passed to maturin on every platform
+args = "--find-interpreter"
+
+# Per-platform overrides. Each platform may set a simple `targets` list
+# (architecture names such as "x86_64" / "aarch64") or a detailed
+# `[[tool.maturin.generate-ci.github.<platform>.target]]` array, plus shared
+# keys: runner, manylinux, container, docker-options, rust-toolchain,
+# rustup-components, before-script-linux, args.
+[tool.maturin.generate-ci.github.linux]
+runner = "ubuntu-22.04"
+manylinux = "2_28"
+targets = ["x86_64", "aarch64"]
+
+[tool.maturin.generate-ci.github.macos]
+targets = ["aarch64"]
+
+# Detailed per-target form (mutually exclusive with `targets` on the same platform):
+# [[tool.maturin.generate-ci.github.linux.target]]
+# arch = "x86_64"
+# manylinux = "2_28"
+#
+# [[tool.maturin.generate-ci.github.linux.target]]
+# arch = "aarch64"
+# runner = "self-hosted-arm64"
+# before-script-linux = "yum install -y openssl-devel"
+```
+
+Supported platform tables under `[tool.maturin.generate-ci.github]` are
+`linux`, `musllinux`, `windows`, `macos`, `emscripten`, and `android`.
+
+See [GitHub Actions](./distribution.md#github-actions) for usage of
+`maturin generate-ci` and trusted publishing details.
 
 The `[tool.maturin.include]` and `[tool.maturin.exclude]` configuration are
 inspired by

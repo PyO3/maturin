@@ -2,10 +2,10 @@
 
 _formerly pyo3-pack_
 
-[![Maturin User Guide](https://img.shields.io/badge/user-guide-brightgreen?logo=readthedocs&style=flat-square)](https://maturin.rs)
-[![Crates.io](https://img.shields.io/crates/v/maturin.svg?logo=rust&style=flat-square)](https://crates.io/crates/maturin)
-[![PyPI](https://img.shields.io/pypi/v/maturin.svg?logo=python&style=flat-square)](https://pypi.org/project/maturin)
-[![discord server](https://img.shields.io/discord/1209263839632424990?logo=discord&style=flat-square)](https://discord.gg/33kcChzH7f)
+[![Maturin User Guide](https://shieldcn.dev/badge/user-guide-44BB00.svg?size=xs&font=geist&split=true&logo=readthedocs&logoColor=ffffff&color=44BB00&labelColor=555555&valueColor=ffffff&labelTextColor=ffffff)](https://maturin.rs)
+[![Crates.io](https://shieldcn.dev/crates/maturin.svg?variant=branded&size=xs)](https://crates.io/crates/maturin)
+[![PyPI version](https://shieldcn.dev/badge/dynamic/json.svg?url=https%3A%2F%2Fpypi.org%2Fpypi%2Fmaturin%2Fjson&query=%24.info.version&variant=branded&size=xs&logo=python&label=pypi%20version&prefix=v)](https://pypi.org/project/maturin)
+[![discord server](https://shieldcn.dev/discord/1209263839632424990.svg?variant=branded&size=xs)](https://discord.gg/33kcChzH7f)
 
 Build and publish crates with [pyo3, cffi and uniffi bindings](https://maturin.rs/bindings) as well as rust binaries as python packages with minimal configuration.
 It supports building wheels for python 3.8+ on Windows, Linux, macOS and FreeBSD, can upload them to [pypi](https://pypi.org/) and has basic PyPy and GraalPy support.

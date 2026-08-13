@@ -235,19 +235,19 @@ To include arbitrary files in the sdist for use during compilation specify `incl
 include = [{ path = "path/**/*", format = "sdist" }]
 ```
 
-### Cross Compiling
+## Cross Compiling
 
 Maturin has decent cross compilation support for `pyo3` and `bin` bindings,
 other kind of bindings may work but aren't tested regularly.
 
-#### Cross-compile to Linux/macOS
+### Cross-compile to Linux/macOS
 
-##### Use Docker
+#### Use Docker
 
 For manylinux support the [manylinux-cross](https://github.com/rust-cross/manylinux-cross) docker images can be used.
 And [maturin-action](https://github.com/PyO3/maturin-action) makes it easy to do cross compilation on GitHub Actions.
 
-##### Use Zig
+#### Use Zig
 
 Since v0.12.7 maturin added support for linking with [`zig cc`](https://andrewkelley.me/post/zig-cc-powerful-drop-in-replacement-gcc-clang.html),
 compile for Linux works and is regularly tested on CI, other platforms may also work but aren't tested regularly.
@@ -259,7 +259,7 @@ Then pass `--zig` to maturin `build` or `publish` commands to use it, for exampl
 maturin build --release --target aarch64-unknown-linux-gnu --zig
 ```
 
-#### Cross-compile to Windows
+### Cross-compile to Windows
 
 Pyo3 0.16.5 added an experimental feature `generate-import-lib` enables the user to cross compile
 extension modules for Windows targets without setting the `PYO3_CROSS_LIB_DIR` environment variable

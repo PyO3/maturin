@@ -748,15 +748,13 @@ fn add_cargo_lock(writer: &mut VirtualWriter<SDistWriter>, ctx: &SdistContext<'_
 }
 
 /// Regenerate Cargo.lock when workspace members were removed from the sdist.
+///
+/// The caller is responsible for determining whether members were actually
+/// stripped — this function unconditionally regenerates the lockfile.
 fn regenerate_cargo_lock(
     writer: &mut VirtualWriter<SDistWriter>,
     ctx: &SdistContext<'_>,
 ) -> Result<()> {
-    let has_stripped_members = ctx.project.cargo_metadata.workspace_members.len() > 1;
-    if !has_stripped_members {
-        return Ok(());
-    }
-
     let cargo_lock_target = ctx.root_dir.join("Cargo.lock");
     if !writer.contains_target(&cargo_lock_target) {
         return Ok(());
@@ -925,8 +923,18 @@ fn add_cargo_package_files_to_sdist(
     // 4. Add workspace Cargo.toml (if applicable)
     add_workspace_manifest(writer, &ctx)?;
 
-    // 4.5 Regenerate Cargo.lock if workspace members were removed (#2609)
-    regenerate_cargo_lock(writer, &ctx)?;
+    // 4.5 Regenerate Cargo.lock if workspace members were actually removed.
+    // Count members kept in the sdist (main crate + path deps in same workspace)
+    // and compare against the original workspace member count.
+    let kept_member_count = 1 + ctx
+        .known_path_deps
+        .values()
+        .filter(|dep| dep.workspace_root.as_path() == ctx.workspace_root.as_std_path())
+        .count();
+    let original_member_count = project.cargo_metadata.workspace_members.len();
+    if original_member_count > kept_member_count {
+        regenerate_cargo_lock(writer, &ctx)?;
+    }
 
     // 5. Add pyproject.toml metadata files and collect path rewrites.
     let metadata_rewrites =

@@ -772,8 +772,10 @@ fn regenerate_cargo_lock(
     // which silently floats third-party pins and breaks reproducibility.
     // `update --workspace` conservatively preserves existing pins while
     // pruning entries for packages no longer reachable from the workspace.
+    let manifest_path = sdist_dir.join("Cargo.toml");
     let mut cmd = Command::new("cargo");
-    cmd.args(["update", "--workspace"]).current_dir(&sdist_dir);
+    cmd.args(["update", "--workspace", "--manifest-path"])
+        .arg(&manifest_path);
     if ctx.project.cargo_options.offline {
         cmd.arg("--offline");
     }

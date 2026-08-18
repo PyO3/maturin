@@ -469,6 +469,172 @@ fn sdist_workspace_removed_members_cargo_lock() {
     );
 }
 
+/// When `cargo update --workspace` fails during lockfile regeneration (e.g.
+/// because the temp dir has no `.cargo/config.toml` for private registries,
+/// or a `[patch]` path doesn't resolve), the sdist build should degrade
+/// gracefully: warn and keep the original lockfile rather than failing.
+#[test]
+fn sdist_workspace_lockfile_regen_graceful_degradation() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let workspace_dir = temp_dir.path().join("workspace");
+
+    let python_dir = workspace_dir.join("crates/python-pkg");
+    let devtool_dir = workspace_dir.join("crates/devtool");
+    let local_itoa_dir = temp_dir.path().join("local-itoa");
+    fs_err::create_dir_all(python_dir.join("src")).unwrap();
+    fs_err::create_dir_all(devtool_dir.join("src")).unwrap();
+    fs_err::create_dir_all(local_itoa_dir.join("src")).unwrap();
+
+    // Local itoa patch crate (outside the workspace).
+    fs_err::write(
+        local_itoa_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "itoa"
+            version = "1.0.1"
+            edition = "2021"
+
+            [lib]
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(local_itoa_dir.join("src/lib.rs"), "pub fn fmt() {}\n").unwrap();
+
+    // The [patch] uses a relative path that resolves here but not in the
+    // materialized temp dir, causing `cargo update --workspace` to fail.
+    fs_err::write(
+        workspace_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [workspace]
+            resolver = "2"
+            members = ["crates/python-pkg", "crates/devtool"]
+
+            [patch.crates-io]
+            itoa = { path = "../local-itoa" }
+            "#
+        ),
+    )
+    .unwrap();
+
+    fs_err::write(
+        python_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "python-pkg"
+            version = "0.1.0"
+            edition = "2021"
+
+            [lib]
+            crate-type = ["cdylib"]
+
+            [dependencies]
+            pyo3 = { version = "0.28.3", features = ["extension-module"] }
+            itoa = "1"
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        python_dir.join("src/lib.rs"),
+        indoc!(
+            r#"
+            use pyo3::prelude::*;
+
+            #[pymodule]
+            fn python_pkg(_m: &Bound<'_, PyModule>) -> PyResult<()> {
+                Ok(())
+            }
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        python_dir.join("pyproject.toml"),
+        indoc!(
+            r#"
+            [build-system]
+            requires = ["maturin>=1.0,<2.0"]
+            build-backend = "maturin"
+
+            [project]
+            name = "python-pkg"
+            version = "0.1.0"
+
+            [tool.maturin]
+            module-name = "python_pkg"
+            "#
+        ),
+    )
+    .unwrap();
+
+    fs_err::write(
+        devtool_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "devtool"
+            version = "0.1.0"
+            edition = "2021"
+
+            [dependencies]
+            rand = "0.8"
+
+            [[bin]]
+            name = "devtool"
+            path = "src/main.rs"
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(devtool_dir.join("src/main.rs"), "fn main() {}\n").unwrap();
+
+    let output = Command::new("cargo")
+        .args(["generate-lockfile"])
+        .current_dir(&workspace_dir)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "failed to generate workspace Cargo.lock\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    // Build an sdist for python-pkg. Devtool is stripped, so regeneration
+    // fires — but it will fail because the [patch] path doesn't resolve in
+    // the temp dir. The build should succeed anyway (graceful degradation).
+    let sdist_dir = temp_dir.path().join("dist");
+    let build_options = BuildOptions {
+        output: OutputOptions {
+            out: Some(sdist_dir),
+            ..Default::default()
+        },
+        cargo: CargoOptions {
+            manifest_path: Some(python_dir.join("Cargo.toml")),
+            quiet: true,
+            target_dir: Some(temp_dir.path().join("target")),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let build_context = build_options
+        .into_build_context()
+        .strip(Some(false))
+        .editable(false)
+        .sdist_only(true)
+        .build()
+        .unwrap();
+    // With graceful degradation, this should succeed (with a warning)
+    // even though cargo update fails in the temp dir.
+    BuildOrchestrator::new(&build_context)
+        .build_source_distribution()
+        .unwrap()
+        .expect("sdist build should succeed with graceful degradation");
+}
+
 /// When all workspace members are path deps of the main crate (none stripped),
 /// regeneration must be skipped entirely. A `[patch]` section with a relative
 /// path makes this observable: the path resolves correctly in the original

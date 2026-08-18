@@ -772,21 +772,27 @@ fn regenerate_cargo_lock(
     // which silently floats third-party pins and breaks reproducibility.
     // `update --workspace` conservatively preserves existing pins while
     // pruning entries for packages no longer reachable from the workspace.
-    let output = Command::new("cargo")
-        .args(["update", "--workspace"])
-        .current_dir(&sdist_dir)
+    let mut cmd = Command::new("cargo");
+    cmd.args(["update", "--workspace"]).current_dir(&sdist_dir);
+    if ctx.project.cargo_options.offline {
+        cmd.arg("--offline");
+    }
+    let output = cmd
         .output()
         .context("Failed to run `cargo update --workspace`")?;
     if !output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        bail!(
-            "`cargo update --workspace` failed in `{}` (exit status: {}):\n{}\n{}",
-            sdist_dir.display(),
+        // The temp dir has no `.cargo/config.toml`, so source replacement and
+        // private registries are invisible to the regeneration run. Degrade
+        // gracefully: keep the original lockfile (which may have stale entries
+        // for removed members) rather than failing the entire build.
+        warn!(
+            "`cargo update --workspace` failed in sdist temp dir \
+             (exit status: {}); keeping original Cargo.lock. \
+             The lockfile may contain stale entries for removed workspace members.\n{}",
             output.status,
-            stderr,
-            stdout
+            String::from_utf8_lossy(&output.stderr),
         );
+        return Ok(());
     }
 
     let regenerated = fs_err::read(sdist_dir.join("Cargo.lock"))

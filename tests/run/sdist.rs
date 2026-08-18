@@ -424,10 +424,11 @@ fn sdist_workspace_removed_members_cargo_lock() {
         .sdist_only(true)
         .build()
         .unwrap();
-    let (sdist_path, _) = BuildOrchestrator::new(&build_context)
+    let sdist_path = BuildOrchestrator::new(&build_context)
         .build_source_distribution()
         .unwrap()
-        .expect("failed to build sdist");
+        .expect("failed to build sdist")
+        .path;
 
     let maturin::UnpackedSdist {
         tmpdir: _tmp,

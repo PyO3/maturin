@@ -280,7 +280,8 @@ fn workspace_cargo_lock() {
 
 /// Regression test for https://github.com/PyO3/maturin/issues/2609:
 /// `cargo build --locked` must succeed inside an sdist built from a workspace
-/// where some members were removed.
+/// where some members were removed, AND existing dependency pins must be
+/// preserved (not re-resolved to latest).
 #[test]
 fn sdist_workspace_removed_members_cargo_lock() {
     let temp_dir = tempfile::tempdir().unwrap();
@@ -317,6 +318,7 @@ fn sdist_workspace_removed_members_cargo_lock() {
 
             [dependencies]
             pyo3 = { version = "0.28.3", features = ["extension-module"] }
+            itoa = "1"
             "#
         ),
     )
@@ -387,6 +389,19 @@ fn sdist_workspace_removed_members_cargo_lock() {
         String::from_utf8_lossy(&output.stderr),
     );
 
+    // Pin itoa to a specific older version. This lets us verify that the
+    // sdist lockfile preserves pins rather than re-resolving to latest.
+    let output = Command::new("cargo")
+        .args(["update", "itoa", "--precise", "1.0.1"])
+        .current_dir(&workspace_dir)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "failed to pin itoa\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stderr),
+    );
+
     // Build an sdist for python-pkg only — devtool will be stripped.
     let sdist_dir = temp_dir.path().join("dist");
     let build_options = BuildOptions {
@@ -414,14 +429,13 @@ fn sdist_workspace_removed_members_cargo_lock() {
         .unwrap()
         .expect("failed to build sdist");
 
-    // Unpack and verify `cargo metadata --frozen` succeeds (it uses the
-    // lockfile without modifying it, which fails if stale entries remain).
     let maturin::UnpackedSdist {
         tmpdir: _tmp,
         cargo_toml,
-        pyproject_toml: _,
+        pyproject_toml,
     } = unpack_sdist(&sdist_path).unwrap();
 
+    // Verify `cargo metadata --frozen` succeeds (lockfile is consistent).
     let output = Command::new("cargo")
         .args(["metadata", "--frozen", "--manifest-path"])
         .arg(&cargo_toml)
@@ -432,6 +446,26 @@ fn sdist_workspace_removed_members_cargo_lock() {
         output.status.success(),
         "`cargo metadata --frozen` failed in unpacked sdist (stale Cargo.lock?)\nstderr:\n{}",
         String::from_utf8_lossy(&output.stderr),
+    );
+
+    // Read the regenerated lockfile and verify specific properties.
+    let sdist_root = pyproject_toml.parent().unwrap();
+    let lockfile_content = fs_err::read_to_string(sdist_root.join("Cargo.lock")).unwrap();
+
+    // Devtool-only packages must be absent.
+    assert!(
+        !lockfile_content.contains("\nname = \"devtool\""),
+        "devtool should have been pruned from the sdist lockfile",
+    );
+    assert!(
+        !lockfile_content.contains("\nname = \"rand\""),
+        "rand (devtool-only dep) should have been pruned from the sdist lockfile",
+    );
+
+    // The pinned itoa version must be preserved (not re-resolved to latest).
+    assert!(
+        lockfile_content.contains("\nname = \"itoa\"\nversion = \"1.0.1\""),
+        "itoa should remain pinned at 1.0.1, but the lockfile was re-resolved:\n{lockfile_content}",
     );
 }
 

@@ -769,16 +769,21 @@ fn regenerate_cargo_lock(
     writer.materialize_to(tmp.path())?;
 
     let sdist_dir = tmp.path().join(ctx.root_dir);
+    // Use `cargo update --workspace` rather than `cargo generate-lockfile`:
+    // generate-lockfile re-resolves ALL dependencies to their latest versions,
+    // which silently floats third-party pins and breaks reproducibility.
+    // `update --workspace` conservatively preserves existing pins while
+    // pruning entries for packages no longer reachable from the workspace.
     let output = Command::new("cargo")
-        .args(["generate-lockfile"])
+        .args(["update", "--workspace"])
         .current_dir(&sdist_dir)
         .output()
-        .context("Failed to run `cargo generate-lockfile`")?;
+        .context("Failed to run `cargo update --workspace`")?;
     if !output.status.success() {
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
         bail!(
-            "`cargo generate-lockfile` failed in `{}`(exit status: {}):\n{}\n{}",
+            "`cargo update --workspace` failed in `{}` (exit status: {}):\n{}\n{}",
             sdist_dir.display(),
             output.status,
             stderr,

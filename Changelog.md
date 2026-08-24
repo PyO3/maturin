@@ -1,5 +1,35 @@
 # Changelog
 
+## 1.15.0
+
+* Set `UV_PYTHON` when running `maturin develop` with uv ([#3236](https://github.com/pyo3/maturin/pull/3236))
+* Set UID and GID headers in pax ([#3241](https://github.com/pyo3/maturin/pull/3241))
+* Replace unguarded panics with explicit errors on fallible input ([#3242](https://github.com/pyo3/maturin/pull/3242))
+* Harden PEP 517 build-wheel and fix unreachable OIDC 404 fallback ([#3244](https://github.com/pyo3/maturin/pull/3244))
+* Fix abi3t PyModExport entrypoint check ([#3246](https://github.com/pyo3/maturin/pull/3246))
+* Fix `maturin build --pgo -i <version>` with `uv` install ([#3237](https://github.com/pyo3/maturin/pull/3237))
+* Refactor: apply some mechanical cleanups ([#3250](https://github.com/pyo3/maturin/pull/3250))
+* Refactor: BuildOrchestrator pipeline deduplication ([#3251](https://github.com/pyo3/maturin/pull/3251))
+* Refactor: improve context and environment hygiene ([#3252](https://github.com/pyo3/maturin/pull/3252))
+* Fix(ci): honor ~= and ==X.* in requires-python for generate-ci ([#3249](https://github.com/pyo3/maturin/pull/3249))
+* Refactor: type cleanup for options, tags, and wheel metadata ([#3253](https://github.com/pyo3/maturin/pull/3253))
+* Refactor: InstallDest, single BridgeModel, and ui output facade ([#3254](https://github.com/pyo3/maturin/pull/3254))
+* Don’t specify generate-import-lib for PyO3 0.29 ([#3258](https://github.com/pyo3/maturin/pull/3258))
+* Refactor build so that pgo is part of normal pathway ([#3257](https://github.com/pyo3/maturin/pull/3257))
+* Fix: verify bindings detection with cargo tree in workspaces ([#3264](https://github.com/pyo3/maturin/pull/3264))
+* Fix: harden cargo tree verification of bindings detection ([#3266](https://github.com/pyo3/maturin/pull/3266))
+* Feat: support --pgo for maturin develop ([#3270](https://github.com/pyo3/maturin/pull/3270))
+* Feat: support `MATURIN_PGO` env var to activate --pgo ([#3271](https://github.com/pyo3/maturin/pull/3271))
+* Docs: correct crate feature documentation; remove stale clippy allow
+* Fix: deduplicate SBOM includes across full merged list, preserving first-seen order
+* Feat: type the bindings input with a single-source-of-truth enum ([#3273](https://github.com/pyo3/maturin/pull/3273))
+* Don't force export of the `PyInit_{module_name}` in UniFfi mode ([#3275](https://github.com/pyo3/maturin/pull/3275))
+* Switch musllinux images to `musllinux_1_2` as `musllinux_1_1` is EOL ([#3280](https://github.com/pyo3/maturin/pull/3280))
+* Fix(generate-stubs): write stubs into the module's package directory ([#3282](https://github.com/pyo3/maturin/pull/3282))
+* Fix group not cwd ([#3284](https://github.com/pyo3/maturin/pull/3284))
+* Docs: document missing [tool.maturin] config fields ([#3287](https://github.com/pyo3/maturin/pull/3287))
+* Update cargo-zigbuild & cargo-xwin to 0.23.1
+
 ## 1.14.1
 
 * Bump uraimo/run-on-arch-action to v3 to fix pytest job ([#3221](https://github.com/pyo3/maturin/pull/3221))

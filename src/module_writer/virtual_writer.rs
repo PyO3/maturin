@@ -6,8 +6,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use anyhow::Result;
-use anyhow::bail;
+use anyhow::{Context, Result, bail};
 use ignore::overrides::Override;
 #[cfg(test)]
 use indexmap::IndexMap;
@@ -340,6 +339,53 @@ impl VirtualWriter<SDistWriter> {
         let inner = self.finish_internal(&mut comparator)?;
         let path = inner.finish()?;
         Ok(path)
+    }
+
+    /// Write all tracked entries to a directory on disk.
+    pub(crate) fn materialize_to(&self, dir: &Path) -> Result<()> {
+        for (target, source) in &self.tracker {
+            let dest = dir.join(target);
+            if let Some(parent) = dest.parent() {
+                fs_err::create_dir_all(parent)?;
+            }
+            match source {
+                ArchiveSource::Generated(g) => {
+                    fs_err::write(&dest, &g.data)?;
+                }
+                ArchiveSource::File(f) => {
+                    fs_err::copy(&f.path, &dest)?;
+                }
+            }
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let mode = super::default_permission(source.executable());
+                fs_err::set_permissions(&dest, std::fs::Permissions::from_mode(mode))?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Replace an existing tracker entry with new in-memory bytes,
+    /// preserving the original entry's metadata.
+    pub(crate) fn replace_bytes(&mut self, target: &Path, data: Vec<u8>) -> Result<()> {
+        let old = self.tracker.get(target).with_context(|| {
+            format!(
+                "cannot replace non-existent tracker entry: {}",
+                target.display()
+            )
+        })?;
+        let path = old.path().map(Path::to_path_buf);
+        let executable = old.executable();
+        self.tracker.insert(
+            target.to_path_buf(),
+            ArchiveSource::Generated(GeneratedSourceData {
+                data,
+                path,
+                executable,
+            }),
+        );
+        Ok(())
     }
 }
 

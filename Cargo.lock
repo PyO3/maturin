@@ -320,9 +320,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-xwin"
-version = "0.23.0"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22a978d433c17ee532d4cb0a8ec9b7aeb121e658267ac1c637504583b12b2861"
+checksum = "08fe6fef95319ecc03c40127b2af811522b7918b05502ebb35b2972208993a57"
 dependencies = [
  "anyhow",
  "cargo-config2",
@@ -335,6 +335,7 @@ dependencies = [
  "paste",
  "path-slash",
  "serde",
+ "serde_json",
  "tar",
  "tracing-subscriber",
  "ureq",
@@ -345,9 +346,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-zigbuild"
-version = "0.23.0"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68c7df45b9d9934aaed5987fbf422b31419f81827b13a52251a61e1e772c6ff7"
+checksum = "9840ba8824cf43c7efb04a268090199072ad3ca8c65c386132909aee1bd4d4bf"
 dependencies = [
  "anyhow",
  "cargo-config2",
@@ -358,6 +359,7 @@ dependencies = [
  "dirs",
  "fs-err",
  "goblin",
+ "libc",
  "path-slash",
  "rustc_version",
  "rustflags",
@@ -1620,9 +1622,9 @@ checksum = "b3a6a8c165077efc8f3a971534c50ea6a1a18b329ef4a66e897a7e3a1494565f"
 
 [[package]]
 name = "libc"
-version = "0.2.185"
+version = "0.2.189"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52ff2c0fe9bc6cb6b14a0592c2ff4fa9ceb83eea9db979b0487cd054946a2b8f"
+checksum = "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2"
 
 [[package]]
 name = "libmimalloc-sys"
@@ -1819,7 +1821,7 @@ dependencies = [
  "which",
  "wild",
  "xz2",
- "zip 8.5.1",
+ "zip",
 ]
 
 [[package]]
@@ -2369,7 +2371,7 @@ dependencies = [
  "rfc2047-decoder",
  "tar",
  "thiserror 2.0.18",
- "zip 8.5.1",
+ "zip",
 ]
 
 [[package]]
@@ -2900,9 +2902,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.149"
+version = "1.0.151"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "83fc039473c5595ace860d8c4fafa220ff474b3fc6bfdb4293327f1a37e94d86"
+checksum = "c841b55ecdae098c80dcae9cf767f6f8a0c2cdb3416bbef72181df4d0fe73f14"
 dependencies = [
  "itoa",
  "memchr",
@@ -4405,9 +4407,9 @@ checksum = "3ae8337f8a065cfc972643663ea4279e04e7256de865aa66fe25cec5fb912d3f"
 
 [[package]]
 name = "xwin"
-version = "0.9.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c337699251ad0c38cf87ee63944de38c2201d017cfbb768e5a3897ae835aacc7"
+checksum = "e3ae2ef8d627ac8d97b3aeb67e4b711520154edca5cc80fbec551415c7b671ef"
 dependencies = [
  "anyhow",
  "bytes",
@@ -4434,7 +4436,7 @@ dependencies = [
  "ureq",
  "versions",
  "walkdir",
- "zip 7.2.0",
+ "zip",
 ]
 
 [[package]]
@@ -4533,19 +4535,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "zip"
-version = "7.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c42e33efc22a0650c311c2ef19115ce232583abbe80850bc8b66509ebef02de0"
-dependencies = [
- "crc32fast",
- "flate2",
- "indexmap",
- "memchr",
- "typed-path",
 ]
 
 [[package]]

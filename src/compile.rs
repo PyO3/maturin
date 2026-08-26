@@ -986,6 +986,12 @@ fn compile_target(
 ) -> Result<(HashMap<CrateType, BuildArtifact>, HashMap<String, PathBuf>)> {
     debug!("Running {:?}", build_command);
 
+    let root_package = context
+        .project
+        .cargo_metadata
+        .root_package()
+        .context("No root package found in cargo metadata")?;
+
     let using_cross = build_command
         .get_program()
         .to_string_lossy()
@@ -1007,32 +1013,10 @@ fn compile_target(
         trace!("cargo message: {:?}", message);
         match message {
             cargo_metadata::Message::CompilerArtifact(artifact) => {
-                let package_in_metadata = context
-                    .project
-                    .cargo_metadata
-                    .packages
-                    .iter()
-                    .find(|package| package.id == artifact.package_id);
-                let crate_name = match package_in_metadata {
-                    Some(package) => &package.name,
-                    None => {
-                        let package_id = &artifact.package_id;
-                        // Ignore the package if it's coming from Rust sysroot when compiling with `-Zbuild-std`
-                        let should_warn = !package_id.repr.contains("rustup")
-                            && !package_id.repr.contains("rustlib")
-                            && !artifact.features.contains(&"rustc-dep-of-std".to_string());
-                        if should_warn {
-                            // This is a spurious error I don't really understand
-                            eprintln!(
-                                "⚠️  Warning: The package {package_id} wasn't listed in `cargo metadata`"
-                            );
-                        }
-                        continue;
-                    }
-                };
-
-                // Extract the location of the .so/.dll/etc. from cargo's json output
-                if crate_name.as_ref() == context.project.crate_name {
+                // Only collect artifacts for the package being built. Target-filtered
+                // metadata may omit host-only dependencies used by build scripts or
+                // proc macros, so looking up every dependency can fail legitimately.
+                if artifact.package_id == root_package.id {
                     let num_crate_types = artifact.target.crate_types.len();
                     let mut filenames_iter = artifact.filenames.into_iter();
                     for crate_type in artifact.target.crate_types {

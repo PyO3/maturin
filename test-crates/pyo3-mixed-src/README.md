@@ -10,5 +10,6 @@ pip install .
 
 ```python
 import pyo3_mixed_src
+
 assert pyo3_mixed_src.get_42() == 42
 ```

@@ -6,6 +6,7 @@ A package with pyo3-ffi bindings for testing maturin.
 
 ```python
 import pyo3_ffi_pure
+
 assert pyo3_ffi_pure.sum(2, 40) == 42
 ```
 

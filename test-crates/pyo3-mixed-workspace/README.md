@@ -10,5 +10,6 @@ pip install .
 
 ```python
 import pyo3_mixed_workspace
+
 assert pyo3_mixed_workspace.get_42() == 42
 ```

@@ -102,6 +102,7 @@ To activate the import hook in a single Python script, call `install()` at the t
 
 ```python
 import maturin_import_hook
+
 maturin_import_hook.install()  # Must come first. Not active for imports above.
 
 import my_rust_package  # An editable-installed Maturin project.
@@ -113,9 +114,11 @@ The Maturin project importer and the Rust file importer can be used separately:
 
 ```python
 from maturin_import_hook import project_importer
+
 project_importer.install()
 
 from maturin_import_hook import rust_file_importer
+
 rust_file_importer.install()
 ```
 
@@ -135,6 +138,7 @@ Tip: If you want to use non-defaults across multiple modules you can create a fu
 import maturin_import_hook
 
 _HOOK_INSTALLED = False
+
 
 def install_maturin_hook() -> None:
     global _HOOK_INSTALLED
@@ -202,8 +206,10 @@ information from Maturin.
 
 ```python
 import logging
-logging.basicConfig(format='%(asctime)s %(name)s [%(levelname)s] %(message)s', level=logging.DEBUG)
+
+logging.basicConfig(format="%(asctime)s %(name)s [%(levelname)s] %(message)s", level=logging.DEBUG)
 import maturin_import_hook
+
 maturin_import_hook.reset_logger()
 maturin_import_hook.install()
 ```
@@ -288,6 +294,7 @@ from pathlib import Path
 from maturin_import_hook.settings import MaturinSettings
 from maturin_import_hook.project_importer import MaturinProjectImporter
 
+
 class CustomImporter(MaturinProjectImporter):
     def get_settings(self, module_path: str, source_path: Path) -> MaturinSettings:
         return MaturinSettings(
@@ -295,6 +302,7 @@ class CustomImporter(MaturinProjectImporter):
             strip=True,
             # ...
         )
+
 
 sys.meta_path.insert(0, CustomImporter())
 ```
@@ -309,6 +317,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from maturin_import_hook.project_importer import ProjectFileSearcher, install
 
+
 class CustomFileSearcher(ProjectFileSearcher):
     def get_source_paths(
         self,
@@ -318,6 +327,7 @@ class CustomFileSearcher(ProjectFileSearcher):
     ) -> Iterator[Path]: ...
 
     def get_installation_paths(self, installed_package_root: Path) -> Iterator[Path]: ...
+
 
 install(file_searcher=CustomFileSearcher())
 ```

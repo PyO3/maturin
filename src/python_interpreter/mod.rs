@@ -1,8 +1,8 @@
 pub use self::config::InterpreterConfig;
-use crate::Target;
 use crate::auditwheel::PlatformTag;
 use crate::bridge::{ABI3T_MINIMUM_PYTHON_MINOR, StableAbiKind};
 use crate::target::WheelTag;
+use crate::{StableAbi, Target};
 use anyhow::{Result, bail};
 use std::borrow::Cow;
 use std::ffi::OsStr;
@@ -151,6 +151,39 @@ impl PythonInterpreter {
             StableAbiKind::Abi3 => self.has_abi3(),
             StableAbiKind::Abi3t => self.has_abi3t(),
         }
+    }
+
+    /// Generate PyO3 config file content for this interpreter.
+    ///
+    /// When maturin supplies `PYO3_CONFIG_FILE`, PyO3 does not live-probe the
+    /// interpreter. Use `platform` (from `sysconfig.get_platform()`) to preserve
+    /// the `libpython3` / `libpython3t` names PyO3's native MinGW discovery
+    /// would otherwise select.
+    pub(crate) fn pyo3_config_file(
+        &self,
+        target: &Target,
+        stable_abi: Option<StableAbi>,
+        use_target_abi: bool,
+    ) -> String {
+        let mut content = self
+            .config
+            .pyo3_config_file(target, stable_abi, use_target_abi);
+        if target.is_windows()
+            && self.interpreter_kind == InterpreterKind::CPython
+            && self
+                .platform
+                .as_deref()
+                .is_some_and(|platform| platform.starts_with("mingw"))
+            && let Some(stable_abi) = stable_abi
+        {
+            let lib_name = match stable_abi.kind {
+                StableAbiKind::Abi3 => "libpython3",
+                StableAbiKind::Abi3t => "libpython3t",
+            };
+            content.push_str("\nlib_name=");
+            content.push_str(lib_name);
+        }
+        content
     }
 
     /// Formats this interpreter as a value for uv's `--python` argument.
@@ -552,6 +585,68 @@ mod tests {
             implementation_name: kind.to_string().to_ascii_lowercase(),
             soabi: None,
         }
+    }
+
+    fn windows_interpreter(
+        platform: &str,
+        minor: usize,
+        abiflags: &str,
+        gil_disabled: bool,
+    ) -> PythonInterpreter {
+        let mut interpreter = interpreter(InterpreterKind::CPython, minor, abiflags, gil_disabled);
+        // Keep EXT_SUFFIX and SOABI identical so sysconfig.get_platform() is
+        // the only source of MinGW identity exercised by these tests.
+        interpreter.config.ext_suffix = ".pyd".to_string();
+        interpreter.platform = Some(platform.to_string());
+        interpreter
+    }
+
+    #[test]
+    fn pyo3_config_file_windows_mingw_abi3_lib_name() {
+        let target = Target::from_resolved_target_triple("x86_64-pc-windows-gnu").unwrap();
+        let interpreter = windows_interpreter("mingw_x86_64_msvcrt_gnu", 14, "", false);
+
+        let config_file =
+            interpreter.pyo3_config_file(&target, Some(StableAbi::from_abi3_version(3, 10)), true);
+
+        assert!(
+            config_file
+                .lines()
+                .any(|line| line == "lib_name=libpython3"),
+            "MinGW abi3 config did not select libpython3:\n{config_file}"
+        );
+    }
+
+    #[test]
+    fn pyo3_config_file_windows_mingw_abi3t_lib_name() {
+        let target = Target::from_resolved_target_triple("x86_64-pc-windows-gnu").unwrap();
+        let interpreter = windows_interpreter("mingw_x86_64_msvcrt_gnu", 15, "t", true);
+
+        let config_file =
+            interpreter.pyo3_config_file(&target, Some(StableAbi::from_abi3t_version(3, 15)), true);
+
+        assert!(
+            config_file
+                .lines()
+                .any(|line| line == "lib_name=libpython3t"),
+            "MinGW abi3t config did not select libpython3t:\n{config_file}"
+        );
+    }
+
+    #[test]
+    fn pyo3_config_file_windows_non_mingw_control() {
+        let target = Target::from_resolved_target_triple("x86_64-pc-windows-gnu").unwrap();
+        let interpreter = windows_interpreter("win_amd64", 14, "", false);
+
+        let config_file =
+            interpreter.pyo3_config_file(&target, Some(StableAbi::from_abi3_version(3, 10)), true);
+
+        assert!(
+            !config_file
+                .lines()
+                .any(|line| line.starts_with("lib_name=")),
+            "non-MinGW Windows config unexpectedly selected a library name:\n{config_file}"
+        );
     }
 
     #[test]

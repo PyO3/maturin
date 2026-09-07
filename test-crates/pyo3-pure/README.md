@@ -10,6 +10,7 @@ pip install .
 
 ```python
 import pyo3_pure
+
 assert pyo3_pure.DummyClass.get_42() == 42
 ```
 

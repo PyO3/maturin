@@ -193,6 +193,7 @@ pub struct InterpreterResolver<'a> {
     requires_python: Option<&'a VersionSpecifiers>,
     user_interpreters: &'a [PathBuf],
     find_interpreter: bool,
+    allow_prereleases: bool,
     has_import_lib_support: bool,
 }
 
@@ -204,6 +205,7 @@ impl<'a> InterpreterResolver<'a> {
         requires_python: Option<&'a VersionSpecifiers>,
         user_interpreters: &'a [PathBuf],
         find_interpreter: bool,
+        allow_prereleases: bool,
         has_import_lib_support: bool,
     ) -> Self {
         Self {
@@ -212,6 +214,7 @@ impl<'a> InterpreterResolver<'a> {
             requires_python,
             user_interpreters,
             find_interpreter,
+            allow_prereleases,
             has_import_lib_support,
         }
     }
@@ -347,6 +350,7 @@ impl<'a> InterpreterResolver<'a> {
                 runnable: false,
                 implementation_name,
                 soabi,
+                is_prerelease: false,
             };
             Ok((
                 vec![Candidate {
@@ -425,8 +429,26 @@ impl<'a> InterpreterResolver<'a> {
     fn discover_native(&self, fixed_abi3: Option<(u8, u8)>) -> Result<DiscoveryResult> {
         // --- Step 1+2: Find real interpreters with per-interpreter sysconfig fallback ---
         let found = if self.find_interpreter {
-            super::discovery::find_all(self.target, self.bridge, self.requires_python)
-                .context("Finding python interpreters failed")?
+            let found = super::discovery::find_all(self.target, self.bridge, self.requires_python)
+                .context("Finding python interpreters failed")?;
+            // Skip prereleases (alpha/beta/rc) unless opted in, so `--find-interpreter`
+            // doesn't silently build wheels for preview Python (e.g. published to PyPI).
+            if self.allow_prereleases {
+                found
+            } else {
+                found
+                    .into_iter()
+                    .filter(|interp| {
+                        if interp.is_prerelease {
+                            eprintln!(
+                                "⚠️  Skipping prerelease interpreter {interp}; \
+                                 pass `--allow-prereleases` to build for it"
+                            );
+                        }
+                        !interp.is_prerelease
+                    })
+                    .collect()
+            }
         } else {
             self.find_specified_interpreters()?
         };
@@ -875,6 +897,7 @@ impl<'a> InterpreterResolver<'a> {
             runnable: false,
             implementation_name: interpreter_kind.to_string().to_ascii_lowercase(),
             soabi: soabi.cloned(),
+            is_prerelease: false,
         })
     }
 

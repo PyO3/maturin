@@ -31,6 +31,7 @@ such that the module functions may be called directly with:
 
 ```python
 import my_project
+
 my_project.foo()
 ```
 

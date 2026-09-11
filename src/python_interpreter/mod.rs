@@ -159,7 +159,7 @@ impl PythonInterpreter {
     /// interpreter. Use `platform` (from `sysconfig.get_platform()`) to preserve
     /// the `libpython3` / `libpython3t` names PyO3's native MinGW discovery
     /// would otherwise select.
-    pub(crate) fn pyo3_config_file(
+    pub(crate) fn pyo3_config_file_with_platform(
         &self,
         target: &Target,
         stable_abi: Option<StableAbi>,
@@ -606,8 +606,11 @@ mod tests {
         let target = Target::from_resolved_target_triple("x86_64-pc-windows-gnu").unwrap();
         let interpreter = windows_interpreter("mingw_x86_64_msvcrt_gnu", 14, "", false);
 
-        let config_file =
-            interpreter.pyo3_config_file(&target, Some(StableAbi::from_abi3_version(3, 10)), true);
+        let config_file = interpreter.pyo3_config_file_with_platform(
+            &target,
+            Some(StableAbi::from_abi3_version(3, 10)),
+            true,
+        );
 
         assert!(
             config_file
@@ -622,8 +625,11 @@ mod tests {
         let target = Target::from_resolved_target_triple("x86_64-pc-windows-gnu").unwrap();
         let interpreter = windows_interpreter("mingw_x86_64_msvcrt_gnu", 15, "t", true);
 
-        let config_file =
-            interpreter.pyo3_config_file(&target, Some(StableAbi::from_abi3t_version(3, 15)), true);
+        let config_file = interpreter.pyo3_config_file_with_platform(
+            &target,
+            Some(StableAbi::from_abi3t_version(3, 15)),
+            true,
+        );
 
         assert!(
             config_file
@@ -638,8 +644,11 @@ mod tests {
         let target = Target::from_resolved_target_triple("x86_64-pc-windows-gnu").unwrap();
         let interpreter = windows_interpreter("win_amd64", 14, "", false);
 
-        let config_file =
-            interpreter.pyo3_config_file(&target, Some(StableAbi::from_abi3_version(3, 10)), true);
+        let config_file = interpreter.pyo3_config_file_with_platform(
+            &target,
+            Some(StableAbi::from_abi3_version(3, 10)),
+            true,
+        );
 
         assert!(
             !config_file

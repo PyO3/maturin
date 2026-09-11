@@ -913,7 +913,8 @@ fn configure_pyo3_env(
             && (force_target_abi || !interpreter.runnable)
             && env::var_os("PYO3_CONFIG_FILE").is_none()
         {
-            let pyo3_config = interpreter.pyo3_config_file(target, stable_abi, use_target_abi);
+            let pyo3_config =
+                interpreter.pyo3_config_file_with_platform(target, stable_abi, use_target_abi);
             let maturin_target_dir = ensure_target_maturin_dir(&context.project.target_dir);
             let config_file = maturin_target_dir.join(format!(
                 "pyo3-config-{}-{}.{}{}.txt",

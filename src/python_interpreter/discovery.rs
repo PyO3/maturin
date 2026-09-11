@@ -43,6 +43,7 @@ pub(super) struct InterpreterMetadataMessage {
     pub system: String,
     pub soabi: Option<String>,
     pub gil_disabled: bool,
+    pub debug: bool,
 }
 
 /// Manages interpreter discovery on Windows.
@@ -881,6 +882,7 @@ mod tests {
             implementation_name: "CPython".to_string(),
             abiflags: None,
             ext_suffix: Some(".pyd".to_string()),
+            debug: false,
             platform: platform.to_string(),
             executable: None,
             soabi: None,
@@ -1008,6 +1010,7 @@ mod tests {
             implementation_name: "CPython".to_string(),
             abiflags: Some("".to_string()),
             ext_suffix: Some(".cp314-win_amd64.pyd".to_string()),
+            debug: false,
             platform: "win-amd64".to_string(),
             executable: None,
             soabi: None,
@@ -1029,6 +1032,7 @@ mod tests {
             implementation_name: "CPython".to_string(),
             abiflags: Some("t".to_string()),
             ext_suffix: Some(".cp314t-win_amd64.pyd".to_string()),
+            debug: false,
             platform: "win-amd64".to_string(),
             executable: None,
             soabi: None,
@@ -1042,6 +1046,88 @@ mod tests {
         assert_eq!(interp.minor, 14);
         assert_eq!(interp.abiflags, "t");
         assert!(interp.gil_disabled);
+    }
+
+    #[test]
+    fn test_discovery_infers_windows_abiflags() {
+        let target = Target::from_resolved_target_triple("x86_64-pc-windows-msvc").unwrap();
+        for (gil_disabled, debug, expected) in [
+            (false, false, ""),
+            (true, false, "t"),
+            (false, true, "d"),
+            (true, true, "td"),
+        ] {
+            let message = InterpreterMetadataMessage {
+                major: 3,
+                minor: 13,
+                interpreter: "cpython".to_string(),
+                implementation_name: "cpython".to_string(),
+                abiflags: None,
+                ext_suffix: Some("_d.pyd".to_string()),
+                platform: "win-amd64".to_string(),
+                executable: None,
+                soabi: None,
+                gil_disabled,
+                debug,
+                system: "windows".to_string(),
+            };
+            let interpreter =
+                from_metadata_message("python", &target, &BridgeModel::Bin(None), message)
+                    .unwrap()
+                    .unwrap();
+            assert_eq!(interpreter.abiflags, expected);
+        }
+    }
+
+    #[test]
+    fn test_discovery_abiflags() {
+        for (triple, system, platform, minor, flags, expected) in [
+            (
+                "x86_64-pc-windows-msvc",
+                "windows",
+                "win-amd64",
+                13,
+                None,
+                "t",
+            ),
+            (
+                "x86_64-unknown-linux-gnu",
+                "linux",
+                "linux-x86_64",
+                14,
+                Some("d"),
+                "d",
+            ),
+            (
+                "x86_64-unknown-linux-gnu",
+                "linux",
+                "linux-x86_64",
+                14,
+                Some("td"),
+                "td",
+            ),
+        ] {
+            let target = Target::from_resolved_target_triple(triple).unwrap();
+            let message = InterpreterMetadataMessage {
+                major: 3,
+                minor,
+                interpreter: "cpython".to_string(),
+                implementation_name: "cpython".to_string(),
+                abiflags: flags.map(str::to_string),
+                ext_suffix: Some(".so".to_string()),
+                platform: platform.to_string(),
+                executable: None,
+                soabi: None,
+                debug: expected.contains('d'),
+                gil_disabled: expected.contains('t'),
+                system: system.to_string(),
+            };
+            let interpreter =
+                from_metadata_message("python", &target, &BridgeModel::Bin(None), message)
+                    .unwrap()
+                    .unwrap();
+            assert_eq!(interpreter.abiflags, expected);
+        }
     }
 
     #[test]

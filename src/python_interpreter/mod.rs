@@ -470,13 +470,13 @@ impl PythonInterpreter {
         }
     }
 
-    /// An opaque string that uniquely identifies this Python interpreter.
+    /// An opaque fingerprint of this Python interpreter's version and ABI.
     /// Used to trigger rebuilds for `pyo3` when the Python interpreter changes.
     pub fn environment_signature(&self) -> String {
         let pointer_width = self.pointer_width.unwrap_or(64);
         format!(
-            "{}-{}.{}-{}bit",
-            self.implementation_name, self.major, self.minor, pointer_width
+            "{}-{}.{}{}-{}bit",
+            self.implementation_name, self.major, self.minor, self.abiflags, pointer_width
         )
     }
 
@@ -551,6 +551,17 @@ mod tests {
             runnable: false,
             implementation_name: kind.to_string().to_ascii_lowercase(),
             soabi: None,
+        }
+    }
+
+    #[test]
+    fn environment_signature_includes_abiflags() {
+        for flags in ["", "d", "t", "td"] {
+            let interp = interpreter(InterpreterKind::CPython, 14, flags, flags.contains('t'));
+            assert_eq!(
+                interp.environment_signature(),
+                format!("cpython-3.14{flags}-64bit")
+            );
         }
     }
 

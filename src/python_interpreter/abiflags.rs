@@ -8,12 +8,46 @@ use anyhow::{Result, bail, ensure};
 
 use super::discovery::InterpreterMetadataMessage;
 
+pub(super) fn default_abiflags(minor_version: usize, gil_disabled: bool, debug: bool) -> String {
+    let mut abiflags = String::new();
+
+    // order is [t][d][m], to match order used in `packaging`
+    // https://github.com/pypa/packaging/blob/10590c194edb33c82f84a127883d6097c56b7840/src/packaging/tags.py#L376-L390
+    if gil_disabled {
+        abiflags.push('t');
+    }
+
+    if debug {
+        abiflags.push('d');
+    }
+
+    // pymalloc abi was the default until 3.8
+    if minor_version < 8 {
+        abiflags.push('m');
+    }
+
+    abiflags
+}
+
+pub(super) fn validate_abiflags(abiflags: &str, gil_disabled: bool, debug: bool) -> Result<()> {
+    for (flag, enabled, name) in [
+        ('t', gil_disabled, "Py_GIL_DISABLED"),
+        ('d', debug, "Py_DEBUG"),
+    ] {
+        ensure!(
+            abiflags.contains(flag) == enabled,
+            "ABI flags are inconsistent with {name}={enabled}"
+        );
+    }
+    Ok(())
+}
+
 /// Returns the abiflags that are assembled through the message, with some
 /// additional sanity checks.
 ///
 /// The rules are as follows:
 ///  - python 3 + Unix: Use ABIFLAGS
-///  - python 3 + Windows: No ABIFLAGS, return an empty string
+///  - python 3 + Windows: Use ABIFLAGS when available, otherwise infer them
 pub(super) fn fun_with_abiflags(
     message: &InterpreterMetadataMessage,
     target: &Target,
@@ -59,46 +93,19 @@ pub(super) fn fun_with_abiflags(
         // - Python 3.13t: abiflags is empty/None but we need "t" (gil_disabled)
         // - Python >= 3.14: abiflags is now defined in sysconfig (upstream change)
         match message.abiflags.as_deref() {
-            Some("") | None => {
-                if message.minor <= 7 {
-                    Ok("m".to_string())
-                } else if message.gil_disabled {
-                    ensure!(
-                        message.minor >= 13,
-                        "gil_disabled is only available in python 3.13+ ಠ_ಠ"
-                    );
-                    Ok("t".to_string())
-                } else {
-                    Ok("".to_string())
-                }
-            }
+            Some("") | None => Ok(default_abiflags(
+                message.minor,
+                message.gil_disabled,
+                message.debug,
+            )),
             Some(abiflags) => {
-                // Python 3.14+ on Windows now defines ABIFLAGS in sysconfig.
-                // Accept it (fixes #2740).
-                if message.minor >= 14 {
-                    Ok(abiflags.to_string())
-                } else if message.gil_disabled && abiflags == "t" {
-                    // Python 3.13t may also report "t"
-                    Ok(abiflags.to_string())
-                } else {
-                    bail!(
-                        "Unexpected abiflags '{}' for Python {}.{} on Windows ಠ_ಠ",
-                        abiflags,
-                        message.major,
-                        message.minor
-                    )
-                }
+                validate_abiflags(abiflags, message.gil_disabled, message.debug)?;
+                Ok(abiflags.to_string())
             }
         }
-    } else if let Some(ref abiflags) = message.abiflags {
-        if message.minor >= 8 {
-            // for 3.8, "builds with and without pymalloc are ABI compatible" and the flag dropped
-            Ok(abiflags.to_string())
-        } else if (abiflags != "m") && (abiflags != "dm") {
-            bail!("A python 3 interpreter on Linux or macOS must have 'm' or 'dm' as abiflags ಠ_ಠ")
-        } else {
-            Ok(abiflags.to_string())
-        }
+    } else if let Some(abiflags) = &message.abiflags {
+        validate_abiflags(abiflags, message.gil_disabled, message.debug)?;
+        Ok(abiflags.to_string())
     } else {
         bail!("A python 3 interpreter on Linux or macOS must define abiflags in its sysconfig ಠ_ಠ")
     }
@@ -136,6 +143,36 @@ pub(super) fn calculate_abi_tag(ext_suffix: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_default_abiflags() {
+        for (minor_version, gil_disabled, debug, expected) in [
+            (7, false, false, "m"),
+            (7, false, true, "dm"),
+            (8, false, false, ""),
+            (8, false, true, "d"),
+            (13, false, false, ""),
+            (13, true, false, "t"),
+            (13, true, true, "td"),
+        ] {
+            let flags = default_abiflags(minor_version, gil_disabled, debug);
+            assert_eq!(flags, expected);
+        }
+    }
+
+    #[test]
+    fn test_validate_abiflags() {
+        for (flags, debug, gil_disabled) in [
+            ("", false, false),
+            ("d", true, false),
+            ("t", false, true),
+            ("td", true, true),
+        ] {
+            assert!(validate_abiflags(flags, gil_disabled, debug,).is_ok());
+            assert!(validate_abiflags(flags, !gil_disabled, debug,).is_err());
+            assert!(validate_abiflags(flags, gil_disabled, !debug).is_err());
+        }
+    }
 
     #[test]
     fn test_calculate_abi_tag() {

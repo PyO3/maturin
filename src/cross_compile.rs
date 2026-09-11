@@ -69,6 +69,7 @@ KEYS = [
     "EXT_SUFFIX",
     "SOABI",
     "Py_GIL_DISABLED",
+    "Py_DEBUG",
 ]
 for key in KEYS:
     print(key, build_time_vars.get(key, ""))
@@ -327,12 +328,7 @@ pub fn parse_build_details(content: &str) -> Result<InterpreterConfig> {
     )?;
 
     let abiflags = abi.flags.as_deref().unwrap_or_default().join("");
-    let gil_disabled = abi
-        .flags
-        .as_deref()
-        .unwrap_or_default()
-        .iter()
-        .any(|f| f == "t");
+    let gil_disabled = abiflags.contains('t');
     let ext_suffix = abi.extension_suffix.clone();
 
     debug!(

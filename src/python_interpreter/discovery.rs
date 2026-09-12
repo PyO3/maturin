@@ -179,7 +179,7 @@ fn find_all_windows(
                 Lazy::new(|| Regex::new(r" -(V:)?(\d).(\d+)-?(arm)?(\d*)\s*\*?\s*(.*)?").unwrap());
             &*RE
         };
-        let stdout = str::from_utf8(&output.stdout).unwrap();
+        let stdout = String::from_utf8_lossy(&output.stdout);
         for line in stdout.lines() {
             if let Some(capture) = expr.captures(line) {
                 let major = capture
@@ -215,7 +215,8 @@ fn find_all_windows(
     // Conda environments are also supported on windows
     let conda_info = Command::new("conda").arg("info").arg("-e").output();
     if let Ok(output) = conda_info {
-        let lines = str::from_utf8(&output.stdout).unwrap().lines();
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let lines = stdout.lines();
         // The regex has three parts: The first matches the name and skips
         // comments, the second skips the part in between and the third
         // extracts the path
@@ -1153,5 +1154,31 @@ mod tests {
         let result = check_executables(&executables, &target, &bridge);
         let err_msg = result.unwrap_err().to_string();
         assert_snapshot!(err_msg, @"The following Python interpreters could not be found: `nonexistent-python-1`, `nonexistent-python-2`");
+    }
+
+    #[test]
+    fn test_non_utf8_command_output_is_lossily_decoded() {
+        // Localized Windows installations (e.g. a CJK or accented username
+        // under a legacy console codepage) can make `py --list-paths` and
+        // `conda info -e` emit non-UTF-8 bytes. Interpreter discovery must
+        // lossily decode that output instead of panicking: undecodable bytes
+        // become U+FFFD, which cannot match the interpreter path regexes, so
+        // affected lines are skipped like any other junk line.
+        let mut raw = b" -3.11-64 * C:\\Users\\".to_vec();
+        raw.extend_from_slice(&[0xff, 0xfd, 0xfe]);
+        raw.extend_from_slice(b"\\python.exe\r\n");
+
+        // The previous `str::from_utf8(&output.stdout).unwrap()` panicked here.
+        assert!(str::from_utf8(&raw).is_err());
+
+        let stdout = String::from_utf8_lossy(&raw);
+        let line = stdout.lines().next().unwrap();
+        assert!(line.starts_with(" -3.11-64 * C:\\Users\\"));
+        assert!(line.contains(char::REPLACEMENT_CHARACTER));
+        assert!(line.ends_with("\\python.exe"));
+
+        // Valid UTF-8 output is decoded unchanged.
+        let stdout = String::from_utf8_lossy(b" -3.10-64 * C:\\Python\\python.exe");
+        assert_eq!(stdout, " -3.10-64 * C:\\Python\\python.exe");
     }
 }

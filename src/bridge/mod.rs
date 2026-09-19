@@ -339,6 +339,21 @@ impl StableAbiVersion {
             StableAbiVersion::Version(major, minor) => Some((*major, *minor)),
         }
     }
+
+    /// Returns the effective minimum version given the current target interpreter's version.
+    /// Returns the effective minimum (major, minor) Python version for this stable ABI version.
+    /// Returns `None` if the version is `CurrentPython` and no target interpreter was provided.
+    pub fn effective_min_version(
+        &self,
+        target_python: Option<&crate::PythonInterpreter>,
+    ) -> Option<(u8, u8)> {
+        match self {
+            StableAbiVersion::Version(major, minor) => Some((*major, *minor)),
+            StableAbiVersion::CurrentPython => {
+                target_python.map(|i| (i.major as u8, i.minor as u8))
+            }
+        }
+    }
 }
 
 /// The "kind" of stable ABI. Either abi3 or abi3t currently.

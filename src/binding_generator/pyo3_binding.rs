@@ -35,20 +35,21 @@ pub struct Pyo3BindingGenerator<'a> {
 }
 
 enum BindingType<'a> {
-    Abi3(Option<&'a PythonInterpreter>),
-    Abi3t(Option<&'a PythonInterpreter>),
+    Abi3(Option<&'a PythonInterpreter>, Option<(u8, u8)>),
+    Abi3t(Option<&'a PythonInterpreter>, Option<(u8, u8)>),
     VersionSpecific(&'a PythonInterpreter),
 }
 
 impl<'a> Pyo3BindingGenerator<'a> {
     pub fn new_stable_abi(
-        stable_abi: StableAbiKind,
+        kind: StableAbiKind,
         interpreter: Option<&'a PythonInterpreter>,
         tempdir: Rc<TempDir>,
+        min_version: Option<(u8, u8)>,
     ) -> Self {
-        let binding_type = match stable_abi {
-            StableAbiKind::Abi3 => BindingType::Abi3(interpreter),
-            StableAbiKind::Abi3t => BindingType::Abi3t(interpreter),
+        let binding_type = match kind {
+            StableAbiKind::Abi3 => BindingType::Abi3(interpreter, min_version),
+            StableAbiKind::Abi3t => BindingType::Abi3t(interpreter, min_version),
         };
         Self {
             binding_type,
@@ -68,15 +69,10 @@ fn ext_suffix(
     target: &Target,
     interpreter: Option<&PythonInterpreter>,
     ext_name: &str,
-    abi_name: &str,
+    kind: StableAbiKind,
+    min_version: Option<(u8, u8)>,
 ) -> String {
-    if target.is_unix() {
-        if target.is_cygwin() {
-            format!("{ext_name}.{abi_name}.dll")
-        } else {
-            format!("{ext_name}.{abi_name}.so")
-        }
-    } else {
+    if !target.is_unix() {
         match interpreter {
             Some(interpreter) if interpreter.is_windows_debug() => {
                 format!("{ext_name}_d.pyd")
@@ -84,6 +80,10 @@ fn ext_suffix(
             // Apparently there is no tag for abi3 on windows
             _ => format!("{ext_name}.pyd"),
         }
+    } else {
+        let soabi_platform = interpreter.and_then(|i| i.soabi_platform.as_deref());
+        let suffix = Target::stable_abi_extension_suffix(target, kind, min_version, soabi_platform);
+        format!("{ext_name}{suffix}")
     }
 }
 
@@ -98,8 +98,20 @@ impl<'a> BindingGenerator for Pyo3BindingGenerator<'a> {
         let target = &context.project.target;
 
         let so_filename = match self.binding_type {
-            BindingType::Abi3(interpreter) => ext_suffix(target, interpreter, ext_name, "abi3"),
-            BindingType::Abi3t(interpreter) => ext_suffix(target, interpreter, ext_name, "abi3t"),
+            BindingType::Abi3(interpreter, min_version) => ext_suffix(
+                target,
+                interpreter,
+                ext_name,
+                StableAbiKind::Abi3,
+                min_version,
+            ),
+            BindingType::Abi3t(interpreter, min_version) => ext_suffix(
+                target,
+                interpreter,
+                ext_name,
+                StableAbiKind::Abi3t,
+                min_version,
+            ),
             BindingType::VersionSpecific(interpreter) => interpreter.get_library_name(ext_name),
         };
         let artifact_target = ArtifactTarget::ExtensionModule(module.join(so_filename));

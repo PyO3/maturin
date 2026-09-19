@@ -348,6 +348,7 @@ impl<'a> InterpreterResolver<'a> {
                 runnable: false,
                 implementation_name,
                 soabi,
+                soabi_platform: None,
             };
             Ok((
                 vec![Candidate {
@@ -840,6 +841,7 @@ impl<'a> InterpreterResolver<'a> {
             .get("EXT_SUFFIX")
             .context("sysconfig didn't define an `EXT_SUFFIX` ಠ_ಠ")?;
         let soabi = data.get("SOABI");
+        let soabi_platform = data.get("SOABI_PLATFORM").cloned();
         let interpreter_kind = soabi
             .and_then(|tag| {
                 if tag.starts_with("pypy") {
@@ -889,6 +891,7 @@ impl<'a> InterpreterResolver<'a> {
             runnable: false,
             implementation_name: interpreter_kind.to_string().to_ascii_lowercase(),
             soabi: soabi.cloned(),
+            soabi_platform,
         })
     }
 

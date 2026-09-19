@@ -542,6 +542,7 @@ fn configure_platform_linker_args(
             configure_macos_pyo3_linker_args(
                 cargo_rustc,
                 rustflags,
+                target,
                 bridge_model,
                 module_name,
                 python_interpreter,
@@ -587,6 +588,7 @@ fn configure_platform_linker_args(
 fn configure_macos_pyo3_linker_args(
     cargo_rustc: &mut cargo_options::Rustc,
     rustflags: &mut cargo_config2::Flags,
+    target: &Target,
     bridge_model: &BridgeModel,
     module_name: &str,
     python_interpreter: Option<&PythonInterpreter>,
@@ -616,11 +618,20 @@ fn configure_macos_pyo3_linker_args(
     let stable_abi_suffix = python_interpreter.and_then(|i| {
         bridge_model
             .stable_abi_for_interpreter(i)
-            .map(|stable_abi| stable_abi.kind.to_string())
+            .map(|stable_abi| {
+                let min_version = stable_abi.version.effective_min_version(Some(i));
+                let soabi_platform = i.soabi_platform.as_deref();
+                Target::stable_abi_extension_suffix(
+                    target,
+                    stable_abi.kind,
+                    min_version,
+                    soabi_platform,
+                )
+            })
     });
 
     let so_filename = if let Some(suffix) = stable_abi_suffix {
-        format!("{module_name}.{suffix}.so")
+        format!("{module_name}{suffix}")
     } else {
         python_interpreter
             .expect("missing python interpreter for non-abi3 wheel build")

@@ -434,6 +434,9 @@ pub struct ToolMaturin {
     /// Executed in a temporary virtualenv with the instrumented wheel installed.
     /// Example: `python -m pytest tests/benchmarks`
     pub pgo_command: Option<String>,
+    /// Dependency group to install before PGO profile generation.
+    /// Defaults to `dev`.
+    pub pgo_dependency_group: Option<String>,
     /// CI generation configuration
     pub generate_ci: Option<GenerateCIConfig>,
 }
@@ -598,6 +601,12 @@ impl PyProjectToml {
     /// Returns the PGO training command from `[tool.maturin]`
     pub fn pgo_command(&self) -> Option<&str> {
         self.maturin().and_then(|m| m.pgo_command.as_deref())
+    }
+
+    /// Returns the PGO dependency group from `[tool.maturin]`
+    pub fn pgo_dependency_group(&self) -> Option<&str> {
+        self.maturin()
+            .and_then(|m| m.pgo_dependency_group.as_deref())
     }
 
     /// Returns the value of `[tool.maturin.compatibility]` in pyproject.toml
@@ -1311,6 +1320,7 @@ mod tests {
 
             [tool.maturin]
             pgo-command = "python -m pytest tests/benchmarks"
+            pgo-dependency-group = "testing-extra"
             "#,
         )
         .unwrap();
@@ -1319,6 +1329,7 @@ mod tests {
             pyproject.pgo_command(),
             Some("python -m pytest tests/benchmarks")
         );
+        assert_eq!(pyproject.pgo_dependency_group(), Some("testing-extra"));
     }
 
     #[test]
@@ -1339,5 +1350,6 @@ mod tests {
         .unwrap();
         let pyproject = PyProjectToml::new(pyproject_file).unwrap();
         assert_eq!(pyproject.pgo_command(), None);
+        assert_eq!(pyproject.pgo_dependency_group(), None);
     }
 }

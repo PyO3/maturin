@@ -156,6 +156,13 @@
         "null"
       ]
     },
+    "pgo-dependency-group": {
+      "description": "Dependency group to install before PGO profile generation.\nDefaults to `dev`.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "profile": {
       "description": "Build artifacts with the specified Cargo profile",
       "type": [

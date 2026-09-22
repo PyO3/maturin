@@ -1,6 +1,8 @@
 use anyhow::{Context, Result, bail};
 use maturin::{DevelopOptions, Target, develop};
 use std::env;
+#[cfg(any(windows, test))]
+use std::path::Path;
 use std::path::PathBuf;
 use tracing::{debug, instrument};
 
@@ -12,11 +14,47 @@ pub fn develop_cmd(develop_options: DevelopOptions) -> Result<()> {
     Ok(())
 }
 
+#[cfg(any(windows, test))]
+fn git_bash_path_to_windows(path: &Path) -> Option<PathBuf> {
+    let path = path.to_str()?;
+    let bytes = path.as_bytes();
+    if bytes.len() < 3 || bytes[0] != b'/' || !bytes[1].is_ascii_alphabetic() || bytes[2] != b'/' {
+        return None;
+    }
+
+    let drive = (bytes[1] as char).to_ascii_uppercase();
+    Some(PathBuf::from(format!("{drive}:{}", &path[2..])))
+}
+
+fn normalize_env_venv_path(path: PathBuf) -> PathBuf {
+    #[cfg(windows)]
+    if !path.exists()
+        && let Some(native_path) = git_bash_path_to_windows(&path)
+        && native_path.exists()
+    {
+        debug!(
+            original = %path.display(),
+            normalized = %native_path.display(),
+            "Normalized Git Bash virtualenv path"
+        );
+        return native_path;
+    }
+
+    path
+}
+
 fn detect_venv(target: &Target) -> Result<PathBuf> {
-    match (env::var_os("VIRTUAL_ENV"), env::var_os("CONDA_PREFIX")) {
-        (Some(dir), None) => return Ok(PathBuf::from(dir)),
-        (None, Some(dir)) => return Ok(PathBuf::from(dir)),
-        (Some(venv), Some(conda)) if venv == conda => return Ok(PathBuf::from(venv)),
+    let virtual_env = env::var_os("VIRTUAL_ENV")
+        .map(PathBuf::from)
+        .map(normalize_env_venv_path);
+    let conda_prefix = env::var_os("CONDA_PREFIX")
+        .map(PathBuf::from)
+        .map(normalize_env_venv_path);
+
+    match (virtual_env, conda_prefix) {
+        (Some(dir), None) => return Ok(dir),
+        (None, Some(dir)) => return Ok(dir),
+        (Some(venv), Some(conda)) if venv == conda => return Ok(venv),
         (Some(_), Some(_)) => {
             bail!("Both VIRTUAL_ENV and CONDA_PREFIX are set. Please unset one of them")
         }
@@ -57,4 +95,32 @@ fn detect_venv(target: &Target) -> Result<PathBuf> {
         See https://virtualenv.pypa.io/en/latest/index.html on how to use virtualenv or \
         use `maturin build` and `pip install <path/to/wheel>` instead."
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::git_bash_path_to_windows;
+    use std::path::{Path, PathBuf};
+
+    #[test]
+    fn test_git_bash_path_to_windows() {
+        assert_eq!(
+            git_bash_path_to_windows(Path::new("/c/Users/me/project/.venv")),
+            Some(PathBuf::from("C:/Users/me/project/.venv"))
+        );
+        assert_eq!(
+            git_bash_path_to_windows(Path::new("/D/work/project/.venv")),
+            Some(PathBuf::from("D:/work/project/.venv"))
+        );
+    }
+
+    #[test]
+    fn test_git_bash_path_to_windows_rejects_native_and_posix_paths() {
+        assert_eq!(
+            git_bash_path_to_windows(Path::new("C:/Users/me/project/.venv")),
+            None
+        );
+        assert_eq!(git_bash_path_to_windows(Path::new("/usr/local/venv")), None);
+        assert_eq!(git_bash_path_to_windows(Path::new("relative/.venv")), None);
+    }
 }

@@ -15,7 +15,8 @@ use anyhow::{Context, Result, anyhow, bail, ensure};
 use cargo_options::heading;
 use fs_err as fs;
 use install_backend::{
-    InstallBackend, check_pip_exists, find_uv_bin, find_uv_python, is_pixi_venv, is_uv_venv,
+    InstallBackend, check_pip_exists, find_uv_bin, find_uv_bin_in_venv, find_uv_python,
+    is_pixi_venv, is_uv_venv,
 };
 use once_cell::sync::Lazy;
 use regex::Regex;
@@ -94,6 +95,26 @@ pub struct DevelopOptions {
     /// Auto generate Python type stubs by introspecting the binary. Requires PyO3 and its "experimental-inspect" feature
     #[arg(long)]
     pub generate_stubs: bool,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum UvDiscovery {
+    RequiredGlobal,
+    OptionalGlobal,
+    OptionalVenv,
+    Disabled,
+}
+
+fn uv_discovery(explicit_uv: bool, uv_venv: bool, pixi_venv: bool) -> UvDiscovery {
+    if explicit_uv {
+        UvDiscovery::RequiredGlobal
+    } else if pixi_venv {
+        UvDiscovery::OptionalVenv
+    } else if uv_venv {
+        UvDiscovery::OptionalGlobal
+    } else {
+        UvDiscovery::Disabled
+    }
 }
 
 #[instrument(skip_all)]
@@ -432,21 +453,29 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
                 anyhow!("Expected `python` to be a python interpreter inside a virtualenv ಠ_ಠ")
             })?;
 
-    let uv_venv = is_uv_venv(venv_dir) || is_pixi_venv(venv_dir);
-    let uv_info = if uv || uv_venv {
-        match find_uv_python(&interpreter.executable).or_else(|_| find_uv_bin()) {
-            Ok(uv_info) => Some(Ok(uv_info)),
-            Err(e) => {
-                if uv {
-                    Some(Err(e))
-                } else {
-                    // Ignore error and try pip instead if it's a uv/pixi venv but `--uv` is not specified
-                    None
-                }
-            }
+    let uv_info = match uv_discovery(uv, is_uv_venv(venv_dir), is_pixi_venv(venv_dir)) {
+        UvDiscovery::RequiredGlobal => {
+            // Explicit --uv keeps the existing behavior: use uv from the
+            // interpreter when possible, otherwise allow a uv binary from PATH.
+            Some(find_uv_python(&interpreter.executable).or_else(|_| find_uv_bin()))
         }
-    } else {
-        None
+        UvDiscovery::OptionalVenv => {
+            // Pixi environments can contain either pip or uv. Only auto-select
+            // uv when it belongs to this environment; a global uv must not
+            // hijack a pixi environment that provides pip instead.
+            find_uv_python(&interpreter.executable)
+                .or_else(|_| find_uv_bin_in_venv(venv_dir))
+                .ok()
+                .map(Ok)
+        }
+        UvDiscovery::OptionalGlobal => {
+            // Preserve automatic uv selection for uv-created virtual environments.
+            find_uv_python(&interpreter.executable)
+                .or_else(|_| find_uv_bin())
+                .ok()
+                .map(Ok)
+        }
+        UvDiscovery::Disabled => None,
     };
     let install_backend = if let Some(uv_info) = uv_info {
         let (uv_path, uv_args) = uv_info?;
@@ -498,7 +527,30 @@ pub fn develop(develop_options: DevelopOptions, venv_dir: &Path) -> Result<()> {
 mod tests {
     use std::path::PathBuf;
 
-    use super::{detect_pip_in_use_leftover, parse_direct_url_path};
+    use super::{UvDiscovery, detect_pip_in_use_leftover, parse_direct_url_path, uv_discovery};
+
+    #[test]
+    fn test_uv_discovery_explicit_uv_allows_global_fallback() {
+        assert_eq!(uv_discovery(true, false, true), UvDiscovery::RequiredGlobal);
+    }
+
+    #[test]
+    fn test_uv_discovery_pixi_only_allows_environment_uv() {
+        assert_eq!(uv_discovery(false, false, true), UvDiscovery::OptionalVenv);
+    }
+
+    #[test]
+    fn test_uv_discovery_uv_venv_preserves_global_fallback() {
+        assert_eq!(
+            uv_discovery(false, true, false),
+            UvDiscovery::OptionalGlobal
+        );
+    }
+
+    #[test]
+    fn test_uv_discovery_plain_venv_is_disabled() {
+        assert_eq!(uv_discovery(false, false, false), UvDiscovery::Disabled);
+    }
 
     #[test]
     fn test_detect_pip_in_use_leftover_windows() {

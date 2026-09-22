@@ -105,6 +105,8 @@ pub struct PythonInterpreter {
     pub implementation_name: String,
     /// Comes from sysconfig var `SOABI`
     pub soabi: Option<String>,
+    /// Comes from sysconfig var `SOABI_PLATFORM` (Python 3.15+)
+    pub soabi_platform: Option<String>,
 }
 
 impl Deref for PythonInterpreter {
@@ -351,6 +353,7 @@ impl PythonInterpreter {
             runnable: false,
             implementation_name,
             soabi: None,
+            soabi_platform: None,
         }
     }
 
@@ -379,6 +382,7 @@ impl PythonInterpreter {
             runnable: false,
             implementation_name: "cpython".to_string(),
             soabi: None,
+            soabi_platform: None,
         }
     }
 
@@ -584,6 +588,7 @@ mod tests {
             runnable: false,
             implementation_name: kind.to_string().to_ascii_lowercase(),
             soabi: None,
+            soabi_platform: None,
         }
     }
 

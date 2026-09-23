@@ -35,8 +35,14 @@ pub struct Pyo3BindingGenerator<'a> {
 }
 
 enum BindingType<'a> {
-    Abi3(Option<&'a PythonInterpreter>, (u8, u8)),
-    Abi3t(Option<&'a PythonInterpreter>, (u8, u8)),
+    Abi3 {
+        interpreter: Option<&'a PythonInterpreter>,
+        min_version: (u8, u8),
+    },
+    Abi3t {
+        interpreter: Option<&'a PythonInterpreter>,
+        min_version: (u8, u8),
+    },
     VersionSpecific(&'a PythonInterpreter),
 }
 
@@ -48,8 +54,14 @@ impl<'a> Pyo3BindingGenerator<'a> {
         min_version: (u8, u8),
     ) -> Self {
         let binding_type = match kind {
-            StableAbiKind::Abi3 => BindingType::Abi3(interpreter, min_version),
-            StableAbiKind::Abi3t => BindingType::Abi3t(interpreter, min_version),
+            StableAbiKind::Abi3 => BindingType::Abi3 {
+                interpreter,
+                min_version,
+            },
+            StableAbiKind::Abi3t => BindingType::Abi3t {
+                interpreter,
+                min_version,
+            },
         };
         Self {
             binding_type,
@@ -97,14 +109,20 @@ impl<'a> BindingGenerator for Pyo3BindingGenerator<'a> {
         let target = &context.project.target;
 
         let so_filename = match self.binding_type {
-            BindingType::Abi3(interpreter, min_version) => ext_suffix(
+            BindingType::Abi3 {
+                interpreter,
+                min_version,
+            } => ext_suffix(
                 target,
                 interpreter,
                 ext_name,
                 StableAbiKind::Abi3,
                 min_version,
             ),
-            BindingType::Abi3t(interpreter, min_version) => ext_suffix(
+            BindingType::Abi3t {
+                interpreter,
+                min_version,
+            } => ext_suffix(
                 target,
                 interpreter,
                 ext_name,

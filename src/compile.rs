@@ -619,14 +619,11 @@ fn configure_macos_pyo3_linker_args(
         bridge_model
             .stable_abi_for_interpreter(i)
             .map(|stable_abi| {
-                let min_version = stable_abi.version.effective_min_version(Some(i));
-                let soabi_platform = i.soabi_platform.as_deref();
-                Target::stable_abi_extension_suffix(
-                    target,
-                    stable_abi.kind,
-                    min_version,
-                    soabi_platform,
-                )
+                let min_version = stable_abi
+                    .version
+                    .min_version()
+                    .unwrap_or((i.major as u8, i.minor as u8));
+                target.stable_abi_extension_suffix(stable_abi.kind, min_version, Some(i))
             })
     });
 

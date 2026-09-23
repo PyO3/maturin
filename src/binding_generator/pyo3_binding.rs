@@ -35,8 +35,8 @@ pub struct Pyo3BindingGenerator<'a> {
 }
 
 enum BindingType<'a> {
-    Abi3(Option<&'a PythonInterpreter>, Option<(u8, u8)>),
-    Abi3t(Option<&'a PythonInterpreter>, Option<(u8, u8)>),
+    Abi3(Option<&'a PythonInterpreter>, (u8, u8)),
+    Abi3t(Option<&'a PythonInterpreter>, (u8, u8)),
     VersionSpecific(&'a PythonInterpreter),
 }
 
@@ -45,7 +45,7 @@ impl<'a> Pyo3BindingGenerator<'a> {
         kind: StableAbiKind,
         interpreter: Option<&'a PythonInterpreter>,
         tempdir: Rc<TempDir>,
-        min_version: Option<(u8, u8)>,
+        min_version: (u8, u8),
     ) -> Self {
         let binding_type = match kind {
             StableAbiKind::Abi3 => BindingType::Abi3(interpreter, min_version),
@@ -70,7 +70,7 @@ fn ext_suffix(
     interpreter: Option<&PythonInterpreter>,
     ext_name: &str,
     kind: StableAbiKind,
-    min_version: Option<(u8, u8)>,
+    min_version: (u8, u8),
 ) -> String {
     if !target.is_unix() {
         match interpreter {
@@ -81,8 +81,7 @@ fn ext_suffix(
             _ => format!("{ext_name}.pyd"),
         }
     } else {
-        let soabi_platform = interpreter.and_then(|i| i.soabi_platform.as_deref());
-        let suffix = Target::stable_abi_extension_suffix(target, kind, min_version, soabi_platform);
+        let suffix = target.stable_abi_extension_suffix(kind, min_version, interpreter);
         format!("{ext_name}{suffix}")
     }
 }

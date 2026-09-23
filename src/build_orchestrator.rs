@@ -532,7 +532,6 @@ impl<'a> BuildOrchestrator<'a> {
         let tag = WheelTag::new(format!("cp{major}{min_minor}"), abi_tag, platform);
 
         let mut audited = [audited_artifact];
-        let effective_min_version = stable_abi.version.effective_min_version(python_interpreter);
         let wheel_path = self.write_wheel(
             &tag,
             &mut audited,
@@ -541,7 +540,7 @@ impl<'a> BuildOrchestrator<'a> {
                     stable_abi.kind,
                     python_interpreter,
                     temp_dir,
-                    effective_min_version,
+                    (major, min_minor),
                 ))
             },
             sbom_data,

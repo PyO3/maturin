@@ -632,6 +632,35 @@ pub fn combined_stable_abi_wheel_selection(unique_name: &str, features: &[&str])
     let expected = expected.iter().copied().map(String::from).collect();
     assert_eq!(actual, expected);
 
+    // Stable ABI extensions only include SOABI_PLATFORM when the minimum version is 3.15+,
+    // older Pythons don't accept such filenames.
+    if !cfg!(windows) {
+        for wheel in &wheels {
+            let filename = wheel.path.file_name().unwrap().to_str().unwrap();
+            let expected_suffix = if filename.contains("-cp38-abi3-") {
+                ".abi3.so".to_string()
+            } else if filename.contains("-cp315-abi3.abi3t-") {
+                match &python_interpreter.soabi_platform {
+                    Some(platform) => format!(".abi3t-{platform}.so"),
+                    None => ".abi3t.so".to_string(),
+                }
+            } else {
+                continue;
+            };
+            let archive = ZipArchive::new(File::open(&wheel.path)?)?;
+            let extensions: Vec<_> = archive
+                .file_names()
+                .filter(|name| name.ends_with(".so"))
+                .collect();
+            assert_eq!(
+                extensions,
+                [format!(
+                    "pyo3_abi3_and_abi3t/pyo3_abi3_and_abi3t{expected_suffix}"
+                )]
+            );
+        }
+    }
+
     crate::common::cleanup_case(unique_name);
     Ok(())
 }

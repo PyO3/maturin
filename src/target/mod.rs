@@ -1,8 +1,9 @@
-use crate::PlatformTag;
+use crate::bridge::StableAbiKind;
 use crate::build_options::TargetTriple;
 use crate::cross_compile::is_cross_compiling;
 use crate::python_interpreter::InterpreterKind;
 use crate::python_interpreter::InterpreterKind::{CPython, GraalPy, PyPy};
+use crate::{PlatformTag, PythonInterpreter};
 use anyhow::{Result, anyhow, bail, format_err};
 use platform_info::*;
 use rustc_version::VersionMeta;
@@ -473,6 +474,53 @@ impl Target {
         }
     }
 
+    /// Returns CPython's `SOABI_PLATFORM` for this target, if it can be derived from the
+    /// target alone.
+    ///
+    /// On Linux and Android this is the multiarch triplet (e.g. `x86_64-linux-gnu`),
+    /// on macOS it is `darwin`.
+    pub(crate) fn get_soabi_platform(&self) -> Option<String> {
+        if self.is_linux() || self.is_android() {
+            let python_ext_arch = self.get_python_ext_arch(CPython);
+            let target_env = self.get_python_target_env(CPython, (3, 15));
+            Some(format!("{python_ext_arch}-linux-{target_env}"))
+        } else if self.is_macos() {
+            Some("darwin".to_string())
+        } else {
+            None
+        }
+    }
+
+    /// Returns the stable ABI extension suffix for unix targets, e.g. `.abi3.so`.
+    ///
+    /// Python 3.15+ also accepts suffixes that include `SOABI_PLATFORM`, e.g.
+    /// `.abi3-x86_64-linux-gnu.so` (gh-122931), so the platform is only added when the
+    /// stable ABI minimum version is 3.15 or newer; older Pythons reject such filenames.
+    ///
+    /// The interpreter's `SOABI_PLATFORM` is only used when it describes the target,
+    /// i.e. when not cross compiling or when it was read from the target's sysconfig.
+    pub(crate) fn stable_abi_extension_suffix(
+        &self,
+        kind: StableAbiKind,
+        min_version: (u8, u8),
+        interpreter: Option<&PythonInterpreter>,
+    ) -> String {
+        if self.is_cygwin() {
+            return format!(".{kind}.dll");
+        }
+        if min_version < (3, 15) {
+            return format!(".{kind}.so");
+        }
+        let soabi_platform = interpreter
+            .filter(|interp| !self.cross_compiling || !interp.runnable)
+            .and_then(|interp| interp.soabi_platform.clone())
+            .or_else(|| self.get_soabi_platform());
+        match soabi_platform {
+            Some(platform) => format!(".{kind}-{platform}.so"),
+            None => format!(".{kind}.so"),
+        }
+    }
+
     /// Returns the name python uses in `sys.platform` for this os
     pub fn get_python_os(&self) -> &str {
         match self.os {
@@ -841,4 +889,102 @@ pub(crate) fn detect_target_from_cross_python(python: &PathBuf) -> Option<Target
         _ => eprintln!("⚠️  Warning: Failed to determine python platform"),
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use pretty_assertions::assert_eq;
+
+    fn target(triple: &str, cross_compiling: bool) -> Target {
+        let mut target = Target::from_resolved_target_triple(triple).unwrap();
+        target.cross_compiling = cross_compiling;
+        target
+    }
+
+    fn interpreter(target: &Target, soabi_platform: &str, runnable: bool) -> PythonInterpreter {
+        let mut interpreter = PythonInterpreter::placeholder(3, 15, target);
+        interpreter.soabi_platform = Some(soabi_platform.to_string());
+        interpreter.runnable = runnable;
+        interpreter
+    }
+
+    #[test]
+    fn test_stable_abi_extension_suffix_before_315() {
+        let linux = target("x86_64-unknown-linux-gnu", false);
+        let python = interpreter(&linux, "x86_64-linux-gnu", true);
+        for kind in [StableAbiKind::Abi3, StableAbiKind::Abi3t] {
+            for min_version in [(3, 8), (3, 14)] {
+                assert_eq!(
+                    linux.stable_abi_extension_suffix(kind, min_version, Some(&python)),
+                    format!(".{kind}.so")
+                );
+            }
+        }
+        let cygwin = target("x86_64-pc-cygwin", true);
+        assert_eq!(
+            cygwin.stable_abi_extension_suffix(StableAbiKind::Abi3, (3, 15), None),
+            ".abi3.dll"
+        );
+    }
+
+    #[test]
+    fn test_stable_abi_extension_suffix_inferred() {
+        let cases = [
+            ("x86_64-unknown-linux-gnu", ".abi3-x86_64-linux-gnu.so"),
+            ("aarch64-unknown-linux-gnu", ".abi3-aarch64-linux-gnu.so"),
+            ("i686-unknown-linux-gnu", ".abi3-i386-linux-gnu.so"),
+            ("x86_64-unknown-linux-musl", ".abi3-x86_64-linux-musl.so"),
+            (
+                "armv7-unknown-linux-gnueabihf",
+                ".abi3-arm-linux-gnueabihf.so",
+            ),
+            ("aarch64-linux-android", ".abi3-aarch64-linux-android.so"),
+            ("x86_64-apple-darwin", ".abi3-darwin.so"),
+            ("aarch64-apple-ios", ".abi3.so"),
+        ];
+        for (triple, expected) in cases {
+            let target = target(triple, true);
+            assert_eq!(
+                target.stable_abi_extension_suffix(StableAbiKind::Abi3, (3, 15), None),
+                expected,
+                "{triple}"
+            );
+        }
+        let linux = target("x86_64-unknown-linux-gnu", true);
+        assert_eq!(
+            linux.stable_abi_extension_suffix(StableAbiKind::Abi3t, (3, 15), None),
+            ".abi3t-x86_64-linux-gnu.so"
+        );
+    }
+
+    #[test]
+    fn test_stable_abi_extension_suffix_from_interpreter() {
+        // Native build: trust the interpreter's SOABI_PLATFORM
+        let native = target("x86_64-unknown-linux-gnu", false);
+        let python = interpreter(&native, "x86_64-custom-linux-gnu", true);
+        assert_eq!(
+            native.stable_abi_extension_suffix(StableAbiKind::Abi3, (3, 15), Some(&python)),
+            ".abi3-x86_64-custom-linux-gnu.so"
+        );
+
+        // Cross compiling with a target sysconfig (non-runnable): trust it too
+        let cross = target("aarch64-unknown-linux-gnu", true);
+        let sysconfig = interpreter(&cross, "aarch64-custom-linux-gnu", false);
+        assert_eq!(
+            cross.stable_abi_extension_suffix(StableAbiKind::Abi3, (3, 15), Some(&sysconfig)),
+            ".abi3-aarch64-custom-linux-gnu.so"
+        );
+
+        // Cross compiling with a host interpreter: its platform describes the host, not the target
+        let host = interpreter(&cross, "darwin", true);
+        assert_eq!(
+            cross.stable_abi_extension_suffix(StableAbiKind::Abi3, (3, 15), Some(&host)),
+            ".abi3-aarch64-linux-gnu.so"
+        );
+        assert_eq!(
+            cross.stable_abi_extension_suffix(StableAbiKind::Abi3t, (3, 15), Some(&host)),
+            ".abi3t-aarch64-linux-gnu.so"
+        );
+    }
 }

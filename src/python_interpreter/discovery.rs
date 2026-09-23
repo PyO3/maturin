@@ -42,6 +42,7 @@ pub(super) struct InterpreterMetadataMessage {
     // comes from `platform.system()`
     pub system: String,
     pub soabi: Option<String>,
+    pub soabi_platform: Option<String>,
     pub gil_disabled: bool,
     pub debug: bool,
 }
@@ -682,6 +683,7 @@ fn from_metadata_message(
         runnable: true,
         implementation_name: message.implementation_name,
         soabi: message.soabi,
+        soabi_platform: message.soabi_platform,
     }))
 }
 
@@ -887,6 +889,7 @@ mod tests {
             platform: platform.to_string(),
             executable: None,
             soabi: None,
+            soabi_platform: None,
             gil_disabled: false,
             system: "windows".to_string(),
         };
@@ -942,6 +945,7 @@ mod tests {
                     runnable: true,
                     implementation_name: "CPython".to_string(),
                     soabi: None,
+                    soabi_platform: None,
                 }
             );
         }
@@ -987,6 +991,7 @@ mod tests {
                 runnable: true,
                 implementation_name: "CPython".to_string(),
                 soabi: None,
+                soabi_platform: None,
             }
         );
     }
@@ -1015,6 +1020,7 @@ mod tests {
             platform: "win-amd64".to_string(),
             executable: None,
             soabi: None,
+            soabi_platform: None,
             gil_disabled: false,
             system: "windows".to_string(),
         };
@@ -1037,6 +1043,7 @@ mod tests {
             platform: "win-amd64".to_string(),
             executable: None,
             soabi: None,
+            soabi_platform: None,
             gil_disabled: true,
             system: "windows".to_string(),
         };
@@ -1068,6 +1075,7 @@ mod tests {
                 platform: "win-amd64".to_string(),
                 executable: None,
                 soabi: None,
+                soabi_platform: None,
                 gil_disabled,
                 debug,
                 system: "windows".to_string(),
@@ -1119,6 +1127,7 @@ mod tests {
                 platform: platform.to_string(),
                 executable: None,
                 soabi: None,
+                soabi_platform: None,
                 debug: expected.contains('d'),
                 gil_disabled: expected.contains('t'),
                 system: system.to_string(),

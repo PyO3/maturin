@@ -538,9 +538,9 @@ impl<'a> BuildOrchestrator<'a> {
             |temp_dir| {
                 Ok(Pyo3BindingGenerator::new_stable_abi(
                     stable_abi.kind,
+                    (major, min_minor),
                     python_interpreter,
                     temp_dir,
-                    (major, min_minor),
                 ))
             },
             sbom_data,

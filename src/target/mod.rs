@@ -479,7 +479,7 @@ impl Target {
     ///
     /// On Linux and Android this is the multiarch triplet (e.g. `x86_64-linux-gnu`),
     /// on macOS it is `darwin`.
-    pub fn get_soabi_platform(&self) -> Option<String> {
+    pub(crate) fn get_soabi_platform(&self) -> Option<String> {
         if self.is_linux() || self.is_android() {
             let python_ext_arch = self.get_python_ext_arch(CPython);
             let target_env = self.get_python_target_env(CPython, (3, 15));
@@ -499,7 +499,7 @@ impl Target {
     ///
     /// The interpreter's `SOABI_PLATFORM` is only used when it describes the target,
     /// i.e. when not cross compiling or when it was read from the target's sysconfig.
-    pub fn stable_abi_extension_suffix(
+    pub(crate) fn stable_abi_extension_suffix(
         &self,
         kind: StableAbiKind,
         min_version: (u8, u8),

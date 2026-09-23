@@ -492,7 +492,8 @@ pub fn write_pth(
 ///
 /// The native library artifacts follow different naming conventions depending on the
 /// binding type:
-/// - **PyO3/pyo3-ffi**: `{ext_name}.cpython-3XX-*.so`, `{ext_name}.abi3.so`, `{ext_name}.pyd`
+/// - **PyO3/pyo3-ffi**: `{ext_name}.cpython-3XX-*.so`, `{ext_name}.abi3.so`,
+///   `{ext_name}.abi3-{platform}.so` (3.15+), `{ext_name}.pyd`
 /// - **CFFI**: `lib{ext_name}.so`, `lib{ext_name}.dylib` (Unix), `{ext_name}.dll` (Windows)
 /// - **UniFFI**: `lib{ext_name}.so`, `lib{ext_name}.dylib` (Unix), `{ext_name}.dll` (Windows)
 ///

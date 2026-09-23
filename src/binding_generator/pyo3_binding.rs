@@ -46,9 +46,9 @@ enum BindingType<'a> {
 impl<'a> Pyo3BindingGenerator<'a> {
     pub fn new_stable_abi(
         kind: StableAbiKind,
+        min_version: (u8, u8),
         interpreter: Option<&'a PythonInterpreter>,
         tempdir: Rc<TempDir>,
-        min_version: (u8, u8),
     ) -> Self {
         Self {
             binding_type: BindingType::StableAbi {

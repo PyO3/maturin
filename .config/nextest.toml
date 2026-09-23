@@ -16,3 +16,12 @@ priority = 100
 # allowing overlap. See https://nexte.st/book/threads-required.html
 filter = 'test(/_uniffi_/)'
 threads-required = 2
+
+[test-groups]
+conda = { max-threads = 1 }
+
+[[profile.default.overrides]]
+# conda tests share the conda package cache, and concurrent `conda create` runs
+# race on renaming the same `.conda.partial` downloads.
+filter = 'binary(run) & test(/_conda$/)'
+test-group = 'conda'

@@ -35,11 +35,8 @@ pub struct Pyo3BindingGenerator<'a> {
 }
 
 enum BindingType<'a> {
-    Abi3 {
-        interpreter: Option<&'a PythonInterpreter>,
-        min_version: (u8, u8),
-    },
-    Abi3t {
+    StableAbi {
+        kind: StableAbiKind,
         interpreter: Option<&'a PythonInterpreter>,
         min_version: (u8, u8),
     },
@@ -53,18 +50,12 @@ impl<'a> Pyo3BindingGenerator<'a> {
         tempdir: Rc<TempDir>,
         min_version: (u8, u8),
     ) -> Self {
-        let binding_type = match kind {
-            StableAbiKind::Abi3 => BindingType::Abi3 {
-                interpreter,
-                min_version,
-            },
-            StableAbiKind::Abi3t => BindingType::Abi3t {
-                interpreter,
-                min_version,
-            },
-        };
         Self {
-            binding_type,
+            binding_type: BindingType::StableAbi {
+                kind,
+                interpreter,
+                min_version,
+            },
             tempdir,
         }
     }
@@ -109,26 +100,11 @@ impl<'a> BindingGenerator for Pyo3BindingGenerator<'a> {
         let target = &context.project.target;
 
         let so_filename = match self.binding_type {
-            BindingType::Abi3 {
+            BindingType::StableAbi {
+                kind,
                 interpreter,
                 min_version,
-            } => ext_suffix(
-                target,
-                interpreter,
-                ext_name,
-                StableAbiKind::Abi3,
-                min_version,
-            ),
-            BindingType::Abi3t {
-                interpreter,
-                min_version,
-            } => ext_suffix(
-                target,
-                interpreter,
-                ext_name,
-                StableAbiKind::Abi3t,
-                min_version,
-            ),
+            } => ext_suffix(target, interpreter, ext_name, kind, min_version),
             BindingType::VersionSpecific(interpreter) => interpreter.get_library_name(ext_name),
         };
         let artifact_target = ArtifactTarget::ExtensionModule(module.join(so_filename));

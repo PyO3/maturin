@@ -278,6 +278,539 @@ fn workspace_cargo_lock() {
     handle_result(other::test_workspace_cargo_lock())
 }
 
+/// Regression test for https://github.com/PyO3/maturin/issues/2609:
+/// `cargo build --locked` must succeed inside an sdist built from a workspace
+/// where some members were removed, AND existing dependency pins must be
+/// preserved (not re-resolved to latest).
+#[test]
+fn sdist_workspace_removed_members_cargo_lock() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let workspace_dir = temp_dir.path().join("workspace");
+
+    let python_dir = workspace_dir.join("crates/python-pkg");
+    let devtool_dir = workspace_dir.join("crates/devtool");
+    fs_err::create_dir_all(python_dir.join("src")).unwrap();
+    fs_err::create_dir_all(devtool_dir.join("src")).unwrap();
+
+    fs_err::write(
+        workspace_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [workspace]
+            resolver = "2"
+            members = ["crates/python-pkg", "crates/devtool"]
+            "#
+        ),
+    )
+    .unwrap();
+
+    fs_err::write(
+        python_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "python-pkg"
+            version = "0.1.0"
+            edition = "2021"
+
+            [lib]
+            crate-type = ["cdylib"]
+
+            [dependencies]
+            pyo3 = { version = "0.28.3", features = ["extension-module"] }
+            itoa = "1"
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        python_dir.join("src/lib.rs"),
+        indoc!(
+            r#"
+            use pyo3::prelude::*;
+
+            #[pymodule]
+            fn python_pkg(_m: &Bound<'_, PyModule>) -> PyResult<()> {
+                Ok(())
+            }
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        python_dir.join("pyproject.toml"),
+        indoc!(
+            r#"
+            [build-system]
+            requires = ["maturin>=1.0,<2.0"]
+            build-backend = "maturin"
+
+            [project]
+            name = "python-pkg"
+            version = "0.1.0"
+
+            [tool.maturin]
+            module-name = "python_pkg"
+            "#
+        ),
+    )
+    .unwrap();
+
+    fs_err::write(
+        devtool_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "devtool"
+            version = "0.1.0"
+            edition = "2021"
+
+            [dependencies]
+            rand = "0.8"
+
+            [[bin]]
+            name = "devtool"
+            path = "src/main.rs"
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(devtool_dir.join("src/main.rs"), "fn main() {}\n").unwrap();
+
+    // Generate the workspace Cargo.lock that covers both members.
+    let output = Command::new("cargo")
+        .args(["generate-lockfile"])
+        .current_dir(&workspace_dir)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "failed to generate workspace Cargo.lock\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    // Pin itoa to a specific older version. This lets us verify that the
+    // sdist lockfile preserves pins rather than re-resolving to latest.
+    let output = Command::new("cargo")
+        .args(["update", "itoa", "--precise", "1.0.1"])
+        .current_dir(&workspace_dir)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "failed to pin itoa\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    // Build an sdist for python-pkg only — devtool will be stripped.
+    let sdist_dir = temp_dir.path().join("dist");
+    let build_options = BuildOptions {
+        output: OutputOptions {
+            out: Some(sdist_dir),
+            ..Default::default()
+        },
+        cargo: CargoOptions {
+            manifest_path: Some(python_dir.join("Cargo.toml")),
+            quiet: true,
+            target_dir: Some(temp_dir.path().join("target")),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let build_context = build_options
+        .into_build_context()
+        .strip(Some(false))
+        .editable(false)
+        .sdist_only(true)
+        .build()
+        .unwrap();
+    let sdist_path = BuildOrchestrator::new(&build_context)
+        .build_source_distribution()
+        .unwrap()
+        .expect("failed to build sdist")
+        .path;
+
+    let maturin::UnpackedSdist {
+        tmpdir: _tmp,
+        cargo_toml,
+        pyproject_toml,
+    } = unpack_sdist(&sdist_path).unwrap();
+
+    // Verify `cargo metadata --frozen` succeeds (lockfile is consistent).
+    let output = Command::new("cargo")
+        .args(["metadata", "--frozen", "--manifest-path"])
+        .arg(&cargo_toml)
+        .args(["--format-version", "1"])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "`cargo metadata --frozen` failed in unpacked sdist (stale Cargo.lock?)\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    // Read the regenerated lockfile and verify specific properties.
+    let sdist_root = pyproject_toml.parent().unwrap();
+    let lockfile_content = fs_err::read_to_string(sdist_root.join("Cargo.lock")).unwrap();
+
+    // Devtool-only packages must be absent.
+    assert!(
+        !lockfile_content.contains("\nname = \"devtool\""),
+        "devtool should have been pruned from the sdist lockfile",
+    );
+    assert!(
+        !lockfile_content.contains("\nname = \"rand\""),
+        "rand (devtool-only dep) should have been pruned from the sdist lockfile",
+    );
+
+    // The pinned itoa version must be preserved (not re-resolved to latest).
+    assert!(
+        lockfile_content.contains("\nname = \"itoa\"\nversion = \"1.0.1\""),
+        "itoa should remain pinned at 1.0.1, but the lockfile was re-resolved:\n{lockfile_content}",
+    );
+}
+
+/// When `cargo update --workspace` fails during lockfile regeneration (e.g.
+/// because the temp dir has no `.cargo/config.toml` for private registries,
+/// or a `[patch]` path doesn't resolve), the sdist build should degrade
+/// gracefully: warn and keep the original lockfile rather than failing.
+#[test]
+fn sdist_workspace_lockfile_regen_graceful_degradation() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let workspace_dir = temp_dir.path().join("workspace");
+
+    let python_dir = workspace_dir.join("crates/python-pkg");
+    let devtool_dir = workspace_dir.join("crates/devtool");
+    let local_itoa_dir = temp_dir.path().join("local-itoa");
+    fs_err::create_dir_all(python_dir.join("src")).unwrap();
+    fs_err::create_dir_all(devtool_dir.join("src")).unwrap();
+    fs_err::create_dir_all(local_itoa_dir.join("src")).unwrap();
+
+    // Local itoa patch crate (outside the workspace).
+    fs_err::write(
+        local_itoa_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "itoa"
+            version = "1.0.1"
+            edition = "2021"
+
+            [lib]
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(local_itoa_dir.join("src/lib.rs"), "pub fn fmt() {}\n").unwrap();
+
+    // The [patch] uses a relative path that resolves here but not in the
+    // materialized temp dir, causing `cargo update --workspace` to fail.
+    fs_err::write(
+        workspace_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [workspace]
+            resolver = "2"
+            members = ["crates/python-pkg", "crates/devtool"]
+
+            [patch.crates-io]
+            itoa = { path = "../local-itoa" }
+            "#
+        ),
+    )
+    .unwrap();
+
+    fs_err::write(
+        python_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "python-pkg"
+            version = "0.1.0"
+            edition = "2021"
+
+            [lib]
+            crate-type = ["cdylib"]
+
+            [dependencies]
+            pyo3 = { version = "0.28.3", features = ["extension-module"] }
+            itoa = "1"
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        python_dir.join("src/lib.rs"),
+        indoc!(
+            r#"
+            use pyo3::prelude::*;
+
+            #[pymodule]
+            fn python_pkg(_m: &Bound<'_, PyModule>) -> PyResult<()> {
+                Ok(())
+            }
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        python_dir.join("pyproject.toml"),
+        indoc!(
+            r#"
+            [build-system]
+            requires = ["maturin>=1.0,<2.0"]
+            build-backend = "maturin"
+
+            [project]
+            name = "python-pkg"
+            version = "0.1.0"
+
+            [tool.maturin]
+            module-name = "python_pkg"
+            "#
+        ),
+    )
+    .unwrap();
+
+    fs_err::write(
+        devtool_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "devtool"
+            version = "0.1.0"
+            edition = "2021"
+
+            [dependencies]
+            rand = "0.8"
+
+            [[bin]]
+            name = "devtool"
+            path = "src/main.rs"
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(devtool_dir.join("src/main.rs"), "fn main() {}\n").unwrap();
+
+    let output = Command::new("cargo")
+        .args(["generate-lockfile"])
+        .current_dir(&workspace_dir)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "failed to generate workspace Cargo.lock\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    // Build an sdist for python-pkg. Devtool is stripped, so regeneration
+    // fires — but it will fail because the [patch] path doesn't resolve in
+    // the temp dir. The build should succeed anyway (graceful degradation).
+    let sdist_dir = temp_dir.path().join("dist");
+    let build_options = BuildOptions {
+        output: OutputOptions {
+            out: Some(sdist_dir),
+            ..Default::default()
+        },
+        cargo: CargoOptions {
+            manifest_path: Some(python_dir.join("Cargo.toml")),
+            quiet: true,
+            target_dir: Some(temp_dir.path().join("target")),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let build_context = build_options
+        .into_build_context()
+        .strip(Some(false))
+        .editable(false)
+        .sdist_only(true)
+        .build()
+        .unwrap();
+    // With graceful degradation, this should succeed (with a warning)
+    // even though cargo update fails in the temp dir.
+    BuildOrchestrator::new(&build_context)
+        .build_source_distribution()
+        .unwrap()
+        .expect("sdist build should succeed with graceful degradation");
+}
+
+/// When all workspace members are path deps of the main crate (none stripped),
+/// regeneration must be skipped entirely. A `[patch]` section with a relative
+/// path makes this observable: the path resolves correctly in the original
+/// workspace but won't exist in the materialized temp dir, so any unnecessary
+/// `cargo update` invocation will fail.
+#[test]
+fn sdist_workspace_all_members_kept_skips_regeneration() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let workspace_dir = temp_dir.path().join("workspace");
+
+    let python_dir = workspace_dir.join("crates/python-pkg");
+    let helper_dir = workspace_dir.join("crates/helper");
+    // Create a local crate OUTSIDE the workspace that will be used as a
+    // [patch] target. It exists at `../local-itoa` relative to the workspace.
+    let local_itoa_dir = temp_dir.path().join("local-itoa");
+    fs_err::create_dir_all(python_dir.join("src")).unwrap();
+    fs_err::create_dir_all(helper_dir.join("src")).unwrap();
+    fs_err::create_dir_all(local_itoa_dir.join("src")).unwrap();
+
+    // Create the local itoa replacement crate.
+    fs_err::write(
+        local_itoa_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "itoa"
+            version = "1.0.1"
+            edition = "2021"
+
+            [lib]
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(local_itoa_dir.join("src/lib.rs"), "pub fn fmt() {}\n").unwrap();
+
+    // The workspace Cargo.toml patches `itoa` with the local crate via a
+    // relative path (`../local-itoa`). This path resolves correctly here
+    // but will NOT exist relative to the materialized temp dir that
+    // `regenerate_cargo_lock` uses, causing `cargo update` to fail if it
+    // runs unnecessarily.
+    fs_err::write(
+        workspace_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [workspace]
+            resolver = "2"
+            members = ["crates/python-pkg", "crates/helper"]
+
+            [patch.crates-io]
+            itoa = { path = "../local-itoa" }
+            "#
+        ),
+    )
+    .unwrap();
+
+    fs_err::write(
+        helper_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "helper"
+            version = "0.1.0"
+            edition = "2021"
+
+            [lib]
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        helper_dir.join("src/lib.rs"),
+        "pub fn greet() -> &'static str { \"hello\" }\n",
+    )
+    .unwrap();
+
+    fs_err::write(
+        python_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "python-pkg"
+            version = "0.1.0"
+            edition = "2021"
+
+            [lib]
+            crate-type = ["cdylib"]
+
+            [dependencies]
+            pyo3 = { version = "0.28.3", features = ["extension-module"] }
+            helper = { path = "../helper" }
+            itoa = "1"
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        python_dir.join("src/lib.rs"),
+        indoc!(
+            r#"
+            use pyo3::prelude::*;
+
+            #[pymodule]
+            fn python_pkg(_m: &Bound<'_, PyModule>) -> PyResult<()> {
+                let _ = helper::greet();
+                Ok(())
+            }
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        python_dir.join("pyproject.toml"),
+        indoc!(
+            r#"
+            [build-system]
+            requires = ["maturin>=1.0,<2.0"]
+            build-backend = "maturin"
+
+            [project]
+            name = "python-pkg"
+            version = "0.1.0"
+
+            [tool.maturin]
+            module-name = "python_pkg"
+            "#
+        ),
+    )
+    .unwrap();
+
+    // Generate the workspace Cargo.lock (uses the local itoa patch).
+    let output = Command::new("cargo")
+        .args(["generate-lockfile"])
+        .current_dir(&workspace_dir)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "failed to generate workspace Cargo.lock\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    // Build an sdist. Both members are path deps, so no regeneration needed.
+    // If the coarse trigger fires, `cargo update --workspace` will fail
+    // because `../local-itoa` doesn't exist relative to the temp dir.
+    let sdist_dir = temp_dir.path().join("dist");
+    let build_options = BuildOptions {
+        output: OutputOptions {
+            out: Some(sdist_dir),
+            ..Default::default()
+        },
+        cargo: CargoOptions {
+            manifest_path: Some(python_dir.join("Cargo.toml")),
+            quiet: true,
+            target_dir: Some(temp_dir.path().join("target")),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let build_context = build_options
+        .into_build_context()
+        .strip(Some(false))
+        .editable(false)
+        .sdist_only(true)
+        .build()
+        .unwrap();
+    // If the trigger condition is too coarse, this will fail with:
+    //   "Unable to update .../local-itoa" because the [patch] relative path
+    //   doesn't exist in the materialized temp dir.
+    BuildOrchestrator::new(&build_context)
+        .build_source_distribution()
+        .unwrap()
+        .expect("failed to build sdist");
+}
+
 fn write_workspace_bin_project(
     workspace_dir: &Path,
     member: &str,

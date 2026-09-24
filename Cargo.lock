@@ -346,9 +346,9 @@ dependencies = [
 
 [[package]]
 name = "cargo-zigbuild"
-version = "0.23.1"
+version = "0.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9840ba8824cf43c7efb04a268090199072ad3ca8c65c386132909aee1bd4d4bf"
+checksum = "cfd0dbe23ae1b71e74014ba62e3262d6b2fdf76251828644823bdfd21ce5d84e"
 dependencies = [
  "anyhow",
  "cargo-config2",
@@ -369,6 +369,7 @@ dependencies = [
  "serde_json",
  "shell-words",
  "target-lexicon",
+ "toml 1.1.2+spec-1.1.0",
  "which",
 ]
 

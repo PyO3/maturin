@@ -1,8 +1,6 @@
 use std::collections::BTreeSet;
 use std::fmt;
-use std::str::FromStr;
 
-use anyhow::bail;
 use itertools::Itertools as _;
 
 /// A PEP 425 wheel tag with optional compressed (dot-separated) components.
@@ -11,35 +9,34 @@ use itertools::Itertools as _;
 /// per combination of components via [`WheelTag::expand`].
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WheelTag {
-    python: String,
-    abi: String,
+    python: BTreeSet<String>,
+    abi: BTreeSet<String>,
     platform: BTreeSet<String>,
 }
 
 impl WheelTag {
     /// Create a wheel tag from python, ABI, and platform components.
     ///
-    /// Python and ABI components may be compressed (dot-separated) lists, e.g.
-    /// `py2.py3` or `abi3.abi3t`. Platform tags are passed as a sorted set.
+    /// Each component is a sorted set of individual tags.
     pub fn new(
-        python: impl Into<String>,
-        abi: impl Into<String>,
-        platform: BTreeSet<String>,
+        python: impl Into<BTreeSet<String>>,
+        abi: impl Into<BTreeSet<String>>,
+        platform: impl Into<BTreeSet<String>>,
     ) -> Self {
         Self {
-            python: sort_compressed_tags(python.into()),
-            abi: sort_compressed_tags(abi.into()),
-            platform,
+            python: python.into(),
+            abi: abi.into(),
+            platform: platform.into(),
         }
     }
 
-    /// The python tag component (e.g. `cp312`, `pp311`, `py3`).
-    pub fn python(&self) -> &str {
+    /// The Python tags (e.g. `cp312`, `pp311`, `py3`).
+    pub fn python(&self) -> &BTreeSet<String> {
         &self.python
     }
 
-    /// The ABI tag component (e.g. `cp312`, `abi3`, `none`).
-    pub fn abi(&self) -> &str {
+    /// The ABI tags (e.g. `cp312`, `abi3`, `none`).
+    pub fn abi(&self) -> &BTreeSet<String> {
         &self.abi
     }
 
@@ -51,18 +48,10 @@ impl WheelTag {
     /// Expand compressed components into fully qualified PEP 425 tags.
     pub fn expand(&self) -> impl Iterator<Item = String> + '_ {
         self.python
-            .split('.')
-            .cartesian_product(self.abi.split('.'))
+            .iter()
+            .cartesian_product(&self.abi)
             .cartesian_product(&self.platform)
             .map(|((python, abi), platform)| format!("{python}-{abi}-{platform}"))
-    }
-}
-
-fn sort_compressed_tags(tags: String) -> String {
-    if tags.contains('.') {
-        tags.split('.').sorted_unstable().join(".")
-    } else {
-        tags
     }
 }
 
@@ -71,36 +60,10 @@ impl fmt::Display for WheelTag {
         write!(
             f,
             "{}-{}-{}",
-            self.python,
-            self.abi,
+            self.python.iter().format("."),
+            self.abi.iter().format("."),
             self.platform.iter().format(".")
         )
-    }
-}
-
-impl FromStr for WheelTag {
-    type Err = anyhow::Error;
-
-    fn from_str(tag: &str) -> std::result::Result<Self, Self::Err> {
-        let mut components = tag.split('-');
-        let Some(python) = components.next() else {
-            bail!("wheel tag must contain a python tag: {tag}");
-        };
-        let Some(abi) = components.next() else {
-            bail!("wheel tag must contain an ABI tag: {tag}");
-        };
-        let Some(platform) = components.next() else {
-            bail!("wheel tag must contain a platform tag: {tag}");
-        };
-        if components.next().is_some() {
-            bail!("wheel tag must have exactly three components: {tag}");
-        }
-
-        Ok(Self::new(
-            python,
-            abi,
-            platform.split('.').map(str::to_string).collect(),
-        ))
     }
 }
 
@@ -111,9 +74,9 @@ mod tests {
     #[test]
     fn display_renders_pep425_tag() {
         let tag = WheelTag::new(
-            "cp312",
-            "cp312",
-            ["manylinux_2_17_x86_64".to_string()].into(),
+            ["cp312".to_string()],
+            ["cp312".to_string()],
+            ["manylinux_2_17_x86_64".to_string()],
         );
 
         assert_eq!(tag.to_string(), "cp312-cp312-manylinux_2_17_x86_64");
@@ -122,13 +85,12 @@ mod tests {
     #[test]
     fn display_sorts_compressed_tag_sets() {
         let tag = WheelTag::new(
-            "cp39.cp310",
-            "abi3t.abi3",
+            ["cp39".to_string(), "cp310".to_string()],
+            ["abi3t".to_string(), "abi3".to_string()],
             [
                 "manylinux_2_17_x86_64".to_string(),
                 "manylinux2014_x86_64".to_string(),
-            ]
-            .into(),
+            ],
         );
         assert_eq!(
             tag.to_string(),
@@ -136,14 +98,13 @@ mod tests {
         );
 
         let universal2 = WheelTag::new(
-            "py3",
-            "none",
+            ["py3".to_string()],
+            ["none".to_string()],
             [
                 "macosx_10_12_x86_64".to_string(),
                 "macosx_11_0_arm64".to_string(),
                 "macosx_10_12_universal2".to_string(),
-            ]
-            .into(),
+            ],
         );
         assert_eq!(
             universal2.to_string(),
@@ -153,9 +114,13 @@ mod tests {
 
     #[test]
     fn expand_compressed_tags() {
-        let expanded = WheelTag::new("py2.py3", "none", ["any".to_string()].into())
-            .expand()
-            .collect::<Vec<_>>();
+        let expanded = WheelTag::new(
+            ["py2".to_string(), "py3".to_string()],
+            ["none".to_string()],
+            ["any".to_string()],
+        )
+        .expand()
+        .collect::<Vec<_>>();
 
         assert_eq!(expanded, ["py2-none-any", "py3-none-any"]);
     }
@@ -163,13 +128,12 @@ mod tests {
     #[test]
     fn expand_compressed_platform_tags() {
         let expanded = WheelTag::new(
-            "cp37",
-            "abi3",
+            ["cp37".to_string()],
+            ["abi3".to_string()],
             [
                 "manylinux_2_17_x86_64".to_string(),
                 "manylinux2014_x86_64".to_string(),
-            ]
-            .into(),
+            ],
         )
         .expand()
         .collect::<Vec<_>>();
@@ -186,9 +150,9 @@ mod tests {
     #[test]
     fn expand_abi3t_to_abi3_and_abi3t() {
         let expanded = WheelTag::new(
-            "cp315",
-            "abi3.abi3t",
-            ["manylinux_2_17_x86_64".to_string()].into(),
+            ["cp315".to_string()],
+            ["abi3".to_string(), "abi3t".to_string()],
+            ["manylinux_2_17_x86_64".to_string()],
         )
         .expand()
         .collect::<Vec<_>>();
@@ -199,49 +163,6 @@ mod tests {
                 "cp315-abi3-manylinux_2_17_x86_64",
                 "cp315-abi3t-manylinux_2_17_x86_64"
             ]
-        );
-    }
-
-    #[test]
-    fn parses_existing_string_boundary() {
-        let tag = "py3-none-any".parse::<WheelTag>().unwrap();
-
-        assert_eq!(
-            tag,
-            WheelTag::new("py3", "none", ["any".to_string()].into())
-        );
-    }
-
-    #[test]
-    fn display_round_trips_through_from_str() {
-        let original = WheelTag::new(
-            "cp37",
-            "abi3",
-            [
-                "manylinux_2_17_x86_64".to_string(),
-                "manylinux2014_x86_64".to_string(),
-            ]
-            .into(),
-        );
-        let parsed = original.to_string().parse::<WheelTag>().unwrap();
-        assert_eq!(parsed, original);
-    }
-
-    #[test]
-    fn from_str_rejects_too_few_components() {
-        let err = "cp37-abi3".parse::<WheelTag>().unwrap_err();
-        assert!(
-            err.to_string().contains("platform tag"),
-            "unexpected error: {err}"
-        );
-    }
-
-    #[test]
-    fn from_str_rejects_too_many_components() {
-        let err = "a-b-c-d".parse::<WheelTag>().unwrap_err();
-        assert!(
-            err.to_string().contains("exactly three components"),
-            "unexpected error: {err}"
         );
     }
 }

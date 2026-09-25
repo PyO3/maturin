@@ -5,6 +5,7 @@ use crate::target::WheelTag;
 use crate::{StableAbi, Target};
 use anyhow::{Result, bail};
 use std::borrow::Cow;
+use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::fmt;
 use std::ops::Deref;
@@ -249,7 +250,7 @@ impl PythonInterpreter {
             || target.is_illumos();
         let platform = if use_sysconfig_platform {
             if let Some(platform) = self.platform.clone() {
-                [platform].into()
+                BTreeSet::from_iter([platform])
             } else {
                 project.get_platform_tag(platform_tags)?
             }
@@ -260,37 +261,46 @@ impl PythonInterpreter {
             // Use generic tags when `sys.implementation.name` != `platform.python_implementation()`, for example Pyston
             // See also https://github.com/pypa/packaging/blob/0031046f7fad649580bc3127d1cef9157da0dd79/packaging/tags.py#L234-L261
             WheelTag::new(
-                format!(
+                [format!(
                     "{interpreter}{major}{minor}",
                     interpreter = self.implementation_name,
                     major = self.major,
                     minor = self.minor,
-                ),
-                self.soabi
+                )],
+                [self
+                    .soabi
                     .as_deref()
                     .unwrap_or("none")
-                    .replace(['-', '.'], "_"),
+                    .replace(['-', '.'], "_")],
                 platform,
             )
         } else {
             match self.interpreter_kind {
                 InterpreterKind::CPython => WheelTag::new(
-                    format!("cp{major}{minor}", major = self.major, minor = self.minor),
-                    format!(
+                    [format!(
+                        "cp{major}{minor}",
+                        major = self.major,
+                        minor = self.minor
+                    )],
+                    [format!(
                         "cp{major}{minor}{abiflags}",
                         major = self.major,
                         minor = self.minor,
                         abiflags = self.abiflags,
-                    ),
+                    )],
                     platform,
                 ),
                 InterpreterKind::PyPy => {
                     // pypy uses its version as part of the ABI, e.g.
                     // pypy 3.11 7.3 => numpy-1.20.1-pp311-pypy311_pp73-manylinux2014_x86_64.whl
                     WheelTag::new(
-                        format!("pp{major}{minor}", major = self.major, minor = self.minor),
-                        abiflags::calculate_abi_tag(&self.ext_suffix)
-                            .expect("PyPy's syconfig didn't define a valid `EXT_SUFFIX` ಠ_ಠ"),
+                        [format!(
+                            "pp{major}{minor}",
+                            major = self.major,
+                            minor = self.minor
+                        )],
+                        [abiflags::calculate_abi_tag(&self.ext_suffix)
+                            .expect("PyPy's syconfig didn't define a valid `EXT_SUFFIX` ಠ_ಠ")],
                         platform,
                     )
                 }
@@ -298,13 +308,13 @@ impl PythonInterpreter {
                     // GraalPy like PyPy uses its version as part of the ABI
                     // graalpy 3.10 23.1 => numpy-1.23.5-graalpy310-graalpy231_310_native-manylinux2014_x86_64.whl
                     WheelTag::new(
-                        format!(
+                        [format!(
                             "graalpy{major}{minor}",
                             major = self.major,
                             minor = self.minor
-                        ),
-                        abiflags::calculate_abi_tag(&self.ext_suffix)
-                            .expect("GraalPy's syconfig didn't define a valid `EXT_SUFFIX` ಠ_ಠ"),
+                        )],
+                        [abiflags::calculate_abi_tag(&self.ext_suffix)
+                            .expect("GraalPy's syconfig didn't define a valid `EXT_SUFFIX` ಠ_ಠ")],
                         platform,
                     )
                 }

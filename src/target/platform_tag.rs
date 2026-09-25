@@ -36,7 +36,7 @@ pub fn get_platform_tag(
         eprintln!(
             "🚉 Overriding platform tag from _PYTHON_HOST_PLATFORM environment variable as {override_platform}."
         );
-        return Ok([override_platform].into());
+        return Ok(BTreeSet::from([override_platform]));
     }
 
     let tag = match (&target.target_os(), &target.target_arch()) {
@@ -98,12 +98,11 @@ pub fn get_platform_tag(
                 format!("{arm64_major}_{arm64_minor}")
             };
             if universal2 {
-                return Ok([
+                return Ok(BTreeSet::from([
                     format!("macosx_{x86_64_tag}_x86_64"),
                     format!("macosx_{arm64_tag}_arm64"),
                     format!("macosx_{x86_64_tag}_universal2"),
-                ]
-                .into());
+                ]));
             } else if target.target_arch() == Arch::Aarch64 {
                 format!("macosx_{arm64_tag}_arm64")
             } else {
@@ -200,7 +199,7 @@ pub fn get_platform_tag(
             format!("{os}_{release}_{machine}")
         }
     };
-    Ok([tag].into())
+    Ok(BTreeSet::from([tag]))
 }
 
 /// Get the default macOS deployment target version

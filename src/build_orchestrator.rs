@@ -560,7 +560,7 @@ impl<'a> BuildOrchestrator<'a> {
         );
         Ok(BuiltWheel {
             path: wheel_path,
-            tag: BuiltArtifactTag::interpreter(tag.python().iter().join(".")),
+            tag: BuiltArtifactTag::interpreter(tag.python().clone()),
         })
     }
 
@@ -612,7 +612,7 @@ impl<'a> BuildOrchestrator<'a> {
         )?;
         Ok(BuiltWheel {
             path: wheel_path,
-            tag: BuiltArtifactTag::interpreter(tag.python().iter().join(".")),
+            tag: BuiltArtifactTag::interpreter(tag.python().clone()),
         })
     }
 
@@ -875,7 +875,7 @@ impl<'a> BuildOrchestrator<'a> {
         // Interpreter-bound binary wheels (pyo3-bin) carry a real python tag; pure
         // standalone bins remain universal (`py3`).
         let artifact_tag = if python_interpreter.is_some() {
-            BuiltArtifactTag::interpreter(tag.python().iter().join("."))
+            BuiltArtifactTag::interpreter(tag.python().clone())
         } else {
             BuiltArtifactTag::Universal
         };

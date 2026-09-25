@@ -5,7 +5,9 @@ pub use detection::{
     upgrade_bridge_stable_abi,
 };
 
-use std::{collections::BTreeSet, fmt, str::FromStr};
+use std::collections::BTreeSet;
+use std::fmt;
+use std::str::FromStr;
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};

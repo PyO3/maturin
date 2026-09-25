@@ -249,7 +249,7 @@ impl<'a> BuildOrchestrator<'a> {
                         let stable_abi_tag = stable_abi_interps.first().map(|interp| {
                             let (major, minor) =
                                 min_version.unwrap_or((interp.major as u8, interp.minor as u8));
-                            WheelTag::new(format!("cp{major}{minor}"), abi_tag, platform.clone())
+                            WheelTag::new([format!("cp{major}{minor}")], abi_tag, platform.clone())
                         });
                         // Some interpreters in this build may not support the selected stable ABI
                         // family, e.g. 3.14t when abi3t was selected for 3.15.
@@ -329,7 +329,11 @@ impl<'a> BuildOrchestrator<'a> {
     /// Returns the universal Python 3 wheel tag for the given platform tags.
     fn get_universal_tag(&self, platform_tags: &[PlatformTag]) -> Result<WheelTag> {
         let platform = self.context.project.get_platform_tag(platform_tags)?;
-        Ok(WheelTag::new("py3", "none", platform))
+        Ok(WheelTag::new(
+            ["py3".to_string()],
+            ["none".to_string()],
+            platform,
+        ))
     }
 
     /// Returns user-specified platform tags, or falls back to the auditwheel
@@ -529,7 +533,7 @@ impl<'a> BuildOrchestrator<'a> {
 
         let platform = self.context.project.get_platform_tag(&platform_tags)?;
         let abi_tag = stable_abi.kind.wheel_tag();
-        let tag = WheelTag::new(format!("cp{major}{min_minor}"), abi_tag, platform);
+        let tag = WheelTag::new([format!("cp{major}{min_minor}")], abi_tag, platform);
 
         let mut audited = [audited_artifact];
         let wheel_path = self.write_wheel(
@@ -556,7 +560,7 @@ impl<'a> BuildOrchestrator<'a> {
         );
         Ok(BuiltWheel {
             path: wheel_path,
-            tag: BuiltArtifactTag::interpreter(tag.python()),
+            tag: BuiltArtifactTag::interpreter(tag.python().clone()),
         })
     }
 
@@ -608,7 +612,7 @@ impl<'a> BuildOrchestrator<'a> {
         )?;
         Ok(BuiltWheel {
             path: wheel_path,
-            tag: BuiltArtifactTag::interpreter(tag.python()),
+            tag: BuiltArtifactTag::interpreter(tag.python().clone()),
         })
     }
 
@@ -871,7 +875,7 @@ impl<'a> BuildOrchestrator<'a> {
         // Interpreter-bound binary wheels (pyo3-bin) carry a real python tag; pure
         // standalone bins remain universal (`py3`).
         let artifact_tag = if python_interpreter.is_some() {
-            BuiltArtifactTag::interpreter(tag.python())
+            BuiltArtifactTag::interpreter(tag.python().clone())
         } else {
             BuiltArtifactTag::Universal
         };

@@ -618,16 +618,31 @@ Root-Is-Purelib: false
 Tag: py2-none-any
 Tag: py3-none-any
 Tag: pre-expanded-tag
-Tag: cp37-abi3-manylinux_2_17_x86_64
 Tag: cp37-abi3-manylinux2014_x86_64
+Tag: cp37-abi3-manylinux_2_17_x86_64
 ",
             name = env!("CARGO_PKG_NAME"),
             version = env!("CARGO_PKG_VERSION"),
         );
         let actual = wheel_file(&[
-            WheelTag::new("py2.py3", "none", "any"),
-            WheelTag::new("pre", "expanded", "tag"),
-            WheelTag::new("cp37", "abi3", "manylinux_2_17_x86_64.manylinux2014_x86_64"),
+            WheelTag::new(
+                ["py2".to_string(), "py3".to_string()],
+                ["none".to_string()],
+                ["any".to_string()],
+            ),
+            WheelTag::new(
+                ["pre".to_string()],
+                ["expanded".to_string()],
+                ["tag".to_string()],
+            ),
+            WheelTag::new(
+                ["cp37".to_string()],
+                ["abi3".to_string()],
+                [
+                    "manylinux_2_17_x86_64".to_string(),
+                    "manylinux2014_x86_64".to_string(),
+                ],
+            ),
         ])?;
         assert_eq!(expected, actual);
 
@@ -651,9 +666,9 @@ Tag: cp315-abi3t-manylinux_2_17_x86_64
             version = env!("CARGO_PKG_VERSION"),
         );
         let actual = wheel_file(&[WheelTag::new(
-            "cp315",
-            "abi3.abi3t",
-            "manylinux_2_17_x86_64",
+            ["cp315".to_string()],
+            ["abi3".to_string(), "abi3t".to_string()],
+            ["manylinux_2_17_x86_64".to_string()],
         )])?;
         assert_eq!(expected, actual);
 
@@ -690,7 +705,11 @@ Tag: cp315-abi3t-manylinux_2_17_x86_64
             writer.finish(
                 &metadata,
                 tmp_dir.path(),
-                &[WheelTag::new("py3", "none", "any")],
+                &[WheelTag::new(
+                    ["py3".to_string()],
+                    ["none".to_string()],
+                    ["any".to_string()],
+                )],
             )?
         };
 

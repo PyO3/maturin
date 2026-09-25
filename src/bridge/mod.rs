@@ -5,7 +5,9 @@ pub use detection::{
     upgrade_bridge_stable_abi,
 };
 
-use std::{fmt, str::FromStr};
+use std::collections::BTreeSet;
+use std::fmt;
+use std::str::FromStr;
 
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
@@ -360,11 +362,11 @@ impl fmt::Display for StableAbiKind {
 }
 
 impl StableAbiKind {
-    /// The tag to use for wheel building
-    pub fn wheel_tag(&self) -> &str {
+    /// The ABI tags to use for wheel building
+    pub fn wheel_tag(&self) -> BTreeSet<String> {
         match self {
-            StableAbiKind::Abi3 => "abi3",
-            StableAbiKind::Abi3t => "abi3.abi3t",
+            StableAbiKind::Abi3 => BTreeSet::from(["abi3".to_string()]),
+            StableAbiKind::Abi3t => BTreeSet::from(["abi3".to_string(), "abi3t".to_string()]),
         }
     }
 }
@@ -595,10 +597,16 @@ mod tests {
 
     #[test]
     fn stable_abi_kind_wheel_tag() {
-        assert_eq!(StableAbiKind::Abi3.wheel_tag(), "abi3");
+        assert_eq!(
+            StableAbiKind::Abi3.wheel_tag(),
+            BTreeSet::from(["abi3".to_string()])
+        );
         // abi3t wheels are also importable on abi3-capable interpreters, so the
-        // wheel tag is the compressed form `abi3.abi3t`.
-        assert_eq!(StableAbiKind::Abi3t.wheel_tag(), "abi3.abi3t");
+        // wheel declares both ABI tags.
+        assert_eq!(
+            StableAbiKind::Abi3t.wheel_tag(),
+            BTreeSet::from(["abi3".to_string(), "abi3t".to_string()])
+        );
     }
 
     #[test]

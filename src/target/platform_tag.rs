@@ -15,10 +15,11 @@ use anyhow::{Context, Result, anyhow, bail};
 use once_cell::sync::Lazy;
 use platform_info::*;
 use regex::Regex;
+use std::collections::BTreeSet;
 use std::env;
 use std::path::Path;
 
-/// Returns the platform portion of a wheel tag for the given target.
+/// Returns the platform tags for the given target.
 ///
 /// This is a standalone function so that it can be called without a full
 /// `BuildContext`.  The `BuildContext::get_platform_tag` method delegates
@@ -29,13 +30,13 @@ pub fn get_platform_tag(
     universal2: bool,
     pyproject_toml: Option<&PyProjectToml>,
     manifest_path: &Path,
-) -> Result<String> {
+) -> Result<BTreeSet<String>> {
     if let Ok(host_platform) = env::var("_PYTHON_HOST_PLATFORM") {
         let override_platform = host_platform.replace(['.', '-'], "_");
         eprintln!(
             "🚉 Overriding platform tag from _PYTHON_HOST_PLATFORM environment variable as {override_platform}."
         );
-        return Ok(override_platform);
+        return Ok(BTreeSet::from([override_platform]));
     }
 
     let tag = match (&target.target_os(), &target.target_arch()) {
@@ -59,21 +60,19 @@ pub fn get_platform_tag(
         // Linux
         (Os::Linux, _) => {
             let arch = target.get_platform_arch()?;
-            let mut platform_tags = platform_tags.to_vec();
-            platform_tags.sort();
-            let mut tags = vec![];
+            let mut tags = BTreeSet::new();
             for platform_tag in platform_tags {
-                tags.push(format!("{platform_tag}_{arch}"));
+                tags.insert(format!("{platform_tag}_{arch}"));
                 for alias in platform_tag.aliases() {
                     let alias_tag = format!("{alias}_{arch}");
                     // Only add legacy aliases if they're in PyPI's static allow-list,
                     // e.g. manylinux2014 was never defined for riscv64
                     if ALLOWED_PLATFORMS.contains(&alias_tag.as_str()) {
-                        tags.push(alias_tag);
+                        tags.insert(alias_tag);
                     }
                 }
             }
-            tags.join(".")
+            return Ok(tags);
         }
         // macOS
         (Os::Macos, Arch::X86_64) | (Os::Macos, Arch::Aarch64) => {
@@ -99,9 +98,11 @@ pub fn get_platform_tag(
                 format!("{arm64_major}_{arm64_minor}")
             };
             if universal2 {
-                format!(
-                    "macosx_{x86_64_tag}_x86_64.macosx_{arm64_tag}_arm64.macosx_{x86_64_tag}_universal2"
-                )
+                return Ok(BTreeSet::from([
+                    format!("macosx_{x86_64_tag}_x86_64"),
+                    format!("macosx_{arm64_tag}_arm64"),
+                    format!("macosx_{x86_64_tag}_universal2"),
+                ]));
             } else if target.target_arch() == Arch::Aarch64 {
                 format!("macosx_{arm64_tag}_arm64")
             } else {
@@ -198,7 +199,7 @@ pub fn get_platform_tag(
             format!("{os}_{release}_{machine}")
         }
     };
-    Ok(tag)
+    Ok(BTreeSet::from([tag]))
 }
 
 /// Get the default macOS deployment target version

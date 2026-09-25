@@ -16,6 +16,8 @@ use crate::{
 };
 use anyhow::Result;
 use cargo_metadata::Metadata;
+use itertools::Itertools;
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -66,8 +68,8 @@ impl ProjectContext {
         &self.bridge
     }
 
-    /// Returns the platform part of the tag for the wheel name
-    pub fn get_platform_tag(&self, platform_tags: &[PlatformTag]) -> Result<String> {
+    /// Returns the platform tags for the wheel name
+    pub fn get_platform_tag(&self, platform_tags: &[PlatformTag]) -> Result<BTreeSet<String>> {
         crate::target::get_platform_tag(
             &self.target,
             platform_tags,
@@ -154,7 +156,7 @@ pub struct BuiltWheel {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum BuiltArtifactTag {
     /// A Python interpreter tag such as `cp312`.
-    Interpreter(String),
+    Interpreter(BTreeSet<String>),
     /// Universal Python 3 artifact tag, rendered as `py3` at string boundaries.
     Universal,
     /// Source distribution artifact tag, rendered as `source` at string boundaries.
@@ -162,7 +164,7 @@ pub enum BuiltArtifactTag {
 }
 
 impl BuiltArtifactTag {
-    pub(crate) fn interpreter(tag: impl Into<String>) -> Self {
+    pub(crate) fn interpreter(tag: impl Into<BTreeSet<String>>) -> Self {
         Self::Interpreter(tag.into())
     }
 }
@@ -170,7 +172,7 @@ impl BuiltArtifactTag {
 impl std::fmt::Display for BuiltArtifactTag {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Interpreter(tag) => f.write_str(tag),
+            Self::Interpreter(tag) => f.write_str(&tag.iter().join(".")),
             Self::Universal => f.write_str("py3"),
             Self::Source => f.write_str("source"),
         }

@@ -20,7 +20,6 @@ impl WheelTag {
     ///
     /// Each component may itself be a compressed (dot-separated) list, e.g.
     /// `py2.py3`, `abi3.abi3t`, or `manylinux2014_x86_64.manylinux_2_17_x86_64`.
-    /// Compressed tag sets are sorted lexicographically as required by PEP 425.
     pub fn new(
         python: impl Into<String>,
         abi: impl Into<String>,

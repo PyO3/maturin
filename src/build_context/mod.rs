@@ -16,6 +16,7 @@ use crate::{
 };
 use anyhow::Result;
 use cargo_metadata::Metadata;
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -66,8 +67,8 @@ impl ProjectContext {
         &self.bridge
     }
 
-    /// Returns the platform part of the tag for the wheel name
-    pub fn get_platform_tag(&self, platform_tags: &[PlatformTag]) -> Result<String> {
+    /// Returns the platform tags for the wheel name
+    pub fn get_platform_tag(&self, platform_tags: &[PlatformTag]) -> Result<BTreeSet<String>> {
         crate::target::get_platform_tag(
             &self.target,
             platform_tags,

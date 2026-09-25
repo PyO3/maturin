@@ -249,7 +249,7 @@ impl PythonInterpreter {
             || target.is_illumos();
         let platform = if use_sysconfig_platform {
             if let Some(platform) = self.platform.clone() {
-                platform
+                [platform].into()
             } else {
                 project.get_platform_tag(platform_tags)?
             }

@@ -137,7 +137,7 @@ fn write_dist_info_uses_license_file_sources() -> Result<()> {
         &mut writer,
         &pyproject_dir,
         &metadata,
-        &[WheelTag::new("py3", "none", "any")],
+        &[WheelTag::new("py3", "none", ["any".to_string()].into())],
     )?;
 
     let files = writer.finish()?;
@@ -169,7 +169,7 @@ fn write_dist_info_rejects_absolute_license_paths() {
         &mut writer,
         pyproject_dir,
         &metadata,
-        &[WheelTag::new("py3", "none", "any")],
+        &[WheelTag::new("py3", "none", ["any".to_string()].into())],
     )
     .unwrap_err();
 
@@ -216,7 +216,11 @@ fn write_dist_info_respects_metadata_directory_env_var() -> Result<()> {
     // SAFETY: This test is serialized and the env var is removed before returning.
     unsafe { std::env::set_var("MATURIN_PEP517_METADATA_DIR", &pre_existing_dir) };
     let mut writer = VirtualWriter::new(MockWriter::default(), Override::empty());
-    let tags = &[WheelTag::new("cp310", "cp310", "manylinux_2_17_x86_64")];
+    let tags = &[WheelTag::new(
+        "cp310",
+        "cp310",
+        ["manylinux_2_17_x86_64".to_string()].into(),
+    )];
     let result = write_dist_info(&mut writer, &pyproject_dir, &metadata, tags);
     unsafe { std::env::remove_var("MATURIN_PEP517_METADATA_DIR") };
     result?;
@@ -287,7 +291,11 @@ fn write_dist_info_metadata_dir_as_parent_directory() -> Result<()> {
     // SAFETY: This test is serialized and the env var is removed before returning.
     unsafe { std::env::set_var("MATURIN_PEP517_METADATA_DIR", &parent_dir) };
     let mut writer = VirtualWriter::new(MockWriter::default(), Override::empty());
-    let tags = &[WheelTag::new("cp310", "cp310", "manylinux_2_17_x86_64")];
+    let tags = &[WheelTag::new(
+        "cp310",
+        "cp310",
+        ["manylinux_2_17_x86_64".to_string()].into(),
+    )];
     let result = write_dist_info(&mut writer, &pyproject_dir, &metadata, tags);
     unsafe { std::env::remove_var("MATURIN_PEP517_METADATA_DIR") };
     result?;

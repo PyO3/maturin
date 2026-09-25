@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use std::fmt;
 use std::str::FromStr;
 
@@ -12,23 +13,23 @@ use itertools::Itertools as _;
 pub struct WheelTag {
     python: String,
     abi: String,
-    platform: String,
+    platform: BTreeSet<String>,
 }
 
 impl WheelTag {
     /// Create a wheel tag from python, ABI, and platform components.
     ///
-    /// Each component may itself be a compressed (dot-separated) list, e.g.
-    /// `py2.py3`, `abi3.abi3t`, or `manylinux2014_x86_64.manylinux_2_17_x86_64`.
+    /// Python and ABI components may be compressed (dot-separated) lists, e.g.
+    /// `py2.py3` or `abi3.abi3t`. Platform tags are passed as a sorted set.
     pub fn new(
         python: impl Into<String>,
         abi: impl Into<String>,
-        platform: impl Into<String>,
+        platform: BTreeSet<String>,
     ) -> Self {
         Self {
             python: sort_compressed_tags(python.into()),
             abi: sort_compressed_tags(abi.into()),
-            platform: sort_compressed_tags(platform.into()),
+            platform,
         }
     }
 
@@ -42,18 +43,18 @@ impl WheelTag {
         &self.abi
     }
 
-    /// The platform tag component (e.g. `manylinux_2_17_x86_64`, `any`).
-    pub fn platform(&self) -> &str {
+    /// The platform tags (e.g. `manylinux_2_17_x86_64`, `any`).
+    pub fn platform(&self) -> &BTreeSet<String> {
         &self.platform
     }
 
     /// Expand compressed components into fully qualified PEP 425 tags.
     pub fn expand(&self) -> impl Iterator<Item = String> + '_ {
-        [&self.python, &self.abi, &self.platform]
-            .into_iter()
-            .map(|component| component.split('.'))
-            .multi_cartesian_product()
-            .map(|components| components.join("-"))
+        self.python
+            .split('.')
+            .cartesian_product(self.abi.split('.'))
+            .cartesian_product(&self.platform)
+            .map(|((python, abi), platform)| format!("{python}-{abi}-{platform}"))
     }
 }
 
@@ -67,7 +68,13 @@ fn sort_compressed_tags(tags: String) -> String {
 
 impl fmt::Display for WheelTag {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}-{}-{}", self.python, self.abi, self.platform)
+        write!(
+            f,
+            "{}-{}-{}",
+            self.python,
+            self.abi,
+            self.platform.iter().format(".")
+        )
     }
 }
 
@@ -89,7 +96,11 @@ impl FromStr for WheelTag {
             bail!("wheel tag must have exactly three components: {tag}");
         }
 
-        Ok(Self::new(python, abi, platform))
+        Ok(Self::new(
+            python,
+            abi,
+            platform.split('.').map(str::to_string).collect(),
+        ))
     }
 }
 
@@ -99,7 +110,11 @@ mod tests {
 
     #[test]
     fn display_renders_pep425_tag() {
-        let tag = WheelTag::new("cp312", "cp312", "manylinux_2_17_x86_64");
+        let tag = WheelTag::new(
+            "cp312",
+            "cp312",
+            ["manylinux_2_17_x86_64".to_string()].into(),
+        );
 
         assert_eq!(tag.to_string(), "cp312-cp312-manylinux_2_17_x86_64");
     }
@@ -109,7 +124,11 @@ mod tests {
         let tag = WheelTag::new(
             "cp39.cp310",
             "abi3t.abi3",
-            "manylinux_2_17_x86_64.manylinux2014_x86_64",
+            [
+                "manylinux_2_17_x86_64".to_string(),
+                "manylinux2014_x86_64".to_string(),
+            ]
+            .into(),
         );
         assert_eq!(
             tag.to_string(),
@@ -119,7 +138,12 @@ mod tests {
         let universal2 = WheelTag::new(
             "py3",
             "none",
-            "macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2",
+            [
+                "macosx_10_12_x86_64".to_string(),
+                "macosx_11_0_arm64".to_string(),
+                "macosx_10_12_universal2".to_string(),
+            ]
+            .into(),
         );
         assert_eq!(
             universal2.to_string(),
@@ -129,7 +153,7 @@ mod tests {
 
     #[test]
     fn expand_compressed_tags() {
-        let expanded = WheelTag::new("py2.py3", "none", "any")
+        let expanded = WheelTag::new("py2.py3", "none", ["any".to_string()].into())
             .expand()
             .collect::<Vec<_>>();
 
@@ -138,9 +162,17 @@ mod tests {
 
     #[test]
     fn expand_compressed_platform_tags() {
-        let expanded = WheelTag::new("cp37", "abi3", "manylinux_2_17_x86_64.manylinux2014_x86_64")
-            .expand()
-            .collect::<Vec<_>>();
+        let expanded = WheelTag::new(
+            "cp37",
+            "abi3",
+            [
+                "manylinux_2_17_x86_64".to_string(),
+                "manylinux2014_x86_64".to_string(),
+            ]
+            .into(),
+        )
+        .expand()
+        .collect::<Vec<_>>();
 
         assert_eq!(
             expanded,
@@ -153,9 +185,13 @@ mod tests {
 
     #[test]
     fn expand_abi3t_to_abi3_and_abi3t() {
-        let expanded = WheelTag::new("cp315", "abi3.abi3t", "manylinux_2_17_x86_64")
-            .expand()
-            .collect::<Vec<_>>();
+        let expanded = WheelTag::new(
+            "cp315",
+            "abi3.abi3t",
+            ["manylinux_2_17_x86_64".to_string()].into(),
+        )
+        .expand()
+        .collect::<Vec<_>>();
 
         assert_eq!(
             expanded,
@@ -170,12 +206,23 @@ mod tests {
     fn parses_existing_string_boundary() {
         let tag = "py3-none-any".parse::<WheelTag>().unwrap();
 
-        assert_eq!(tag, WheelTag::new("py3", "none", "any"));
+        assert_eq!(
+            tag,
+            WheelTag::new("py3", "none", ["any".to_string()].into())
+        );
     }
 
     #[test]
     fn display_round_trips_through_from_str() {
-        let original = WheelTag::new("cp37", "abi3", "manylinux_2_17_x86_64.manylinux2014_x86_64");
+        let original = WheelTag::new(
+            "cp37",
+            "abi3",
+            [
+                "manylinux_2_17_x86_64".to_string(),
+                "manylinux2014_x86_64".to_string(),
+            ]
+            .into(),
+        );
         let parsed = original.to_string().parse::<WheelTag>().unwrap();
         assert_eq!(parsed, original);
     }

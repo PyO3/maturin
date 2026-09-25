@@ -618,8 +618,8 @@ Root-Is-Purelib: false
 Tag: py2-none-any
 Tag: py3-none-any
 Tag: pre-expanded-tag
-Tag: cp37-abi3-manylinux_2_17_x86_64
 Tag: cp37-abi3-manylinux2014_x86_64
+Tag: cp37-abi3-manylinux_2_17_x86_64
 ",
             name = env!("CARGO_PKG_NAME"),
             version = env!("CARGO_PKG_VERSION"),

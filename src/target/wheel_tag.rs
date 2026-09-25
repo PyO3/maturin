@@ -19,16 +19,17 @@ impl WheelTag {
     /// Create a wheel tag from python, ABI, and platform components.
     ///
     /// Each component may itself be a compressed (dot-separated) list, e.g.
-    /// `py2.py3`, `abi3.abi3t`, or `manylinux_2_17_x86_64.manylinux2014_x86_64`.
+    /// `py2.py3`, `abi3.abi3t`, or `manylinux2014_x86_64.manylinux_2_17_x86_64`.
+    /// Compressed tag sets are sorted lexicographically as required by PEP 425.
     pub fn new(
         python: impl Into<String>,
         abi: impl Into<String>,
         platform: impl Into<String>,
     ) -> Self {
         Self {
-            python: python.into(),
-            abi: abi.into(),
-            platform: platform.into(),
+            python: sort_compressed_tags(python.into()),
+            abi: sort_compressed_tags(abi.into()),
+            platform: sort_compressed_tags(platform.into()),
         }
     }
 
@@ -54,6 +55,14 @@ impl WheelTag {
             .map(|component| component.split('.'))
             .multi_cartesian_product()
             .map(|components| components.join("-"))
+    }
+}
+
+fn sort_compressed_tags(tags: String) -> String {
+    if tags.contains('.') {
+        tags.split('.').sorted_unstable().join(".")
+    } else {
+        tags
     }
 }
 
@@ -97,6 +106,29 @@ mod tests {
     }
 
     #[test]
+    fn display_sorts_compressed_tag_sets() {
+        let tag = WheelTag::new(
+            "cp39.cp310",
+            "abi3t.abi3",
+            "manylinux_2_17_x86_64.manylinux2014_x86_64",
+        );
+        assert_eq!(
+            tag.to_string(),
+            "cp310.cp39-abi3.abi3t-manylinux2014_x86_64.manylinux_2_17_x86_64"
+        );
+
+        let universal2 = WheelTag::new(
+            "py3",
+            "none",
+            "macosx_10_12_x86_64.macosx_11_0_arm64.macosx_10_12_universal2",
+        );
+        assert_eq!(
+            universal2.to_string(),
+            "py3-none-macosx_10_12_universal2.macosx_10_12_x86_64.macosx_11_0_arm64"
+        );
+    }
+
+    #[test]
     fn expand_compressed_tags() {
         let expanded = WheelTag::new("py2.py3", "none", "any")
             .expand()
@@ -114,8 +146,8 @@ mod tests {
         assert_eq!(
             expanded,
             [
-                "cp37-abi3-manylinux_2_17_x86_64",
-                "cp37-abi3-manylinux2014_x86_64"
+                "cp37-abi3-manylinux2014_x86_64",
+                "cp37-abi3-manylinux_2_17_x86_64"
             ]
         );
     }

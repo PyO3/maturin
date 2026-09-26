@@ -177,6 +177,91 @@ fn integration_wasm_hello_world() {
 }
 
 #[test]
+fn integration_wasm_host_only_dependency() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let project_dir = temp_dir.path().join("hello-world");
+    other::copy_dir_recursive(Path::new("test-crates/hello-world"), &project_dir).unwrap();
+
+    let manifest_path = project_dir.join("Cargo.toml");
+    let mut manifest = fs_err::read_to_string(&manifest_path)
+        .unwrap()
+        .replace("../../README.md", "../README.md");
+    manifest.push_str("\n[build-dependencies]\nhost-helper = { path = \"../host-helper\" }\n");
+    fs_err::write(&manifest_path, manifest).unwrap();
+    fs_err::write(temp_dir.path().join("README.md"), "Cargo readme").unwrap();
+    fs_err::write(
+        project_dir.join("build.rs"),
+        "fn main() { host_helper::run(); }\n",
+    )
+    .unwrap();
+
+    // The build script runs on the host, so Cargo compiles host-only even though
+    // metadata filtered for the WASI target excludes it.
+    for (name, dependencies, source) in [
+        (
+            "host-helper",
+            indoc::indoc! {r#"
+                [target.'cfg(not(target_family = "wasm"))'.dependencies]
+                host-only = { path = "../host-only" }
+            "#},
+            "pub fn run() { host_only::run(); }\n",
+        ),
+        ("host-only", "", "pub fn run() {}\n"),
+    ] {
+        let dependency_dir = temp_dir.path().join(name);
+        fs_err::create_dir_all(dependency_dir.join("src")).unwrap();
+        fs_err::write(
+            dependency_dir.join("Cargo.toml"),
+            format!(
+                "[package]\nname = {name:?}\nversion = \"0.1.0\"\nedition = \"2021\"\n{dependencies}"
+            ),
+        )
+        .unwrap();
+        fs_err::write(dependency_dir.join("src/lib.rs"), source).unwrap();
+    }
+
+    let metadata = cargo_metadata::MetadataCommand::new()
+        .manifest_path(&manifest_path)
+        .other_options(vec!["--filter-platform".into(), "wasm32-wasip1".into()])
+        .exec()
+        .unwrap();
+    assert!(metadata.packages.iter().all(|pkg| pkg.name != "host-only"));
+
+    let wheel_dir = temp_dir.path().join("wheels");
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_maturin"))
+        .args(["build", "--target", "wasm32-wasip1", "--offline"])
+        .arg("--manifest-path")
+        .arg(&manifest_path)
+        .arg("--target-dir")
+        .arg(temp_dir.path().join("target"))
+        .arg("--out")
+        .arg(&wheel_dir)
+        .output()
+        .unwrap();
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "{stderr}");
+    assert!(
+        !stderr.contains("wasn't listed in `cargo metadata`"),
+        "{stderr}"
+    );
+
+    let wheels = fs_err::read_dir(&wheel_dir)
+        .unwrap()
+        .map(|entry| entry.unwrap().path())
+        .collect::<Vec<_>>();
+    assert_eq!(wheels.len(), 1);
+    let mut wheel = zip::ZipArchive::new(fs_err::File::open(&wheels[0]).unwrap()).unwrap();
+    for binary in ["hello-world", "foo"] {
+        assert!(
+            wheel
+                .by_name(&format!("hello_world-0.1.0.data/scripts/{binary}.wasm"))
+                .is_ok(),
+            "missing {binary} in wheel"
+        );
+    }
+}
+
+#[test]
 fn abi3_without_version() {
     handle_result(other::abi3_without_version())
 }

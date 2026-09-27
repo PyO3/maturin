@@ -2,6 +2,7 @@ use anyhow::{Context, Result, bail, ensure};
 use fs_err as fs;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use std::env;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::str;
@@ -127,6 +128,49 @@ pub(crate) fn find_uv_bin() -> Result<(PathBuf, Vec<&'static str>)> {
     }
 }
 
+fn venv_search_path(venv_dir: &Path, search_path: &std::ffi::OsStr) -> Result<std::ffi::OsString> {
+    let paths = env::split_paths(search_path)
+        .filter(|path| path.starts_with(venv_dir))
+        .collect::<Vec<_>>();
+    ensure!(
+        !paths.is_empty(),
+        "No PATH entries belong to virtual environment {}",
+        venv_dir.display()
+    );
+    env::join_paths(paths).context("Failed to construct virtual environment PATH")
+}
+
+fn find_executable_in_path(executable: &str, search_path: &std::ffi::OsStr) -> Option<PathBuf> {
+    let executable = format!("{}{}", executable, env::consts::EXE_SUFFIX);
+    env::split_paths(search_path)
+        .map(|directory| directory.join(&executable))
+        .find(|path| path.is_file())
+}
+
+/// Detect a uv binary that belongs to the active virtual environment.
+///
+/// This intentionally ignores uv executables found elsewhere on PATH so a
+/// globally installed uv cannot hijack a pixi environment that should use pip.
+pub(crate) fn find_uv_bin_in_venv(venv_dir: &Path) -> Result<(PathBuf, Vec<&'static str>)> {
+    let path = env::var_os("PATH").context("PATH is not set")?;
+    let search_path = venv_search_path(venv_dir, &path)?;
+    let uv_path = find_executable_in_path("uv", &search_path)
+        .context("uv is not installed in the active virtual environment")?;
+    let output = Command::new(&uv_path).arg("--version").output()?;
+    if output.status.success() {
+        let version_str =
+            str::from_utf8(&output.stdout).context("`uv --version` didn't return utf8 output")?;
+        debug!(path = %uv_path.display(), version = %version_str, "Found uv binary in virtual environment");
+        Ok((uv_path, Vec::new()))
+    } else {
+        bail!(
+            "`{} --version` failed with status: {}",
+            uv_path.display(),
+            output.status
+        );
+    }
+}
+
 /// Detect the Python uv package
 pub(crate) fn find_uv_python(python_path: &Path) -> Result<(PathBuf, Vec<&'static str>)> {
     let output = Command::new(python_path)
@@ -183,9 +227,47 @@ pub(crate) fn is_pixi_venv(venv_dir: &Path) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::is_pixi_venv;
+    use super::{find_executable_in_path, is_pixi_venv, venv_search_path};
     use fs_err as fs;
+    use std::env;
     use tempfile::TempDir;
+
+    #[test]
+    fn test_find_executable_in_path_uses_filtered_path() {
+        let tmp = TempDir::new().unwrap();
+        let bin_dir = tmp.path().join("bin");
+        fs::create_dir_all(&bin_dir).unwrap();
+        let executable = bin_dir.join(format!("uv{}", env::consts::EXE_SUFFIX));
+        fs::write(&executable, "").unwrap();
+        let search_path = env::join_paths([&bin_dir]).unwrap();
+
+        assert_eq!(
+            find_executable_in_path("uv", &search_path),
+            Some(executable)
+        );
+    }
+
+    #[test]
+    fn test_venv_search_path_excludes_global_entries() {
+        let tmp = TempDir::new().unwrap();
+        let venv_bin = tmp.path().join("bin");
+        let global_bin = tmp.path().parent().unwrap().join("global-bin");
+        let search_path = env::join_paths([&venv_bin, &global_bin]).unwrap();
+
+        let filtered = venv_search_path(tmp.path(), &search_path).unwrap();
+        let paths = env::split_paths(&filtered).collect::<Vec<_>>();
+
+        assert_eq!(paths, vec![venv_bin]);
+    }
+
+    #[test]
+    fn test_venv_search_path_rejects_only_global_entries() {
+        let tmp = TempDir::new().unwrap();
+        let global_bin = tmp.path().parent().unwrap().join("global-bin");
+        let search_path = env::join_paths([&global_bin]).unwrap();
+
+        assert!(venv_search_path(tmp.path(), &search_path).is_err());
+    }
 
     #[test]
     fn test_is_pixi_venv_detects_marker() {

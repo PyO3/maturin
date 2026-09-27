@@ -18,6 +18,10 @@ dynamic = ["version"]
 get_42 = "pyo3_mixed:get_42"
 print_cli_args = "pyo3_mixed:print_cli_args"
 
+[dependency-groups]
+pgo = ["attrs"]
+
 [tool.maturin]
 include = ["pyo3_mixed/assets/*"]
-pgo-command = "print_cli_args"
+pgo-dependency-group = "pgo"
+pgo-command = "python pgo_check.py"

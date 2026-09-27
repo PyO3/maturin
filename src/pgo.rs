@@ -176,6 +176,7 @@ impl PgoContext {
         let host_target = Target::from_target_triple(None)?;
         let venv_python = host_target.get_venv_python(venv_path);
         let venv_bin_dir = host_target.get_venv_bin_dir(venv_path);
+        let project_dir = build_context.project.project_layout.project_root.as_path();
 
         // Install the instrumented wheel
         eprintln!("📦 Installing instrumented wheel into temporary venv...");
@@ -206,27 +207,64 @@ impl PgoContext {
             }
         }
 
-        // Install dev dependency group if present (pip only — uv doesn't support --group yet)
-        if uv.is_none() {
-            let has_dev_group = build_context
-                .project
-                .pyproject_toml
-                .as_ref()
-                .and_then(|p| p.dependency_groups.as_ref())
-                .is_some_and(|dg| dg.0.contains_key("dev"));
-            if has_dev_group {
+        // Install the configured PGO dependency group, defaulting to `dev`.
+        // With uv, export the group first so the project's lockfile is respected
+        // without syncing away the already-installed instrumented wheel.
+        let dependency_group = build_context
+            .project
+            .pyproject_toml
+            .as_ref()
+            .and_then(|p| p.pgo_dependency_group())
+            .unwrap_or("dev");
+        let has_dependency_group = build_context
+            .project
+            .pyproject_toml
+            .as_ref()
+            .and_then(|p| p.dependency_groups.as_ref())
+            .is_some_and(|dg| dg.0.contains_key(dependency_group));
+        if has_dependency_group {
+            if let Some((uv_path, uv_args)) = &uv {
+                let requirements_path = venv_path.join("pgo-requirements.txt");
+                debug!("Exporting {dependency_group} dependency group with uv");
+                let status = Command::new(uv_path)
+                    .args(uv_args.iter().copied())
+                    .args(["export", "--group", dependency_group, "--no-emit-workspace"])
+                    .args(["--no-hashes", "--no-header", "--no-annotate", "-o"])
+                    .arg(&requirements_path)
+                    .current_dir(project_dir)
+                    .status()
+                    .context("Failed to export PGO dependency group with uv")?;
+                if !status.success() {
+                    eprintln!(
+                        "⚠️  Warning: failed to export {dependency_group} dependency group with uv"
+                    );
+                } else {
+                    debug!("Installing {dependency_group} dependency group from uv export");
+                    let status = self.pip_install(
+                        &uv,
+                        &venv_python,
+                        &["-r"],
+                        &[requirements_path.as_path()],
+                    )?;
+                    if !status.success() {
+                        eprintln!(
+                            "⚠️  Warning: failed to install {dependency_group} dependency group"
+                        );
+                    }
+                }
+            } else {
                 let pyproject_group = format!(
-                    "{}:dev",
+                    "{}:{dependency_group}",
                     dunce::simplified(&build_context.project.pyproject_toml_path).display()
                 );
-                debug!("Installing dev dependency group");
+                debug!("Installing {dependency_group} dependency group");
                 let status = Command::new(&venv_python)
                     .args(["-m", "pip", "install", "--group", &pyproject_group])
                     .status()
-                    .context("Failed to install dev dependency group")?;
+                    .context("Failed to install PGO dependency group")?;
                 if !status.success() {
                     eprintln!(
-                        "⚠️  Warning: failed to install dev dependency group \
+                        "⚠️  Warning: failed to install {dependency_group} dependency group \
                          (pip >= 25.1 required for --group support)"
                     );
                 }
@@ -244,8 +282,6 @@ impl PgoContext {
         let current_path = std::env::var("PATH").unwrap_or_default();
         let sep = if host_target.is_windows() { ";" } else { ":" };
         let path_env = format!("{}{sep}{current_path}", venv_bin_dir.display());
-
-        let project_dir = build_context.project.project_layout.project_root.as_path();
 
         // Run through the system shell with the venv's bin dir prepended to PATH,
         // so that `python`, `pytest`, etc. resolve to the venv's copies.

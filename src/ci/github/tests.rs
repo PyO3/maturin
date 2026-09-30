@@ -2,6 +2,7 @@ use expect_test::expect_file;
 use semver::Version;
 
 use super::{generate_github, generate_github_from_cli, resolve_config};
+use crate::ci::PythonImplementation;
 use crate::ci::{GenerateCI, Platform};
 use crate::pyproject_toml::{CIConfigOverrides, GitHubCIConfig, PlatformCIConfig, TargetCIConfig};
 use crate::{BridgeModel, PyO3, StableAbi, bridge::PyO3Crate};
@@ -431,6 +432,50 @@ fn test_generate_github_trusted_publishing_no_environment() {
     assert!(!conf.contains("environment:"));
     assert!(conf.contains("uv publish --trusted-publishing always 'wheels-*/*'"));
     assert!(!conf.contains("UV_PUBLISH_TOKEN"));
+}
+
+#[test]
+fn test_generate_github_pypy() {
+    let cli = GenerateCI {
+        platforms: vec![Platform::Windows],
+        python_implementation: PythonImplementation::PyPy,
+        ..Default::default()
+    };
+    let conf = generate_github_from_cli(&cli, PROJECT_NAME, &pyo3_bridge(None), false).unwrap();
+
+    assert!(conf.contains("python-version: \"pypy3.11\""));
+    assert!(conf.contains("args: --release --out dist -i pypy3.11"));
+    assert!(!conf.contains("--find-interpreter"));
+    // PyPy has no prebuilt arm64 Windows interpreters, so the `python_arch`
+    // matrix value must not be wired up to `actions/setup-python`.
+    assert!(!conf.contains("architecture: ${{ matrix.platform.python_arch }}"));
+}
+
+#[test]
+fn test_generate_github_pypy_skips_free_threaded() {
+    let cli = GenerateCI {
+        platforms: vec![Platform::Windows],
+        python_implementation: PythonImplementation::PyPy,
+        ..Default::default()
+    };
+    let abi3_bridge = pyo3_bridge(Some(StableAbi::from_abi3_version(3, 7)));
+    let conf = generate_github_from_cli(&cli, PROJECT_NAME, &abi3_bridge, false).unwrap();
+
+    assert!(!conf.contains("Build free-threaded wheels"));
+    assert!(conf.contains("-i pypy3.11"));
+}
+
+#[test]
+fn test_generate_github_graalpy() {
+    let cli = GenerateCI {
+        platforms: vec![Platform::Macos],
+        python_implementation: PythonImplementation::GraalPy,
+        ..Default::default()
+    };
+    let conf = generate_github_from_cli(&cli, PROJECT_NAME, &pyo3_bridge(None), false).unwrap();
+
+    assert!(conf.contains("python-version: \"graalpy24.2\""));
+    assert!(conf.contains("args: --release --out dist -i graalpy24.2"));
 }
 
 #[test]

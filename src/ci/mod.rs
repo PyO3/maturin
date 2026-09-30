@@ -127,6 +127,19 @@ impl Platform {
     }
 }
 
+/// Target Python implementation to build wheels for
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, ValueEnum)]
+#[clap(rename_all = "lower")]
+pub enum PythonImplementation {
+    /// CPython
+    #[default]
+    CPython,
+    /// PyPy
+    PyPy,
+    /// GraalPy
+    GraalPy,
+}
+
 impl fmt::Display for Platform {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -196,6 +209,9 @@ pub struct GenerateCI {
     /// Skip artifact attestation [deprecated: use [tool.maturin.generate-ci.github] in pyproject.toml]
     #[arg(long)]
     pub skip_attestation: bool,
+    /// Python implementation to build wheels for
+    #[arg(long, value_enum, default_value = "cpython")]
+    pub python_implementation: PythonImplementation,
 }
 
 impl Default for GenerateCI {
@@ -208,6 +224,7 @@ impl Default for GenerateCI {
             pytest: false,
             zig: false,
             skip_attestation: false,
+            python_implementation: PythonImplementation::default(),
         }
     }
 }

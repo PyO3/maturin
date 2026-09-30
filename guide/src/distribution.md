@@ -342,6 +342,16 @@ Options:
       --skip-attestation
           Skip artifact attestation [deprecated: use [tool.maturin.generate-ci.github] in pyproject.toml]
 
+      --python-implementation <PYTHON_IMPLEMENTATION>
+          Python implementation to build wheels for
+
+          Possible values:
+          - cpython: CPython
+          - pypy:    PyPy
+          - graalpy: GraalPy
+
+          [default: cpython]
+
   -h, --help
           Print help (see a summary with '-h')
 ```

@@ -2,7 +2,7 @@ use std::path::Path;
 
 use anyhow::Result;
 
-use super::super::{GenerateCI, Platform, ResolvedCIConfig, ResolvedTarget};
+use super::super::{GenerateCI, Platform, PythonImplementation, ResolvedCIConfig, ResolvedTarget};
 use super::resolve::resolve_config;
 use super::yaml::Yaml;
 use crate::BridgeModel;
@@ -191,6 +191,7 @@ fn emit_platform_job(
         platform,
         context.setup_python,
         context.min_python_minor,
+        context.cli.python_implementation,
     );
 
     let maturin_args = build_maturin_args(
@@ -200,6 +201,7 @@ fn emit_platform_job(
         context.is_abi3,
         context.is_bin,
         context.setup_python,
+        context.min_python_minor,
     );
     let extra_args_suffix = build_extra_args_suffix(targets);
 
@@ -212,7 +214,12 @@ fn emit_platform_job(
         targets,
     );
 
-    if context.is_abi3 {
+    if context.is_abi3
+        && matches!(
+            context.cli.python_implementation,
+            PythonImplementation::CPython
+        )
+    {
         emit_free_threaded_setup(&mut y, platform, context.min_python_minor);
         emit_build_step(
             &mut y,
@@ -266,12 +273,41 @@ fn emit_platform_setup(
     platform: Platform,
     setup_python: bool,
     min_python_minor: Option<u8>,
+    python_implementation: PythonImplementation,
 ) {
     match platform {
         Platform::Emscripten => emit_emscripten_setup(y),
         Platform::Android => {}
-        _ if setup_python => emit_python_setup(y, platform, min_python_minor),
+        _ if setup_python => {
+            emit_python_setup(y, platform, min_python_minor, python_implementation)
+        }
         _ => {}
+    }
+}
+
+/// The `actions/setup-python` `python-version` value for the configured implementation.
+fn python_setup_version(
+    python_implementation: PythonImplementation,
+    platform: Platform,
+    min_python_minor: Option<u8>,
+) -> String {
+    match python_implementation {
+        PythonImplementation::CPython => match (platform, min_python_minor) {
+            (Platform::Windows, Some(minor)) if minor >= 13 => format!("3.{minor}"),
+            (Platform::Windows, _) => "3.13".to_string(),
+            (_, Some(minor)) => format!("3.{minor}"),
+            _ => "3.x".to_string(),
+        },
+        // PyPy version numbers track the CPython minor version they target,
+        // so reuse `min_python_minor` when known.
+        PythonImplementation::PyPy => match min_python_minor {
+            Some(minor) => format!("pypy3.{minor}"),
+            None => "pypy3.11".to_string(),
+        },
+        // GraalPy releases don't map 1:1 onto CPython minor versions, so pin
+        // a recent default; users can still override via `pyproject.toml`
+        // target overrides if they need a specific release.
+        PythonImplementation::GraalPy => "graalpy24.2".to_string(),
     }
 }
 
@@ -317,20 +353,24 @@ fn emit_emscripten_setup(y: &mut Yaml) {
         .line("- run: pip install pyodide-build");
 }
 
-fn emit_python_setup(y: &mut Yaml, platform: Platform, min_python_minor: Option<u8>) {
-    let python_version = match (platform, min_python_minor) {
-        (Platform::Windows, Some(minor)) if minor >= 13 => format!("3.{minor}"),
-        (Platform::Windows, _) => "3.13".to_string(),
-        (_, Some(minor)) => format!("3.{minor}"),
-        _ => "3.x".to_string(),
-    };
+fn emit_python_setup(
+    y: &mut Yaml,
+    platform: Platform,
+    min_python_minor: Option<u8>,
+    python_implementation: PythonImplementation,
+) {
+    let python_version = python_setup_version(python_implementation, platform, min_python_minor);
 
     y.line("- uses: actions/setup-python@v6")
         .indent()
         .line("with:")
         .indent()
         .line(format!("python-version: \"{python_version}\""));
-    if matches!(platform, Platform::Windows) {
+    // PyPy/GraalPy don't publish prebuilt arm64 Windows interpreters, so the
+    // `python_arch` matrix value only applies to CPython.
+    if matches!(platform, Platform::Windows)
+        && matches!(python_implementation, PythonImplementation::CPython)
+    {
         y.line(format!(
             "architecture: {}",
             gha_expr("matrix.platform.python_arch")
@@ -371,8 +411,19 @@ fn build_maturin_args(
     is_abi3: bool,
     is_bin: bool,
     setup_python: bool,
+    min_python_minor: Option<u8>,
 ) -> String {
-    let mut maturin_args = if is_abi3 || (is_bin && !setup_python) {
+    let mut maturin_args = if !matches!(cli.python_implementation, PythonImplementation::CPython)
+        && !matches!(platform, Platform::Emscripten | Platform::Android)
+    {
+        // Build for the specific interpreter `actions/setup-python` installed
+        // rather than relying on `--find-interpreter`, which only recognizes
+        // CPython-style `pythonX.Y` executable names.
+        vec![
+            "-i".to_string(),
+            python_setup_version(cli.python_implementation, platform, min_python_minor),
+        ]
+    } else if is_abi3 || (is_bin && !setup_python) {
         Vec::new()
     } else if matches!(platform, Platform::Emscripten) {
         vec!["-i".to_string(), "${{ env.PYTHON_VERSION }}".to_string()]

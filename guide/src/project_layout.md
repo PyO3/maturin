@@ -3,6 +3,28 @@
 Maturin expects a particular project layout depending on the contents of the
 package.
 
+## Declare a minimum supported Rust version
+
+For packages intended for distribution, declare the minimum supported Rust
+version (MSRV) with `package.rust-version` in `Cargo.toml`:
+
+```toml
+[package]
+name = "my-project"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.74"
+```
+
+Set `rust-version` to the oldest Rust toolchain your project supports. Cargo
+uses this value both to give users a clear error on unsupported toolchains and
+to choose a compatible `Cargo.lock` format. This matters for source
+distributions: Cargo 1.83 and later default to lockfile format v4, which Rust
+versions before 1.78 cannot read.
+
+See Cargo's [`rust-version` documentation](https://doc.rust-lang.org/cargo/reference/rust-version.html)
+for details.
+
 ## Pure Rust project
 
 For a pure Rust project, the structure is as expected and what you get from `cargo new`:

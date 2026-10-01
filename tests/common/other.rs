@@ -274,6 +274,15 @@ pub fn check_sdist_mtimes(
 }
 
 fn build_wheel_files(package: impl AsRef<Path>, unique_name: &str) -> Result<ZipArchive<File>> {
+    let target_dir = crate::common::shared_target_dir(&package);
+    build_wheel_files_with_target_dir(package, target_dir, unique_name)
+}
+
+fn build_wheel_files_with_target_dir(
+    package: impl AsRef<Path>,
+    target_dir: PathBuf,
+    unique_name: &str,
+) -> Result<ZipArchive<File>> {
     let manifest_path = package.as_ref().join("Cargo.toml");
     let wheel_directory = Path::new("test-crates").join("wheels").join(unique_name);
 
@@ -285,7 +294,7 @@ fn build_wheel_files(package: impl AsRef<Path>, unique_name: &str) -> Result<Zip
         cargo: CargoOptions {
             manifest_path: Some(manifest_path),
             quiet: true,
-            target_dir: Some(crate::common::shared_target_dir(&package)),
+            target_dir: Some(target_dir),
             ..Default::default()
         },
         platform: PlatformOptions {
@@ -734,6 +743,31 @@ pub fn test_unreadable_dir() -> Result<()> {
     fs_err::set_permissions(&unreadable_dir, std::fs::Permissions::from_mode(0o755))?;
 
     wheel_result?;
+    Ok(())
+}
+
+/// Test that a target directory inside the python package isn't packaged outside of git.
+///
+/// See https://github.com/PyO3/maturin/issues/3319
+pub fn test_target_dir_in_python_package() -> Result<()> {
+    let temp_dir = tempfile::tempdir()?;
+    let project_dir = temp_dir.path().join("bin-with-python-module");
+    copy_dir_recursive(
+        Path::new("test-crates/bin-with-python-module"),
+        &project_dir,
+    )?;
+
+    let target_dir = project_dir.join("bin_with_python_module/target");
+    let wheel = build_wheel_files_with_target_dir(
+        &project_dir,
+        target_dir,
+        "wheel-files-bin-with-python-module-target-dir",
+    )?;
+    let package_files: Vec<_> = wheel
+        .file_names()
+        .filter(|name| name.starts_with("bin_with_python_module/"))
+        .collect();
+    assert_eq!(package_files, ["bin_with_python_module/__init__.py"]);
     Ok(())
 }
 

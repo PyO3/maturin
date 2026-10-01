@@ -65,3 +65,8 @@ fn pyo3_wheel_record_has_normalized_paths() {
         "wheel-record-pyo3-mixed-include-exclude",
     ))
 }
+
+#[test]
+fn target_dir_in_python_package() {
+    handle_result(other::test_target_dir_in_python_package())
+}

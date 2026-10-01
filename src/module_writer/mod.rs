@@ -119,6 +119,7 @@ pub fn write_python_part(
     writer: &mut VirtualWriter<WheelWriter>,
     project_layout: &ProjectLayout,
     pyproject_toml: Option<&PyProjectToml>,
+    target_dir: &Path,
 ) -> Result<()> {
     let python_dir = &project_layout.python_dir;
     let mut python_packages = Vec::new();
@@ -133,11 +134,23 @@ pub fn write_python_part(
         python_packages.push(package_path);
     }
 
+    // Skip the cargo target directory unless it contains a python package (#3319)
+    let target_dir = target_dir
+        .normalize()
+        .ok()
+        .map(|dir| dir.into_path_buf())
+        .filter(|dir| {
+            !python_packages
+                .iter()
+                .any(|package| package.starts_with(dir))
+        });
+
     for absolute in WalkBuilder::new(&project_layout.project_root)
         .hidden(false)
         .parents(false)
         .git_global(false)
         .git_exclude(false)
+        .filter_entry(move |entry| target_dir.as_deref() != Some(entry.path()))
         .build()
     {
         let absolute = match absolute {

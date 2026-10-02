@@ -1,4 +1,4 @@
-use crate::module_writer::is_build_dir;
+use crate::module_writer::skip_build_dirs;
 use crate::pyproject_toml::Format;
 use crate::{ModuleWriter, PyProjectToml, SDistWriter, VirtualWriter};
 use anyhow::{Context, Result, bail};
@@ -200,16 +200,9 @@ pub(super) fn add_python_sources(
         python_packages.push(package_path);
     }
 
-    // Skip the target directory and cache directories (#3319)
-    let target_dir = project
-        .target_dir
-        .normalize()
-        .ok()
-        .map(|dir| dir.into_path_buf());
-    for package in python_packages {
-        let target_dir = target_dir.clone();
+    for package in &python_packages {
         for entry in WalkBuilder::new(package)
-            .filter_entry(move |entry| !is_build_dir(entry, target_dir.as_deref()))
+            .filter_entry(skip_build_dirs(&project.target_dir, &python_packages))
             .build()
         {
             let source = entry?.into_path();

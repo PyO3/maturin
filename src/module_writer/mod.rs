@@ -114,14 +114,26 @@ impl<T: ModuleWriterInternal> ModuleWriter for T {
     }
 }
 
-/// Whether the entry is the cargo target directory or a cache directory tagged with
-/// `CACHEDIR.TAG` (https://bford.info/cachedir/)
-pub(crate) fn is_build_dir(entry: &ignore::DirEntry, target_dir: Option<&Path>) -> bool {
-    target_dir == Some(entry.path())
-        || (entry
-            .file_type()
-            .is_some_and(|file_type| file_type.is_dir())
-            && entry.path().join("CACHEDIR.TAG").is_file())
+/// Filter for [WalkBuilder::filter_entry] that skips the cargo target directory and cache
+/// directories tagged with `CACHEDIR.TAG` (https://bford.info/cachedir/), unless they contain a
+/// python package (#3319)
+pub(crate) fn skip_build_dirs(
+    target_dir: &Path,
+    python_packages: &[PathBuf],
+) -> impl Fn(&ignore::DirEntry) -> bool + Send + Sync + 'static {
+    let target_dir = target_dir.normalize().ok().map(|dir| dir.into_path_buf());
+    let python_packages = python_packages.to_vec();
+    move |entry| {
+        let is_build_dir = target_dir.as_deref() == Some(entry.path())
+            || (entry
+                .file_type()
+                .is_some_and(|file_type| file_type.is_dir())
+                && entry.path().join("CACHEDIR.TAG").is_file());
+        !is_build_dir
+            || python_packages
+                .iter()
+                .any(|package| package.starts_with(entry.path()))
+    }
 }
 
 /// Adds the python part of a mixed project to the writer,
@@ -144,21 +156,12 @@ pub fn write_python_part(
         python_packages.push(package_path);
     }
 
-    // Skip the target directory and cache directories unless they contain a python package (#3319)
-    let target_dir = target_dir.normalize().ok().map(|dir| dir.into_path_buf());
-    let packages = python_packages.clone();
-
     for absolute in WalkBuilder::new(&project_layout.project_root)
         .hidden(false)
         .parents(false)
         .git_global(false)
         .git_exclude(false)
-        .filter_entry(move |entry| {
-            !is_build_dir(entry, target_dir.as_deref())
-                || packages
-                    .iter()
-                    .any(|package| package.starts_with(entry.path()))
-        })
+        .filter_entry(skip_build_dirs(target_dir, &python_packages))
         .build()
     {
         let absolute = match absolute {

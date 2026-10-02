@@ -161,6 +161,16 @@ pub fn build_source_distribution(
     sdist_generator: SdistGenerator,
     unique_name: &str,
 ) -> Result<Archive<GzDecoder<File>>> {
+    let target_dir = crate::common::case_target_dir(unique_name);
+    build_source_distribution_with_target_dir(package, sdist_generator, target_dir, unique_name)
+}
+
+fn build_source_distribution_with_target_dir(
+    package: impl AsRef<Path>,
+    sdist_generator: SdistGenerator,
+    target_dir: PathBuf,
+    unique_name: &str,
+) -> Result<Archive<GzDecoder<File>>> {
     let manifest_path = package.as_ref().join("Cargo.toml");
     let sdist_directory = crate::common::case_wheel_dir(unique_name);
 
@@ -172,7 +182,7 @@ pub fn build_source_distribution(
         cargo: CargoOptions {
             manifest_path: Some(manifest_path),
             quiet: true,
-            target_dir: Some(crate::common::case_target_dir(unique_name)),
+            target_dir: Some(target_dir),
             ..Default::default()
         },
         ..Default::default()
@@ -745,7 +755,7 @@ pub fn test_unreadable_dir() -> Result<()> {
     Ok(())
 }
 
-/// Test that a target directory inside the python package isn't packaged outside of git.
+/// Test that target and cache directories in the python package aren't packaged outside of git.
 ///
 /// See https://github.com/PyO3/maturin/issues/3319
 pub fn test_target_dir_in_python_package() -> Result<()> {
@@ -756,7 +766,16 @@ pub fn test_target_dir_in_python_package() -> Result<()> {
         &project_dir,
     )?;
 
+    // Like the default `target/wheels` output, creating it first keeps cargo from tagging it
     let target_dir = project_dir.join("bin_with_python_module/target");
+    fs_err::create_dir_all(&target_dir)?;
+    let cache_dir = project_dir.join("bin_with_python_module/cache");
+    fs_err::create_dir_all(&cache_dir)?;
+    fs_err::write(
+        cache_dir.join("CACHEDIR.TAG"),
+        "Signature: 8a477f597d28d172789f06886806bc55\n",
+    )?;
+
     let wheel = build_wheel_files_with_target_dir(
         &project_dir,
         target_dir,
@@ -767,6 +786,48 @@ pub fn test_target_dir_in_python_package() -> Result<()> {
         .filter(|name| name.starts_with("bin_with_python_module/"))
         .collect();
     assert_eq!(package_files, ["bin_with_python_module/__init__.py"]);
+    Ok(())
+}
+
+/// Same as [test_target_dir_in_python_package] for sdists. The python package of pyo3-mixed-src is
+/// outside the crate, so `cargo package` doesn't list these files either.
+pub fn test_target_dir_in_python_package_sdist() -> Result<()> {
+    let temp_dir = tempfile::tempdir()?;
+    let project_dir = temp_dir.path().join("pyo3-mixed-src");
+    copy_dir_recursive(Path::new("test-crates/pyo3-mixed-src"), &project_dir)?;
+
+    // Leftovers of an earlier build in a target directory that cargo didn't tag
+    let target_dir = project_dir.join("src/pyo3_mixed_src/target");
+    fs_err::create_dir_all(target_dir.join("debug"))?;
+    fs_err::write(target_dir.join("debug/libpyo3_mixed_src.rlib"), "")?;
+    let cache_dir = project_dir.join("src/pyo3_mixed_src/cache");
+    fs_err::create_dir_all(&cache_dir)?;
+    fs_err::write(
+        cache_dir.join("CACHEDIR.TAG"),
+        "Signature: 8a477f597d28d172789f06886806bc55\n",
+    )?;
+
+    let mut sdist = build_source_distribution_with_target_dir(
+        project_dir.join("rust"),
+        SdistGenerator::Cargo,
+        target_dir,
+        "sdist-pyo3-mixed-src-target-dir",
+    )?;
+    let mut package_files = Vec::new();
+    for entry in sdist.entries()? {
+        let path = format!("{}", entry?.path()?.display());
+        if path.starts_with("pyo3_mixed_src-2.1.3/src/pyo3_mixed_src/") {
+            package_files.push(path);
+        }
+    }
+    assert_eq!(
+        package_files,
+        [
+            "pyo3_mixed_src-2.1.3/src/pyo3_mixed_src/__init__.py",
+            "pyo3_mixed_src-2.1.3/src/pyo3_mixed_src/python_module/__init__.py",
+            "pyo3_mixed_src-2.1.3/src/pyo3_mixed_src/python_module/double.py",
+        ]
+    );
     Ok(())
 }
 

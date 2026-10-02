@@ -775,6 +775,10 @@ pub fn test_target_dir_in_python_package() -> Result<()> {
         cache_dir.join("CACHEDIR.TAG"),
         "Signature: 8a477f597d28d172789f06886806bc55\n",
     )?;
+    // Without the signature, it's not a cache directory
+    let data_dir = project_dir.join("bin_with_python_module/data");
+    fs_err::create_dir_all(&data_dir)?;
+    fs_err::write(data_dir.join("CACHEDIR.TAG"), "")?;
 
     let wheel = build_wheel_files_with_target_dir(
         &project_dir,
@@ -785,7 +789,13 @@ pub fn test_target_dir_in_python_package() -> Result<()> {
         .file_names()
         .filter(|name| name.starts_with("bin_with_python_module/"))
         .collect();
-    assert_eq!(package_files, ["bin_with_python_module/__init__.py"]);
+    assert_eq!(
+        package_files,
+        [
+            "bin_with_python_module/__init__.py",
+            "bin_with_python_module/data/CACHEDIR.TAG",
+        ]
+    );
     Ok(())
 }
 

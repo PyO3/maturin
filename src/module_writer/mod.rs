@@ -1,4 +1,5 @@
 use std::fmt::Write as _;
+use std::io::Read as _;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -128,12 +129,23 @@ pub(crate) fn skip_build_dirs(
             || (entry
                 .file_type()
                 .is_some_and(|file_type| file_type.is_dir())
-                && entry.path().join("CACHEDIR.TAG").is_file());
+                && has_cachedir_tag(entry.path()));
         !is_build_dir
             || python_packages
                 .iter()
                 .any(|package| package.starts_with(entry.path()))
     }
+}
+
+/// Signature that a `CACHEDIR.TAG` file starts with
+const CACHEDIR_TAG_SIGNATURE: &[u8] = b"Signature: 8a477f597d28d172789f06886806bc55";
+
+/// Whether the directory has a `CACHEDIR.TAG` file starting with the signature
+fn has_cachedir_tag(dir: &Path) -> bool {
+    let mut signature = [0; CACHEDIR_TAG_SIGNATURE.len()];
+    fs::File::open(dir.join("CACHEDIR.TAG"))
+        .and_then(|mut file| file.read_exact(&mut signature))
+        .is_ok_and(|()| signature == CACHEDIR_TAG_SIGNATURE)
 }
 
 /// Adds the python part of a mixed project to the writer,

@@ -1,6 +1,8 @@
+use crate::module_writer::is_cache_dir;
 use crate::pyproject_toml::Format;
 use crate::{ModuleWriter, PyProjectToml, SDistWriter, VirtualWriter};
 use anyhow::{Context, Result, bail};
+use ignore::WalkBuilder;
 use normpath::PathExt as _;
 use path_slash::PathExt as _;
 use pyproject_toml::check_pep639_glob;
@@ -199,7 +201,10 @@ pub(super) fn add_python_sources(
     }
 
     for package in python_packages {
-        for entry in ignore::Walk::new(package) {
+        for entry in WalkBuilder::new(package)
+            .filter_entry(|entry| !is_cache_dir(entry))
+            .build()
+        {
             let source = entry?.into_path();
             if is_compiled_artifact(&source) {
                 debug!("Ignoring {}", source.display());

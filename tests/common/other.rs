@@ -275,6 +275,7 @@ pub fn check_sdist_mtimes(
 
 fn build_wheel_files(package: impl AsRef<Path>, unique_name: &str) -> Result<ZipArchive<File>> {
     let target_dir = crate::common::shared_target_dir(&package);
+    let _fixture_lock = crate::common::lock_fixture(&package)?;
     build_wheel_files_with_target_dir(package, target_dir, unique_name)
 }
 
@@ -309,11 +310,9 @@ fn build_wheel_files_with_target_dir(
         .strip(Some(false))
         .editable(false)
         .build()?;
-    let fixture_lock = crate::common::lock_fixture(&package)?;
     let wheels = BuildOrchestrator::new(&build_context)
         .build_wheels()
         .context("Failed to build wheels")?;
-    drop(fixture_lock);
     assert!(!wheels.is_empty());
     let wheel_path = &wheels[0].path;
 

@@ -30,6 +30,7 @@ pub fn get_platform_tag(
     universal2: bool,
     pyproject_toml: Option<&PyProjectToml>,
     manifest_path: &Path,
+    is_bin: bool,
 ) -> Result<BTreeSet<String>> {
     if let Ok(host_platform) = env::var("_PYTHON_HOST_PLATFORM") {
         let override_platform = host_platform.replace(['.', '-'], "_");
@@ -163,7 +164,7 @@ pub fn get_platform_tag(
         }
         // Emscripten
         (Os::Emscripten, Arch::Wasm32) => emscripten_platform_tag()?,
-        (Os::Wasi, Arch::Wasm32) => "any".to_string(),
+        (Os::Wasi, Arch::Wasm32) => wasi_platform_tag(is_bin),
         // Cygwin
         (Os::Cygwin, _) => {
             format!(
@@ -388,6 +389,32 @@ fn pep783_emscripten_platform_tag(version: &str) -> String {
     format!("pyemscripten_{version}_wasm32")
 }
 
+/// Resolve the platform tag for `wasm32-wasip1` / `wasm32-wasip2`.
+///
+/// Binary bridges (`bindings = "bin"`) package a `.wasm` binary behind a
+/// wasmtime launcher script, so the wheel runs on any host with wasmtime
+/// installed; it keeps the `any` tag it has used since WASI support was
+/// added in #1107.
+///
+/// Native extension modules (PyO3/cffi/uniffi) are compiled directly to
+/// `.wasm` and are only loadable by a WASI-capable Python build, so `any`
+/// is wrong for them. There is no PEP defining a WASI wheel platform tag
+/// yet (unlike Emscripten's PEP 783), but CPython's `sysconfig.get_platform()`
+/// has no WASI special-case and falls back to `os.uname()`, which on WASI
+/// builds of CPython returns the fixed values `sysname=wasi`,
+/// `release=0.0.0`, `machine=wasm32`. That fallback is reproduced here
+/// directly, rather than queried from the host's `uname`, because
+/// cross-compiling to wasm32-wasip1/wasm32-wasip2 never runs on a WASI
+/// host. This matches the `wasi_0_0_0_wasm32` tag that the wasi-wheels
+/// project already retags built wheels to by hand.
+fn wasi_platform_tag(is_bin: bool) -> String {
+    if is_bin {
+        "any".to_string()
+    } else {
+        "wasi_0_0_0_wasm32".to_string()
+    }
+}
+
 /// Return the first env var in `names` that is set to a non-empty (after
 /// trim) value.
 fn first_non_empty_env(names: &[&str]) -> Option<String> {
@@ -597,12 +624,15 @@ fn aix_tag_from_lslpp_output(stdout: &str) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        aix_tag_from_lslpp_output, emscripten_platform_tag, extract_android_api_level,
-        iphoneos_deployment_target, macosx_deployment_target, pep783_emscripten_platform_tag,
+        Target, aix_tag_from_lslpp_output, emscripten_platform_tag, extract_android_api_level,
+        get_platform_tag, iphoneos_deployment_target, macosx_deployment_target,
+        pep783_emscripten_platform_tag, wasi_platform_tag,
     };
     use pretty_assertions::assert_eq;
+    use std::collections::BTreeSet;
     use std::env;
     use std::ffi::OsString;
+    use std::path::Path;
 
     struct EnvVarRestore {
         vars: Vec<(&'static str, Option<OsString>)>,
@@ -629,6 +659,33 @@ mod tests {
                     }
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_wasi_platform_tag() {
+        assert_eq!(wasi_platform_tag(true), "any");
+        assert_eq!(wasi_platform_tag(false), "wasi_0_0_0_wasm32");
+    }
+
+    #[test]
+    fn test_get_platform_tag_wasi() {
+        for triple in ["wasm32-wasip1", "wasm32-wasip2"] {
+            let target = Target::from_resolved_target_triple(triple).unwrap();
+
+            // `bindings = "bin"` ships a wasmtime launcher and stays host-portable.
+            let bin_tag = get_platform_tag(&target, &[], false, None, Path::new("."), true)
+                .unwrap_or_else(|e| panic!("{triple}: {e}"));
+            assert_eq!(bin_tag, BTreeSet::from(["any".to_string()]), "{triple}");
+
+            // PyO3/cffi/uniffi extension modules need a real WASI tag.
+            let ext_tag = get_platform_tag(&target, &[], false, None, Path::new("."), false)
+                .unwrap_or_else(|e| panic!("{triple}: {e}"));
+            assert_eq!(
+                ext_tag,
+                BTreeSet::from(["wasi_0_0_0_wasm32".to_string()]),
+                "{triple}"
+            );
         }
     }
 

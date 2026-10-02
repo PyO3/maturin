@@ -76,6 +76,7 @@ impl ProjectContext {
             self.universal2,
             self.pyproject_toml.as_ref(),
             &self.manifest_path,
+            self.bridge.is_bin(),
         )
     }
 }

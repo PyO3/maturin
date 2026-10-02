@@ -114,12 +114,14 @@ impl<T: ModuleWriterInternal> ModuleWriter for T {
     }
 }
 
-/// Whether the entry is a cache directory tagged with `CACHEDIR.TAG` (https://bford.info/cachedir/)
-pub(crate) fn is_cache_dir(entry: &ignore::DirEntry) -> bool {
-    entry
-        .file_type()
-        .is_some_and(|file_type| file_type.is_dir())
-        && entry.path().join("CACHEDIR.TAG").is_file()
+/// Whether the entry is the cargo target directory or a cache directory tagged with
+/// `CACHEDIR.TAG` (https://bford.info/cachedir/)
+pub(crate) fn is_build_dir(entry: &ignore::DirEntry, target_dir: Option<&Path>) -> bool {
+    target_dir == Some(entry.path())
+        || (entry
+            .file_type()
+            .is_some_and(|file_type| file_type.is_dir())
+            && entry.path().join("CACHEDIR.TAG").is_file())
 }
 
 /// Adds the python part of a mixed project to the writer,
@@ -152,8 +154,7 @@ pub fn write_python_part(
         .git_global(false)
         .git_exclude(false)
         .filter_entry(move |entry| {
-            let is_build_dir = target_dir.as_deref() == Some(entry.path()) || is_cache_dir(entry);
-            !is_build_dir
+            !is_build_dir(entry, target_dir.as_deref())
                 || packages
                     .iter()
                     .any(|package| package.starts_with(entry.path()))

@@ -115,9 +115,10 @@ impl<T: ModuleWriterInternal> ModuleWriter for T {
     }
 }
 
-/// Filter for [WalkBuilder::filter_entry] that skips the cargo target directory and cache
-/// directories tagged with `CACHEDIR.TAG` (https://bford.info/cachedir/), unless they contain a
-/// python package (#3319)
+/// Returns a filter for [WalkBuilder::filter_entry] that skips the cargo target directory and
+/// cache directories tagged with `CACHEDIR.TAG`, unless they contain a python package (#3319)
+///
+/// See https://bford.info/cachedir/
 pub(crate) fn skip_build_dirs(
     target_dir: &Path,
     python_packages: &[PathBuf],

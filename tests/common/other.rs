@@ -799,8 +799,10 @@ pub fn test_target_dir_in_python_package() -> Result<()> {
     Ok(())
 }
 
-/// Same as [test_target_dir_in_python_package] for sdists. The python package of pyo3-mixed-src is
-/// outside the crate, so `cargo package` doesn't list these files either.
+/// Test that target and cache directories in the python package aren't packaged in sdists. The
+/// python package of pyo3-mixed-src is outside the crate, so `cargo package` doesn't list them.
+///
+/// See https://github.com/PyO3/maturin/issues/3319
 pub fn test_target_dir_in_python_package_sdist() -> Result<()> {
     let temp_dir = tempfile::tempdir()?;
     let project_dir = temp_dir.path().join("pyo3-mixed-src");

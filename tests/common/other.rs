@@ -782,6 +782,16 @@ pub fn test_target_dir_in_python_package() -> Result<()> {
         data_dir.join("CACHEDIR.TAG"),
         "Signature: ffffffffffffffffffffffffffffffff\n",
     )?;
+    // The tag must be a regular file, not a symlink
+    #[cfg(unix)]
+    {
+        let symlink_dir = project_dir.join("bin_with_python_module/symlink");
+        fs_err::create_dir_all(&symlink_dir)?;
+        fs_err::os::unix::fs::symlink(
+            cache_dir.join("CACHEDIR.TAG"),
+            symlink_dir.join("CACHEDIR.TAG"),
+        )?;
+    }
 
     let wheel = build_wheel_files_with_target_dir(
         &project_dir,
@@ -792,13 +802,14 @@ pub fn test_target_dir_in_python_package() -> Result<()> {
         .file_names()
         .filter(|name| name.starts_with("bin_with_python_module/"))
         .collect();
-    assert_eq!(
-        package_files,
-        [
-            "bin_with_python_module/__init__.py",
-            "bin_with_python_module/data/CACHEDIR.TAG",
-        ]
-    );
+    #[allow(unused_mut)]
+    let mut expected = vec![
+        "bin_with_python_module/__init__.py",
+        "bin_with_python_module/data/CACHEDIR.TAG",
+    ];
+    #[cfg(unix)]
+    expected.push("bin_with_python_module/symlink/CACHEDIR.TAG");
+    assert_eq!(package_files, expected);
     Ok(())
 }
 

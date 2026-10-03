@@ -143,8 +143,12 @@ const CACHEDIR_TAG_SIGNATURE: &[u8] = b"Signature: 8a477f597d28d172789f06886806b
 
 /// Whether the directory has a `CACHEDIR.TAG` file starting with the signature
 fn has_cachedir_tag(dir: &Path) -> bool {
+    let tag = dir.join("CACHEDIR.TAG");
+    if !fs::symlink_metadata(&tag).is_ok_and(|metadata| metadata.is_file()) {
+        return false;
+    }
     let mut signature = [0; CACHEDIR_TAG_SIGNATURE.len()];
-    fs::File::open(dir.join("CACHEDIR.TAG"))
+    fs::File::open(&tag)
         .and_then(|mut file| file.read_exact(&mut signature))
         .is_ok_and(|()| signature == CACHEDIR_TAG_SIGNATURE)
 }

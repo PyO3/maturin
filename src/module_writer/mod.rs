@@ -1,4 +1,5 @@
 use std::fmt::Write as _;
+use std::io::Read as _;
 use std::path::Path;
 use std::path::PathBuf;
 
@@ -114,11 +115,50 @@ impl<T: ModuleWriterInternal> ModuleWriter for T {
     }
 }
 
+/// Returns a filter for [WalkBuilder::filter_entry] that skips the cargo target directory and
+/// cache directories tagged with `CACHEDIR.TAG`, unless they contain a python package (#3319)
+///
+/// See https://bford.info/cachedir/
+pub(crate) fn skip_build_dirs(
+    target_dir: &Path,
+    python_packages: &[PathBuf],
+) -> impl Fn(&ignore::DirEntry) -> bool + Send + Sync + 'static {
+    let target_dir = target_dir.normalize().ok().map(|dir| dir.into_path_buf());
+    let python_packages = python_packages.to_vec();
+    move |entry| {
+        let is_build_dir = target_dir.as_deref() == Some(entry.path())
+            || (entry
+                .file_type()
+                .is_some_and(|file_type| file_type.is_dir())
+                && has_cachedir_tag(entry.path()));
+        !is_build_dir
+            || python_packages
+                .iter()
+                .any(|package| package.starts_with(entry.path()))
+    }
+}
+
+/// Signature that a `CACHEDIR.TAG` file starts with
+const CACHEDIR_TAG_SIGNATURE: &[u8] = b"Signature: 8a477f597d28d172789f06886806bc55";
+
+/// Whether the directory has a `CACHEDIR.TAG` file starting with the signature
+fn has_cachedir_tag(dir: &Path) -> bool {
+    let tag = dir.join("CACHEDIR.TAG");
+    if !fs::symlink_metadata(&tag).is_ok_and(|metadata| metadata.is_file()) {
+        return false;
+    }
+    let mut signature = [0; CACHEDIR_TAG_SIGNATURE.len()];
+    fs::File::open(&tag)
+        .and_then(|mut file| file.read_exact(&mut signature))
+        .is_ok_and(|()| signature == CACHEDIR_TAG_SIGNATURE)
+}
+
 /// Adds the python part of a mixed project to the writer,
 pub fn write_python_part(
     writer: &mut VirtualWriter<WheelWriter>,
     project_layout: &ProjectLayout,
     pyproject_toml: Option<&PyProjectToml>,
+    target_dir: &Path,
 ) -> Result<()> {
     let python_dir = &project_layout.python_dir;
     let mut python_packages = Vec::new();
@@ -138,6 +178,7 @@ pub fn write_python_part(
         .parents(false)
         .git_global(false)
         .git_exclude(false)
+        .filter_entry(skip_build_dirs(target_dir, &python_packages))
         .build()
     {
         let absolute = match absolute {

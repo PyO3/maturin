@@ -386,6 +386,7 @@ where
             writer,
             &context.project.project_layout,
             context.project.pyproject_toml.as_ref(),
+            &context.project.target_dir,
         )
         .context("Failed to add the python module to the package")?;
     }

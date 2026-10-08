@@ -1057,6 +1057,11 @@ fn pyo3_mixed_src_layout_sdist() {
 }
 
 #[test]
+fn target_dir_in_python_package_sdist() {
+    handle_result(other::test_target_dir_in_python_package_sdist())
+}
+
+#[test]
 fn pyo3_mixed_include_exclude_sdist() {
     run_sdist_case(
         SdistCase {

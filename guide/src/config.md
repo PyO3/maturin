@@ -95,6 +95,8 @@ use-base-python = false
 # virtualenv with the instrumented wheel installed.
 # Example: "python -m pytest tests/benchmarks"
 pgo-command = "python -m pytest tests/benchmarks"
+# Dependency group installed before the PGO training command (defaults to "dev")
+pgo-dependency-group = "testing-extra"
 # Select which Cargo compile targets to build when the crate defines more than
 # one matching target. Each entry is an object with a required `name` (as in
 # Cargo.toml) and an optional `kind` (`bin`, `cdylib`, `dylib`, `lib`, `rlib`,
@@ -158,6 +160,25 @@ pgo-command = "python -m pytest tests/benchmarks"
 
 See the `--pgo` option under [Build](./distribution.md) for the overall
 three-phase flow.
+
+#### `pgo-dependency-group`
+
+Dependency group installed into the temporary PGO virtualenv before running
+`pgo-command`. It defaults to `dev`. Set it when the training workload uses
+a different PEP 735 dependency group:
+
+```toml
+[dependency-groups]
+testing-extra = ["pytest", "pytest-benchmark"]
+
+[tool.maturin]
+pgo-dependency-group = "testing-extra"
+```
+
+When uv is available, maturin exports the selected group before installing it
+so versions from the uv lockfile are respected without replacing the temporary
+PGO environment. Otherwise maturin installs the group with pip's `--group`
+support.
 
 #### `generate-ci`
 

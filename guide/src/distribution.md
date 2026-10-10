@@ -259,6 +259,8 @@ Then pass `--zig` to maturin `build` or `publish` commands to use it, for exampl
 maturin build --release --target aarch64-unknown-linux-gnu --zig
 ```
 
+For macOS targets, maturin passes the deployment target to zig. It uses the same version as the wheel tag: `MACOSX_DEPLOYMENT_TARGET`, or `macos-deployment-target` from `pyproject.toml`, or rustc's default.
+
 ### Cross-compile to Windows
 
 Pyo3 0.16.5 added an experimental feature `generate-import-lib` enables the user to cross compile

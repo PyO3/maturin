@@ -17,6 +17,7 @@ use pep440_rs::{Version, VersionSpecifiers};
 use regex::Regex;
 use serde::Deserialize;
 use std::collections::HashSet;
+use std::env;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -301,7 +302,7 @@ pub(super) fn check_executable(
     target: &Target,
     bridge: &BridgeModel,
 ) -> Result<Option<PythonInterpreter>> {
-    let output = Command::new(executable.as_ref())
+    let output = python_command(executable.as_ref())
         .env("PYTHONNOUSERSITE", "1")
         .args(["-c", GET_INTERPRETER_METADATA])
         .output();
@@ -391,6 +392,33 @@ pub(super) fn check_executable(
         .context(String::from_utf8_lossy(&output.stdout).trim().to_string())?;
 
     from_metadata_message(executable, target, bridge, message)
+}
+
+/// Creates a `Command` that runs a Python interpreter given by path or by name.
+///
+/// On Windows, `Command` appends `.exe` only when the program name has no
+/// extension, so a versioned name such as `pypy3.11` or `python3.14t` (whose
+/// "extension" is `.11` or `.14t`) is never found on `PATH`. Look up
+/// `<name>.exe` on `PATH` for such names instead.
+pub(crate) fn python_command(executable: impl AsRef<Path>) -> Command {
+    let executable = executable.as_ref();
+    if cfg!(windows)
+        && executable.parent() == Some(Path::new(""))
+        && executable
+            .extension()
+            .is_some_and(|ext| !ext.eq_ignore_ascii_case("exe"))
+    {
+        let mut name = executable.as_os_str().to_owned();
+        name.push(".exe");
+        let paths = env::var_os("PATH").unwrap_or_default();
+        if let Some(path) = env::split_paths(&paths)
+            .map(|dir| dir.join(&name))
+            .find(|path| path.is_file())
+        {
+            return Command::new(path);
+        }
+    }
+    Command::new(executable)
 }
 
 /// Look up Python interpreters for a given target from maturin's bundled sysconfig data.

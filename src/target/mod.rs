@@ -3,6 +3,7 @@ use crate::build_options::TargetTriple;
 use crate::cross_compile::is_cross_compiling;
 use crate::python_interpreter::InterpreterKind;
 use crate::python_interpreter::InterpreterKind::{CPython, GraalPy, PyPy};
+use crate::python_interpreter::python_command;
 use crate::{PlatformTag, PythonInterpreter};
 use anyhow::{Result, anyhow, bail, format_err};
 use platform_info::*;
@@ -12,7 +13,6 @@ use std::env;
 use std::fmt;
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
 use std::str;
 use std::str::FromStr;
 use target_lexicon::{Architecture, Environment, Triple};
@@ -843,7 +843,7 @@ fn rustc_version_meta() -> Result<VersionMeta> {
 }
 
 pub(crate) fn detect_arch_from_python(python: &PathBuf, target: &Target) -> Option<TargetTriple> {
-    match Command::new(python)
+    match python_command(python)
         .arg("-c")
         .arg("import sysconfig; print(sysconfig.get_platform(), end='')")
         .output()
@@ -871,7 +871,7 @@ pub(crate) fn detect_arch_from_python(python: &PathBuf, target: &Target) -> Opti
 }
 
 pub(crate) fn detect_target_from_cross_python(python: &PathBuf) -> Option<TargetTriple> {
-    match Command::new(python)
+    match python_command(python)
         .arg("-c")
         .arg("import sys, sysconfig; print(sysconfig.get_platform(), end='') if getattr(sys, 'cross_compiling', False) else ''")
         .output()

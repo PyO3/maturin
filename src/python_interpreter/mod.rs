@@ -17,6 +17,7 @@ mod config;
 mod discovery;
 mod resolver;
 
+pub(crate) use self::discovery::python_command;
 pub(crate) use self::resolver::InterpreterResolver;
 
 /// Minimum supported CPython minor version.

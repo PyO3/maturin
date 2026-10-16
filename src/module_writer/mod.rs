@@ -10,7 +10,7 @@ use fs_err as fs;
 use ignore::WalkBuilder;
 use indexmap::IndexMap;
 use normpath::PathExt as _;
-use tracing::{debug, trace};
+use tracing::{debug, warn};
 
 use crate::Metadata24;
 use crate::PyProjectToml;
@@ -20,6 +20,7 @@ use crate::archive_source::GeneratedSourceData;
 use crate::project_layout::ProjectLayout;
 use crate::pyproject_toml::Format;
 use crate::target::WheelTag;
+use crate::util::{is_symlink_loop_error, is_symlink_within_boundary, symlink_boundary};
 
 pub(crate) mod glob;
 #[cfg(test)]
@@ -173,49 +174,45 @@ pub fn write_python_part(
         python_packages.push(package_path);
     }
 
-    for absolute in WalkBuilder::new(&project_layout.project_root)
-        .hidden(false)
-        .parents(false)
-        .git_global(false)
-        .git_exclude(false)
-        .filter_entry(skip_build_dirs(target_dir, &python_packages))
-        .build()
-    {
-        let absolute = match absolute {
-            Ok(entry) => entry.into_path(),
-            Err(err) => {
-                // Skip errors for paths that don't need to be included, e.g. for directories
-                // that we don't have permissions for.
-                if let ignore::Error::WithPath { path, .. } = &err
-                    && !python_packages.iter().any(|pkg| path.starts_with(pkg))
-                {
-                    // Log priority logging, we're only looking at the directory at all due to
-                    // a particularity in how we're doing path traversal.
-                    trace!(
-                        "Skipping inaccessible path {} due to read error: {err}",
-                        path.display()
-                    );
+    // Walk each python package directly so `follow_links(true)` only applies inside packages.
+    let boundary = symlink_boundary(&project_layout.project_root)?;
+    for package in &python_packages {
+        let skip_build_dirs = skip_build_dirs(target_dir, &python_packages);
+        let boundary = boundary.clone();
+        for absolute in WalkBuilder::new(package)
+            .hidden(false)
+            .parents(false)
+            .git_global(false)
+            .git_exclude(false)
+            .follow_links(true)
+            .filter_entry(move |entry| {
+                skip_build_dirs(entry) && is_symlink_within_boundary(entry, &boundary)
+            })
+            .build()
+        {
+            let absolute = match absolute {
+                Ok(entry) => entry.into_path(),
+                Err(err) => {
+                    if is_symlink_loop_error(&err) {
+                        warn!(
+                            "Skipping symlink loop in Python package source tree while building wheel: {err}"
+                        );
+                        continue;
+                    }
+                    return Err(err.into());
+                }
+            };
+            let relative = absolute.strip_prefix(python_dir).unwrap();
+            if !absolute.is_dir() {
+                if is_develop_build_artifact(relative, &project_layout.extension_name) {
+                    debug!("Ignoring develop build artifact {}", relative.display());
                     continue;
                 }
-                return Err(err.into());
+                let mode = file_permission_mode(&absolute)?;
+                writer
+                    .add_file(relative, &absolute, permission_is_executable(mode))
+                    .context(format!("Failed to add file from {}", absolute.display()))?;
             }
-        };
-        if !python_packages
-            .iter()
-            .any(|path| absolute.starts_with(path))
-        {
-            continue;
-        }
-        let relative = absolute.strip_prefix(python_dir).unwrap();
-        if !absolute.is_dir() {
-            if is_develop_build_artifact(relative, &project_layout.extension_name) {
-                debug!("Ignoring develop build artifact {}", relative.display());
-                continue;
-            }
-            let mode = file_permission_mode(&absolute)?;
-            writer
-                .add_file(relative, &absolute, permission_is_executable(mode))
-                .context(format!("Failed to add file from {}", absolute.display()))?;
         }
     }
 

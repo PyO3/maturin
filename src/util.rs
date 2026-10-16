@@ -1,9 +1,51 @@
 use sha2::{Digest, Sha256};
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use zip::DateTime;
 
 use fs_err as fs;
+
+/// The directory symlinked Python package directories may resolve into: the enclosing
+/// git worktree, or `project_root` itself when it isn't inside a git repository.
+pub(crate) fn symlink_boundary(project_root: &Path) -> io::Result<PathBuf> {
+    let root = fs::canonicalize(project_root)?;
+    Ok(root
+        .ancestors()
+        .find(|dir| dir.join(".git").exists())
+        .unwrap_or(&root)
+        .to_path_buf())
+}
+
+/// Walker filter that skips symlinked directories resolving outside `boundary`, so following
+/// links can't pull unrelated trees into the archive.
+pub(crate) fn is_symlink_within_boundary(entry: &ignore::DirEntry, boundary: &Path) -> bool {
+    if entry.depth() == 0 || !entry.path_is_symlink() || !entry.path().is_dir() {
+        return true;
+    }
+    match fs::canonicalize(entry.path()) {
+        Ok(target) if !target.starts_with(boundary) => {
+            eprintln!(
+                "⚠️  Warning: Skipping symlinked directory {} because its target {} is outside {}",
+                entry.path().display(),
+                target.display(),
+                boundary.display()
+            );
+            false
+        }
+        _ => true,
+    }
+}
+
+pub(crate) fn is_symlink_loop_error(error: &ignore::Error) -> bool {
+    match error {
+        ignore::Error::Loop { .. } => true,
+        ignore::Error::Partial(errors) => errors.iter().any(is_symlink_loop_error),
+        ignore::Error::WithLineNumber { err, .. }
+        | ignore::Error::WithPath { err, .. }
+        | ignore::Error::WithDepth { err, .. } => is_symlink_loop_error(err),
+        _ => false,
+    }
+}
 
 pub(crate) fn sha256_hex(hash: &[u8]) -> String {
     use std::fmt::Write;

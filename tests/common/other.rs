@@ -47,6 +47,46 @@ pub fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+#[cfg(unix)]
+pub fn copy_pyo3_mixed_py_subdir_with_symlinks() -> Result<(tempfile::TempDir, PathBuf)> {
+    use std::os::unix::fs::symlink;
+
+    let temp_dir = tempfile::tempdir()?;
+    // Mimic a monorepo: shared sources live next to the project in the same git repository.
+    let repo_dir = temp_dir.path().join("repo");
+    let project_dir = repo_dir.join("pyo3-mixed-py-subdir");
+    copy_dir_recursive(Path::new("test-crates/pyo3-mixed-py-subdir"), &project_dir)?;
+    let status = Command::new("git")
+        .args(["init", "-q"])
+        .current_dir(&repo_dir)
+        .status()?;
+    anyhow::ensure!(status.success(), "git init failed");
+
+    let shared_sources = repo_dir.join("shared-python");
+    let linked_dir = shared_sources.join("linked_dir");
+    fs_err::create_dir_all(&linked_dir)?;
+    fs_err::write(shared_sources.join("linked_file.py"), "VALUE = 1\n")?;
+    fs_err::write(linked_dir.join("nested.py"), "VALUE = 2\n")?;
+    symlink(&linked_dir, linked_dir.join("cycle"))?;
+
+    let outside_dir = temp_dir.path().join("outside-python");
+    fs_err::create_dir_all(&outside_dir)?;
+    fs_err::write(outside_dir.join("outside.py"), "VALUE = 3\n")?;
+
+    let package_dir = project_dir
+        .join("python")
+        .join("pyo3_mixed_py_subdir")
+        .join("python_module");
+    symlink(
+        shared_sources.join("linked_file.py"),
+        package_dir.join("linked_file.py"),
+    )?;
+    symlink(&linked_dir, package_dir.join("linked_dir"))?;
+    symlink(&outside_dir, package_dir.join("outside_dir"))?;
+
+    Ok((temp_dir, project_dir))
+}
+
 /// Tries to compile a sample crate (pyo3-pure) for musl,
 /// given that rustup and the the musl target are installed
 ///

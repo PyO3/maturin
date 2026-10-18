@@ -78,6 +78,15 @@ ignore = [
     # paste unmaintained
     "RUSTSEC-2024-0436",
     { id = "RUSTSEC-2026-0344", reason = "ruzstd 0.8 comes in through object 0.38, which arwen pins, so the fixed 0.9.1 is out of reach until arwen updates object. maturin only uses arwen to rewrite the Mach-O load commands of libraries it is repairing, not to decompress untrusted zstd data" },
+    # zip >=9 fixes these. python-pkginfo 0.6.8 requires zip <9 and xwin 0.10.0
+    # requires zip ^8, so 8.5.1 stays until those crates allow zip 9.
+    # The advisories are in ZipArchive::extract / ZipStreamReader::extract.
+    # maturin writes wheels and reads entries by name, python-pkginfo reads
+    # metadata with ZipArchive::by_name, and xwin copies VSIX members with
+    # ZipArchive::by_index. None of them call the affected extract APIs.
+    { id = "RUSTSEC-2026-0367", reason = "zip >=9 is unreachable: python-pkginfo 0.6.8 caps zip at <9 and xwin 0.10.0 requires ^8. Callers write archives or read entries by name/index; they do not call ZipArchive::extract or ZipStreamReader::extract" },
+    { id = "RUSTSEC-2026-0368", reason = "zip >=9 is unreachable: python-pkginfo 0.6.8 caps zip at <9 and xwin 0.10.0 requires ^8. Callers write archives or read entries by name/index; they do not call ZipArchive::extract or ZipStreamReader::extract" },
+    { id = "RUSTSEC-2026-0369", reason = "zip >=9 is unreachable: python-pkginfo 0.6.8 caps zip at <9 and xwin 0.10.0 requires ^8. Callers write archives or read entries by name/index; they do not call ZipArchive::extract or ZipStreamReader::extract" },
     #{ id = "RUSTSEC-0000-0000", reason = "you can specify a reason the advisory is ignored" },
     #"a-crate-that-is-yanked@0.1.1", # you can also ignore yanked crate versions if you wish
     #{ crate = "a-crate-that-is-yanked@0.1.1", reason = "you can specify why you are ignoring the yanked crate" },

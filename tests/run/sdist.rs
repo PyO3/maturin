@@ -1,8 +1,10 @@
 use crate::common::{handle_result, other};
-use expect_test::expect;
+use expect_test::{Expect, expect};
 use indoc::indoc;
 use maturin::pyproject_toml::SdistGenerator;
 use maturin::{BuildOptions, BuildOrchestrator, CargoOptions, OutputOptions, unpack_sdist};
+use std::collections::BTreeSet;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use url::Url;
@@ -403,6 +405,125 @@ fn sdist_workspace_member_readme_in_parent() {
         )),
         "sdist-workspace-member-readme-in-parent",
     ))
+}
+
+/// Build an sdist and check that every `License-File` in `PKG-INFO` exists at
+/// that path relative to the sdist root, as PyPI requires.
+fn assert_sdist_license_files(project_dir: &Path, unique_name: &str, expected_files: Expect) {
+    let mut archive =
+        other::build_source_distribution(project_dir, SdistGenerator::Cargo, unique_name).unwrap();
+    let mut files = BTreeSet::new();
+    let mut pkg_info = String::new();
+    for entry in archive.entries().unwrap() {
+        let mut entry = entry.unwrap();
+        let path = entry.path().unwrap().display().to_string();
+        if path.ends_with("/PKG-INFO") {
+            entry.read_to_string(&mut pkg_info).unwrap();
+        }
+        files.insert(path);
+    }
+    expected_files.assert_debug_eq(&files);
+
+    let root_dir = files.first().unwrap().split('/').next().unwrap();
+    let license_files: Vec<_> = pkg_info
+        .lines()
+        .filter_map(|line| line.strip_prefix("License-File: "))
+        .collect();
+    assert!(!license_files.is_empty(), "no License-File in PKG-INFO");
+    for license_file in license_files {
+        assert!(
+            files.contains(&format!("{root_dir}/{license_file}")),
+            "`License-File: {license_file}` is missing from the sdist: {files:?}"
+        );
+    }
+}
+
+/// Regression test for https://github.com/PyO3/maturin/issues/3327: license
+/// files that are not listed in `project.license-files` must also be placed at
+/// the sdist root when the crate is not at the sdist root.
+#[test]
+fn sdist_auto_discovered_license_files_at_sdist_root() {
+    // A workspace member with `license-files` in `project.dynamic`, like
+    // `pyo3-introspection`.
+    let temp_dir = tempfile::tempdir().unwrap();
+    let project_dir = write_workspace_bin_project(
+        temp_dir.path(),
+        "python-pkg",
+        r#"dynamic = ["license-files"]"#,
+    );
+    fs_err::write(project_dir.join("LICENSE-APACHE"), "Apache-2.0\n").unwrap();
+    fs_err::write(project_dir.join("LICENSE-MIT"), "MIT\n").unwrap();
+    assert_sdist_license_files(
+        &project_dir,
+        "sdist-workspace-member-auto-license-files",
+        expect![[r#"
+            {
+                "python_pkg-0.1.0/Cargo.lock",
+                "python_pkg-0.1.0/Cargo.toml",
+                "python_pkg-0.1.0/LICENSE-APACHE",
+                "python_pkg-0.1.0/LICENSE-MIT",
+                "python_pkg-0.1.0/PKG-INFO",
+                "python_pkg-0.1.0/pyproject.toml",
+                "python_pkg-0.1.0/python-pkg/Cargo.toml",
+                "python_pkg-0.1.0/python-pkg/LICENSE-APACHE",
+                "python_pkg-0.1.0/python-pkg/LICENSE-MIT",
+                "python_pkg-0.1.0/python-pkg/src/main.rs",
+            }
+        "#]],
+    );
+
+    // `pyproject.toml` next to the license, with the crate in a subdirectory.
+    let temp_dir = tempfile::tempdir().unwrap();
+    let project_dir = temp_dir.path();
+    let crate_dir = project_dir.join("rust");
+    fs_err::create_dir_all(crate_dir.join("src")).unwrap();
+    fs_err::write(crate_dir.join("src/main.rs"), "fn main() {}\n").unwrap();
+    fs_err::write(
+        crate_dir.join("Cargo.toml"),
+        indoc!(
+            r#"
+            [package]
+            name = "python-pkg"
+            version = "0.1.0"
+            edition = "2021"
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        project_dir.join("pyproject.toml"),
+        indoc!(
+            r#"
+            [project]
+            name = "python-pkg"
+            version = "0.1.0"
+
+            [build-system]
+            requires = ["maturin>=1.0,<2.0"]
+            build-backend = "maturin"
+
+            [tool.maturin]
+            bindings = "bin"
+            manifest-path = "rust/Cargo.toml"
+            "#
+        ),
+    )
+    .unwrap();
+    fs_err::write(project_dir.join("LICENSE"), "MIT\n").unwrap();
+    assert_sdist_license_files(
+        &crate_dir,
+        "sdist-manifest-path-auto-license-files",
+        expect![[r#"
+            {
+                "python_pkg-0.1.0/LICENSE",
+                "python_pkg-0.1.0/PKG-INFO",
+                "python_pkg-0.1.0/pyproject.toml",
+                "python_pkg-0.1.0/rust/Cargo.lock",
+                "python_pkg-0.1.0/rust/Cargo.toml",
+                "python_pkg-0.1.0/rust/src/main.rs",
+            }
+        "#]],
+    );
 }
 
 #[test]

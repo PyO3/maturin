@@ -5,7 +5,7 @@ mod unpack;
 mod utils;
 
 use crate::pyproject_toml::SdistGenerator;
-use crate::{ModuleWriter, PyProjectToml, SDistWriter, VirtualWriter};
+use crate::{Metadata24, ModuleWriter, PyProjectToml, SDistWriter, VirtualWriter};
 use anyhow::{Context, Result, bail};
 use cargo_metadata::camino::{self, Utf8Path};
 use ignore::overrides::Override;
@@ -887,6 +887,52 @@ fn add_cargo_package_files_to_sdist(
     Ok(())
 }
 
+/// Add every license file recorded in `PKG-INFO` at its `License-File` path.
+///
+/// `License-File` paths are relative to the sdist root. Explicit
+/// `project.license-files` are already copied there by
+/// [`add_pyproject_metadata`], but auto-discovered license files and Cargo's
+/// `license-file` are only packaged next to their crate, which is not the sdist
+/// root when `pyproject.toml` is moved up, e.g. for a cargo workspace member.
+///
+/// A file already present at the target path is kept, since replacing it could
+/// break the crate it was packaged for; we only warn if its content differs.
+fn add_license_files(
+    writer: &mut VirtualWriter<SDistWriter>,
+    metadata24: &Metadata24,
+    pyproject_dir: &Path,
+    root_dir: &Path,
+) -> Result<()> {
+    for path in &metadata24.license_files {
+        let target = root_dir.join(path);
+        let source = metadata24
+            .license_file_sources
+            .get(path)
+            .cloned()
+            .unwrap_or_else(|| pyproject_dir.join(path));
+        if writer.contains_target(&target) {
+            if let Some(existing) = writer.target_source(&target)
+                && !matches!(
+                    (fs_err::read(existing), fs_err::read(&source)),
+                    (Ok(a), Ok(b)) if a == b
+                )
+            {
+                eprintln!(
+                    "⚠️  Warning: `License-File: {}` in the source distribution refers to `{}` \
+                    instead of `{}`, because a different file was already added at that path",
+                    path.display(),
+                    existing.display(),
+                    source.display()
+                );
+            }
+            continue;
+        }
+        debug!("Including license file `{}`", path.display());
+        writer.add_file(target, source, false)?;
+    }
+    Ok(())
+}
+
 /// Creates a source distribution, packing the root crate and all local dependencies
 ///
 /// The source distribution format is specified in
@@ -954,6 +1000,7 @@ pub fn source_distribution(
         &root_dir,
         &project.project_layout.python_dir,
     )?;
+    add_license_files(&mut writer, metadata24, pyproject_dir, &root_dir)?;
 
     let pkg_info = root_dir.join("PKG-INFO");
     writer.add_bytes(

@@ -64,7 +64,7 @@ When the `[project]` section is not present, maturin will populate metadata from
 
 * `name` - From `package.name` in Cargo.toml
 * `version` - From `package.version` in Cargo.toml (converted from SemVer to PEP 440 format)
-* `summary` - From `package.description` in Cargo.toml
+* `summary` - From `package.description` in Cargo.toml, with line breaks joined into one line
 * `description` - From the contents of the README file specified in Cargo.toml's `package.readme`
 * `description_content_type` - Set based on the README file extension (e.g. `text/markdown` for `.md` files)
 * `keywords` - From `package.keywords` in Cargo.toml, joined with commas

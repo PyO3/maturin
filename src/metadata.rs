@@ -494,15 +494,19 @@ impl Metadata24 {
     fn merge_optional_dependencies(&mut self, project: &pyproject_toml::Project) -> Result<()> {
         if let Some(dependencies) = &project.optional_dependencies {
             for (extra, deps) in dependencies {
-                self.provides_extra.push(extra.clone());
+                let extra_name = ExtraName::new(extra.clone())
+                    .with_context(|| format!("invalid extra name: {extra}"))?;
+                // Metadata 2.3+ only allows normalized names in `Provides-Extra`
+                // (PEP 685), the same form the `extra == ...` markers use.
+                let normalized = extra_name.to_string();
+                if !self.provides_extra.contains(&normalized) {
+                    self.provides_extra.push(normalized);
+                }
                 for dep in deps {
                     let mut dep = dep.clone();
                     let new_extra = MarkerExpression::Extra {
                         operator: ExtraOperator::Equal,
-                        name: MarkerValueExtra::Extra(
-                            ExtraName::new(extra.clone())
-                                .with_context(|| format!("invalid extra name: {extra}"))?,
-                        ),
+                        name: MarkerValueExtra::Extra(extra_name.clone()),
                     };
                     dep.marker.and(MarkerTree::expression(new_extra));
                     self.requires_dist.push(dep);
@@ -1176,6 +1180,65 @@ A test project
         assert_eq!(metadata.license_files[1], PathBuf::from("LICENSE"));
         assert_eq!(metadata.license_files[2], PathBuf::from("NOTICE.md"));
         assert_eq!(metadata.license_files[3], PathBuf::from("AUTHORS.txt"));
+    }
+
+    #[test]
+    fn test_provides_extra_is_normalized() {
+        let temp_dir = TempDir::new().unwrap();
+        let crate_path = temp_dir.path();
+        let manifest_path = crate_path.join("Cargo.toml");
+        let pyproject_path = crate_path.join("pyproject.toml");
+
+        fs::create_dir(crate_path.join("src")).unwrap();
+        fs::write(crate_path.join("src/lib.rs"), "").unwrap();
+        let cargo_toml = indoc!(
+            r#"
+            [package]
+            name = "test-package"
+            version = "0.1.0"
+
+            [lib]
+            crate-type = ["cdylib"]
+            "#
+        );
+        fs::write(&manifest_path, cargo_toml).unwrap();
+        let pyproject_toml_content = indoc!(
+            r#"
+            [build-system]
+            requires = ["maturin>=1.0,<2.0"]
+            build-backend = "maturin"
+
+            [project]
+            name = "test-package"
+            version = "0.1.0"
+
+            [project.optional-dependencies]
+            Dev_Tools = ["attrs"]
+            "dev.tools" = ["boltons"]
+            "#
+        );
+        fs::write(&pyproject_path, pyproject_toml_content).unwrap();
+
+        let cargo_metadata = MetadataCommand::new()
+            .manifest_path(&manifest_path)
+            .exec()
+            .unwrap();
+        let mut metadata = Metadata24::from_cargo_toml(crate_path, &cargo_metadata).unwrap();
+        let pyproject_toml = PyProjectToml::new(&pyproject_path).unwrap();
+        metadata
+            .merge_pyproject_toml(crate_path, &pyproject_toml)
+            .unwrap();
+
+        // Metadata 2.3+ requires normalized extra names (PEP 685), and they
+        // have to match the names used in the `extra == ...` markers.
+        assert_eq!(metadata.provides_extra, &["dev-tools"]);
+        assert_eq!(
+            metadata.requires_dist,
+            &[
+                Requirement::from_str("attrs; extra == 'dev-tools'").unwrap(),
+                Requirement::from_str("boltons; extra == 'dev-tools'").unwrap(),
+            ]
+        );
     }
 
     #[test]

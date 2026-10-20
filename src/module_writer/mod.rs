@@ -174,45 +174,55 @@ pub fn write_python_part(
         python_packages.push(package_path);
     }
 
-    // Walk each python package directly so `follow_links(true)` only applies inside packages.
+    // Walk from the project root so its `.gitignore` applies; prune non-package dirs.
     let boundary = symlink_boundary(&project_layout.project_root)?;
-    for package in &python_packages {
-        let skip_build_dirs = skip_build_dirs(target_dir, &python_packages);
-        let boundary = boundary.clone();
-        for absolute in WalkBuilder::new(package)
-            .hidden(false)
-            .parents(false)
-            .git_global(false)
-            .git_exclude(false)
-            .follow_links(true)
-            .filter_entry(move |entry| {
-                skip_build_dirs(entry) && is_symlink_within_boundary(entry, &boundary)
-            })
-            .build()
-        {
-            let absolute = match absolute {
-                Ok(entry) => entry.into_path(),
-                Err(err) => {
-                    if is_symlink_loop_error(&err) {
-                        warn!(
-                            "Skipping symlink loop in Python package source tree while building wheel: {err}"
-                        );
-                        continue;
-                    }
-                    return Err(err.into());
-                }
-            };
-            let relative = absolute.strip_prefix(python_dir).unwrap();
-            if !absolute.is_dir() {
-                if is_develop_build_artifact(relative, &project_layout.extension_name) {
-                    debug!("Ignoring develop build artifact {}", relative.display());
+    let skip_build_dirs = skip_build_dirs(target_dir, &python_packages);
+    let packages = python_packages.clone();
+    for absolute in WalkBuilder::new(&project_layout.project_root)
+        .hidden(false)
+        .parents(false)
+        .git_global(false)
+        .git_exclude(false)
+        .follow_links(true)
+        .filter_entry(move |entry| {
+            let path = entry.path();
+            entry.depth() == 0
+                || (packages
+                    .iter()
+                    .any(|pkg| pkg.starts_with(path) || path.starts_with(pkg))
+                    && skip_build_dirs(entry)
+                    && is_symlink_within_boundary(entry, &boundary))
+        })
+        .build()
+    {
+        let absolute = match absolute {
+            Ok(entry) => entry.into_path(),
+            Err(err) => {
+                if is_symlink_loop_error(&err) {
+                    warn!(
+                        "Skipping symlink loop in Python package source tree while building wheel: {err}"
+                    );
                     continue;
                 }
-                let mode = file_permission_mode(&absolute)?;
-                writer
-                    .add_file(relative, &absolute, permission_is_executable(mode))
-                    .context(format!("Failed to add file from {}", absolute.display()))?;
+                return Err(err.into());
             }
+        };
+        if !python_packages
+            .iter()
+            .any(|path| absolute.starts_with(path))
+        {
+            continue;
+        }
+        let relative = absolute.strip_prefix(python_dir).unwrap();
+        if !absolute.is_dir() {
+            if is_develop_build_artifact(relative, &project_layout.extension_name) {
+                debug!("Ignoring develop build artifact {}", relative.display());
+                continue;
+            }
+            let mode = file_permission_mode(&absolute)?;
+            writer
+                .add_file(relative, &absolute, permission_is_executable(mode))
+                .context(format!("Failed to add file from {}", absolute.display()))?;
         }
     }
 

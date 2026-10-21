@@ -425,10 +425,7 @@ fn pytest_chdir_prefix(cli: &GenerateCI) -> String {
 }
 
 fn emit_upload_wheels_step(y: &mut Yaml, platform: Platform) {
-    let artifact_name = match platform {
-        Platform::Emscripten => "wasm-wheels".to_string(),
-        _ => format!("wheels-{platform}-{}", gha_expr("matrix.platform.target")),
-    };
+    let artifact_name = format!("wheels-{platform}-{}", gha_expr("matrix.platform.target"));
 
     y.line("- name: Upload wheels")
         .indent()
@@ -514,12 +511,6 @@ fn emit_release_steps(y: &mut Yaml, resolved: &ResolvedCIConfig) {
         emit_release_attestation_step(y);
     }
     emit_release_publish_steps(y, resolved);
-    if resolved
-        .platform_targets
-        .contains_key(&Platform::Emscripten)
-    {
-        emit_release_github_upload_step(y);
-    }
 }
 
 fn emit_release_attestation_step(y: &mut Yaml) {
@@ -561,22 +552,6 @@ fn emit_release_publish_steps(y: &mut Yaml, resolved: &ResolvedCIConfig) {
         ));
         y.dedent_by(2);
     }
-}
-
-fn emit_release_github_upload_step(y: &mut Yaml) {
-    y.line("- name: Upload to GitHub Release");
-    y.indent();
-    y.line("uses: softprops/action-gh-release@v1");
-    y.line("with:");
-    y.indent();
-    y.line("files: |");
-    y.indent();
-    y.line("wasm-wheels/*.whl");
-    y.dedent();
-    y.line(format!(
-        "prerelease: {}",
-        gha_expr("contains(github.ref, 'alpha') || contains(github.ref, 'beta')")
-    ));
 }
 
 /// Wrap a bare expression in `${{ ... }}` for use as a YAML value.

@@ -29,6 +29,7 @@ jobs:
         run: |
           echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV
           echo PYTHON_VERSION=$(pyodide config get python_version | cut -d '.' -f 1-2) >> $GITHUB_ENV
+          echo RUST_TOOLCHAIN=$(pyodide config get rust_toolchain) >> $GITHUB_ENV
           if v=$(pyodide config get pyemscripten_platform_version 2>/dev/null); then echo PYEMSCRIPTEN_PLATFORM_VERSION=$v >> $GITHUB_ENV; elif v=$(pyodide config get pyodide_abi_version 2>/dev/null); then echo PYODIDE_ABI_VERSION=$v >> $GITHUB_ENV; fi
           pip uninstall -y pyodide-build
       - uses: emscripten-core/setup-emsdk@v16
@@ -45,7 +46,7 @@ jobs:
           target: ${{ matrix.platform.target }}
           args: --release --out dist -i ${{ env.PYTHON_VERSION }}
           sccache: ${{ !startsWith(github.ref, 'refs/tags/') }}
-          rust-toolchain: nightly
+          rust-toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Upload wheels
         uses: actions/upload-artifact@v6
         with:

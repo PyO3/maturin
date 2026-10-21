@@ -284,6 +284,7 @@ fn emit_emscripten_setup(y: &mut Yaml) {
         .indent();
     y.line("echo EMSCRIPTEN_VERSION=$(pyodide config get emscripten_version) >> $GITHUB_ENV");
     y.line("echo PYTHON_VERSION=$(pyodide config get python_version | cut -d '.' -f 1-2) >> $GITHUB_ENV");
+    y.line("echo RUST_TOOLCHAIN=$(pyodide config get rust_toolchain) >> $GITHUB_ENV");
     // PEP 783 platform-tag input. Current pyodide-build exposes the version
     // through the historical `pyodide_abi_version` key (e.g. `2025_0` for
     // Python 3.13 / `pyemscripten_2025_0`). `pyodide config get` exits 1 and

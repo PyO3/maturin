@@ -121,7 +121,7 @@ impl Platform {
 
     pub(crate) fn default_rust_toolchain(self) -> Option<&'static str> {
         match self {
-            Platform::Emscripten => Some("nightly"),
+            Platform::Emscripten => Some("${{ env.RUST_TOOLCHAIN }}"),
             _ => None,
         }
     }

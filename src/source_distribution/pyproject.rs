@@ -1,5 +1,6 @@
 use crate::module_writer::skip_build_dirs;
 use crate::pyproject_toml::Format;
+use crate::util::{is_symlink_loop_error, is_symlink_within_boundary, symlink_boundary};
 use crate::{ModuleWriter, PyProjectToml, SDistWriter, VirtualWriter};
 use anyhow::{Context, Result, bail};
 use ignore::WalkBuilder;
@@ -8,7 +9,7 @@ use path_slash::PathExt as _;
 use pyproject_toml::check_pep639_glob;
 use std::collections::HashSet;
 use std::path::{Component, Path, PathBuf};
-use tracing::{debug, trace};
+use tracing::{debug, trace, warn};
 
 use super::SdistContext;
 use super::cargo_toml_rewrite::parse_toml_file;
@@ -200,12 +201,29 @@ pub(super) fn add_python_sources(
         python_packages.push(package_path);
     }
 
+    let boundary = symlink_boundary(&ctx.project_root)?;
     for package in &python_packages {
+        let skip_build_dirs = skip_build_dirs(&project.target_dir, &python_packages);
+        let boundary = boundary.clone();
         for entry in WalkBuilder::new(package)
-            .filter_entry(skip_build_dirs(&project.target_dir, &python_packages))
+            .follow_links(true)
+            .filter_entry(move |entry| {
+                skip_build_dirs(entry) && is_symlink_within_boundary(entry, &boundary)
+            })
             .build()
         {
-            let source = entry?.into_path();
+            let source = match entry {
+                Ok(entry) => entry.into_path(),
+                Err(err) => {
+                    if is_symlink_loop_error(&err) {
+                        warn!(
+                            "Skipping symlink loop in Python package source tree while building source distribution: {err}"
+                        );
+                        continue;
+                    }
+                    return Err(err.into());
+                }
+            };
             if is_compiled_artifact(&source) {
                 debug!("Ignoring {}", source.display());
                 continue;

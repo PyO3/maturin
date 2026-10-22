@@ -82,6 +82,11 @@ impl<W: ModuleWriterInternal> VirtualWriter<W> {
         self.tracker.contains_key(target.as_ref())
     }
 
+    /// Returns the source path of the file already added at the given target path, if any
+    pub(crate) fn target_source(&self, target: impl AsRef<Path>) -> Option<&Path> {
+        self.tracker.get(target.as_ref())?.path()
+    }
+
     /// Checks exclusions and previously tracked sources to determine if the
     /// current source should be allowed.
     /// Returns Ok(Some(..)) if the new source should be included, Ok(None) if

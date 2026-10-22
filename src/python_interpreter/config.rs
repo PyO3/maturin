@@ -14,7 +14,11 @@ use std::fmt::Write as _;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 
-const PYPY_ABI_TAG: &str = "pp73";
+/// PyPy's ABI tag for a Python version.
+/// PyPy 3.12 was first released with PyPy 8.0, older versions with PyPy 7.3.
+fn pypy_abi_tag(minor: usize) -> &'static str {
+    if minor >= 12 { "pp80" } else { "pp73" }
+}
 
 fn graalpy_version_for_python_version(major: usize, minor: usize) -> Option<(usize, usize)> {
     match (major, minor) {
@@ -106,7 +110,7 @@ impl InterpreterConfig {
                 })
             }
             (Os::Linux, PyPy) => {
-                let abi_tag = format!("pypy{major}{minor}-{PYPY_ABI_TAG}");
+                let abi_tag = format!("pypy{major}{minor}-{}", pypy_abi_tag(minor));
                 let ext_suffix = format!(".{abi_tag}-{python_ext_arch}-linux-{target_env}.so");
                 Some(Self {
                     major,
@@ -153,7 +157,7 @@ impl InterpreterConfig {
                 })
             }
             (Os::Macos, PyPy) => {
-                let ext_suffix = format!(".pypy{major}{minor}-{PYPY_ABI_TAG}-darwin.so");
+                let ext_suffix = format!(".pypy{major}{minor}-{}-darwin.so", pypy_abi_tag(minor));
                 Some(Self {
                     major,
                     minor,
@@ -212,7 +216,8 @@ impl InterpreterConfig {
                     // PyPy on Windows only supports x86_64
                     return None;
                 }
-                let ext_suffix = format!(".pypy{major}{minor}-{PYPY_ABI_TAG}-win_amd64.pyd");
+                let ext_suffix =
+                    format!(".pypy{major}{minor}-{}-win_amd64.pyd", pypy_abi_tag(minor));
                 Some(Self {
                     major,
                     minor,
@@ -409,7 +414,7 @@ impl InterpreterConfig {
             InterpreterKind::CPython => {
                 abi_tag.unwrap_or_else(|| format!("{major}{minor}{abiflags}"))
             }
-            InterpreterKind::PyPy => abi_tag.unwrap_or_else(|| PYPY_ABI_TAG.to_string()),
+            InterpreterKind::PyPy => abi_tag.unwrap_or_else(|| pypy_abi_tag(minor).to_string()),
             InterpreterKind::GraalPy => abi_tag.unwrap_or_else(|| {
                 let (graalpy_major, graalpy_minor) =
                     graalpy_version_for_python_version(major, minor).unwrap_or((23, 0));
@@ -782,6 +787,15 @@ mod tests {
         assert_eq!(sysconfig.ext_suffix, ".pypy39-pp73-x86_64-linux-gnu.so");
 
         let sysconfig = InterpreterConfig::lookup_one(
+            &Target::from_resolved_target_triple("x86_64-unknown-linux-gnu").unwrap(),
+            InterpreterKind::PyPy,
+            (3, 12),
+            "",
+        )
+        .unwrap();
+        assert_eq!(sysconfig.ext_suffix, ".pypy312-pp80-x86_64-linux-gnu.so");
+
+        let sysconfig = InterpreterConfig::lookup_one(
             &Target::from_resolved_target_triple("i686-unknown-linux-gnu").unwrap(),
             InterpreterKind::PyPy,
             (3, 9),
@@ -886,6 +900,15 @@ mod tests {
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".pypy39-pp73-darwin.so");
+
+        let sysconfig = InterpreterConfig::lookup_one(
+            &Target::from_resolved_target_triple("aarch64-apple-darwin").unwrap(),
+            InterpreterKind::PyPy,
+            (3, 12),
+            "",
+        )
+        .unwrap();
+        assert_eq!(sysconfig.ext_suffix, ".pypy312-pp80-darwin.so");
     }
 
     #[test]
@@ -927,6 +950,15 @@ mod tests {
         )
         .unwrap();
         assert_eq!(sysconfig.ext_suffix, ".pypy39-pp73-win_amd64.pyd");
+
+        let sysconfig = InterpreterConfig::lookup_one(
+            &Target::from_resolved_target_triple("x86_64-pc-windows-msvc").unwrap(),
+            InterpreterKind::PyPy,
+            (3, 12),
+            "",
+        )
+        .unwrap();
+        assert_eq!(sysconfig.ext_suffix, ".pypy312-pp80-win_amd64.pyd");
     }
 
     #[test]

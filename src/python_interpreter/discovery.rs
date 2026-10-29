@@ -740,10 +740,12 @@ mod tests {
                 "CPython 3.12",
                 "CPython 3.13",
                 "CPython 3.14",
+                "CPython 3.15",
                 "PyPy 3.8",
                 "PyPy 3.9",
                 "PyPy 3.10",
                 "PyPy 3.11",
+                "PyPy 3.12",
             ]
         "#]];
         expected.assert_debug_eq(&pythons);
@@ -772,10 +774,13 @@ mod tests {
                 "CPython 3.12",
                 "CPython 3.13",
                 "CPython 3.14",
+                "CPython 3.15",
                 "CPython 3.14t",
+                "CPython 3.15t",
                 "PyPy 3.9",
                 "PyPy 3.10",
                 "PyPy 3.11",
+                "PyPy 3.12",
             ]
         "#]];
         expected.assert_debug_eq(&pythons);
@@ -797,10 +802,12 @@ mod tests {
                 "CPython 3.12",
                 "CPython 3.13",
                 "CPython 3.14",
+                "CPython 3.15",
                 "PyPy 3.8",
                 "PyPy 3.9",
                 "PyPy 3.10",
                 "PyPy 3.11",
+                "PyPy 3.12",
             ]
         "#]];
         expected.assert_debug_eq(&pythons);
@@ -820,8 +827,10 @@ mod tests {
                 "CPython 3.12",
                 "CPython 3.13",
                 "CPython 3.14",
+                "CPython 3.15",
                 "PyPy 3.10",
                 "PyPy 3.11",
+                "PyPy 3.12",
             ]
         "#]];
         expected.assert_debug_eq(&pythons);
@@ -849,10 +858,13 @@ mod tests {
                 "CPython 3.12",
                 "CPython 3.13",
                 "CPython 3.14",
+                "CPython 3.15",
                 "CPython 3.14t",
+                "CPython 3.15t",
                 "PyPy 3.9",
                 "PyPy 3.10",
                 "PyPy 3.11",
+                "PyPy 3.12",
             ]
         "#]];
         expected.assert_debug_eq(&pythons);

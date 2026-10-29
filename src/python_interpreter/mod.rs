@@ -25,11 +25,11 @@ pub const MINIMUM_PYTHON_MINOR: usize = 7;
 /// Minimum supported PyPy minor version.
 pub const MINIMUM_PYPY_MINOR: usize = 8;
 /// Be liberal here to include preview versions
-pub const MAXIMUM_PYTHON_MINOR: usize = 14;
+pub const MAXIMUM_PYTHON_MINOR: usize = 15;
 /// Minimum supported version for free-threaded CPython
 pub const FREE_THREADED_MINIMUM_PYTHON_MINOR: usize = 14;
 /// Maximum supported PyPy minor version.
-pub const MAXIMUM_PYPY_MINOR: usize = 11;
+pub const MAXIMUM_PYPY_MINOR: usize = 12;
 
 /// The kind of Python interpreter (CPython, PyPy, or GraalPy).
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, serde::Deserialize, clap::ValueEnum)]

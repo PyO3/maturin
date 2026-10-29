@@ -1,7 +1,7 @@
 [package]
 authors = ["konstin <konstin@mailbox.org>", "messense <messense@icloud.com>"]
 name = "maturin"
-version = "1.15.0"
+version = "1.16.0"
 description = "Build and publish crates with pyo3, cffi and uniffi bindings as well as rust binaries as python packages"
 exclude = [
     "test-crates/**/*",
@@ -58,7 +58,7 @@ tar = "0.4.46"
 tempfile = "3.2.0"
 toml = "1.1.2"
 toml_edit = "0.25.0"
-zip = { version = "8.1.0", default-features = false, features = [
+zip = { version = "9.1.3", default-features = false, features = [
     "bzip2",
     "deflate",
     "time",
@@ -75,7 +75,7 @@ target-lexicon = "0.13.3"
 indexmap = "2.2.3"
 pyproject-toml = { version = "0.13.5", features = ["pep639-glob"] }
 pyo3-introspection = "0.30"
-python-pkginfo = "0.6.8"
+python-pkginfo = "0.7.0"
 textwrap = "0.16.1"
 ignore = "0.4.20"
 itertools = "0.14.0"

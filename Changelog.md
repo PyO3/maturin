@@ -1,5 +1,37 @@
 # Changelog
 
+## 1.16.0
+
+* Update version mapping for GraalPy 3.13 ([#3297](https://github.com/pyo3/maturin/pull/3297))
+* Properly normalize / validate abiflags and include in environment signature ([#3299](https://github.com/pyo3/maturin/pull/3299))
+* Fix MinGW stable ABI library names in generated PyO3 config ([#3298](https://github.com/pyo3/maturin/pull/3298))
+* Fix: lossy-decode external command output in interpreter discovery ([#3302](https://github.com/pyo3/maturin/pull/3302))
+* Build(deps): update rustls for RUSTSEC-2026-0285 ([#3308](https://github.com/pyo3/maturin/pull/3308))
+* Ci: run conda tests one at a time ([#3311](https://github.com/pyo3/maturin/pull/3311))
+* Include SOABI_PLATFORM in Python 3.15 stable ABI extension filenames ([#3305](https://github.com/pyo3/maturin/pull/3305))
+* Sort compressed tag sets ([#3315](https://github.com/pyo3/maturin/pull/3315))
+* Update manylinux/musllinux policies to the latest main ([#3322](https://github.com/pyo3/maturin/pull/3322))
+* Docs: recommend declaring the Rust MSRV ([#3317](https://github.com/pyo3/maturin/pull/3317))
+* Emit a WASI platform tag for non-bin extension wheels ([#3321](https://github.com/pyo3/maturin/pull/3321))
+* Don't include the cargo target directory or cache directories in wheels built from sdists ([#3320](https://github.com/pyo3/maturin/pull/3320))
+* Fix: avoid global uv fallback in pixi environments ([#3306](https://github.com/pyo3/maturin/pull/3306))
+* Fix the cargo-deny advisories that fail Lint ([#3328](https://github.com/pyo3/maturin/pull/3328))
+* Find versioned interpreter names like `pypy3.11` on Windows ([#3325](https://github.com/pyo3/maturin/pull/3325))
+* Update pyo3-introspection to 0.30 ([#3329](https://github.com/pyo3/maturin/pull/3329))
+* Ignore unreachable `zip` extract advisories in `cargo deny` ([#3334](https://github.com/pyo3/maturin/pull/3334))
+* Normalize `Provides-Extra` names from `project.optional-dependencies` ([#3333](https://github.com/pyo3/maturin/pull/3333))
+* Join a multi-line description into a single-line `Summary` ([#3332](https://github.com/pyo3/maturin/pull/3332))
+* Update https cert bundle for the eMudhra CA compromise ([#3337](https://github.com/pyo3/maturin/pull/3337))
+* Fix: use the toolchain pyodide-build expects ([#3338](https://github.com/pyo3/maturin/pull/3338))
+* Feat: upload emscripten wheels to pypi ([#3340](https://github.com/pyo3/maturin/pull/3340))
+* Use system ca certificates instead of ureq's WebPki when building with native-tls ([#3341](https://github.com/pyo3/maturin/pull/3341))
+* Put all `License-File` entries at the sdist root ([#3331](https://github.com/pyo3/maturin/pull/3331))
+* Pass `macosx_deployment_target` to zigbuild ([#3313](https://github.com/pyo3/maturin/pull/3313))
+* Use the `pp80` ABI tag for PyPy 3.12 in the bundled sysconfig ([#3343](https://github.com/pyo3/maturin/pull/3343))
+* Fix: normalize Git Bash virtualenv paths on Windows ([#3307](https://github.com/pyo3/maturin/pull/3307))
+* Feat: add configurable PGO dependency group (#3278) ([#3310](https://github.com/pyo3/maturin/pull/3310))
+* Fix: update rustix to 1.1.5 ([#3344](https://github.com/pyo3/maturin/pull/3344))
+
 ## 1.15.0
 
 * Set `UV_PYTHON` when running `maturin develop` with uv ([#3236](https://github.com/pyo3/maturin/pull/3236))

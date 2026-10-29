@@ -565,8 +565,9 @@ fn check_for_duplicates(wheel: &Path) -> Result<()> {
     let mut reader = File::open(wheel)?;
     // We have to use this API since `ZipArchive` deduplicates names.
     while let Some(file) = zip::read::read_zipfile_from_stream(&mut reader)? {
-        if !seen.insert(file.name().to_string()) {
-            bail!("Duplicate file: {}", file.name());
+        let name = file.name()?.into_owned();
+        if !seen.insert(name.clone()) {
+            bail!("Duplicate file: {name}");
         }
     }
     Ok(())

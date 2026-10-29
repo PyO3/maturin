@@ -378,14 +378,16 @@ pub fn check_wheel_files(
 
 pub fn wheel_files(package: impl AsRef<Path>, unique_name: &str) -> Result<BTreeSet<String>> {
     let wheel = build_wheel_files(package, unique_name)?;
-    let drop_platform_specific_files = |file: &&str| -> bool {
+    let drop_platform_specific_files = |file: &str| -> bool {
         !matches!(Path::new(file).extension(), Some(ext) if ext == "pyc" || ext == "pyd" || ext == "so" || ext == "pdb" || ext == "dwp")
             && !file.contains(".dSYM/")
     };
     Ok(wheel
         .file_names()
-        .filter(drop_platform_specific_files)
-        .map(str::to_owned)
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .filter(|file| drop_platform_specific_files(file))
+        .map(|file| file.into_owned())
         .collect::<BTreeSet<_>>())
 }
 
@@ -395,8 +397,10 @@ pub fn check_wheel_files_with_sbom(package: impl AsRef<Path>, unique_name: &str)
 
     let sbom_files: Vec<String> = wheel
         .file_names()
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
         .filter(|f| f.contains(".dist-info/sboms/"))
-        .map(|f| f.to_string())
+        .map(|f| f.into_owned())
         .collect();
     assert!(
         !sbom_files.is_empty(),
@@ -668,6 +672,8 @@ pub fn combined_stable_abi_wheel_selection(unique_name: &str, features: &[&str])
             let archive = ZipArchive::new(File::open(&wheel.path)?)?;
             let extensions: Vec<_> = archive
                 .file_names()
+                .collect::<Result<Vec<_>, _>>()?
+                .into_iter()
                 .filter(|name| name.ends_with(".so"))
                 .collect();
             assert_eq!(
@@ -800,6 +806,8 @@ pub fn test_target_dir_in_python_package() -> Result<()> {
     )?;
     let package_files: Vec<_> = wheel
         .file_names()
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
         .filter(|name| name.starts_with("bin_with_python_module/"))
         .collect();
     #[allow(unused_mut)]

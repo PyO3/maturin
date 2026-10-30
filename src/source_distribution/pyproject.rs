@@ -187,7 +187,13 @@ pub(super) fn add_python_sources(
 ) -> Result<()> {
     let project = ctx.project;
     let mut python_packages = Vec::new();
-    if let Some(python_module) = project.project_layout.python_module.as_ref() {
+    // A top-level extension module has no directory of its own to walk
+    if let Some(python_module) = project
+        .project_layout
+        .python_module
+        .as_ref()
+        .filter(|python_module| python_module.exists())
+    {
         trace!("Resolved python module: {}", python_module.display());
         python_packages.push(python_module.to_path_buf());
     }

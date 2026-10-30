@@ -21,6 +21,8 @@ pub struct ProjectLayout {
     /// Contains the canonicalized (i.e. absolute) path to the python part of the project
     /// If none, we have a rust crate compiled into a shared library with only some glue python for cffi
     /// If some, we have a python package that is extended by a native rust module.
+    /// This path doesn't exist on disk when the extension is a top-level module sitting next to
+    /// `python_packages`, in which case only its parent, the wheel's root, is meaningful.
     pub python_module: Option<PathBuf>,
     /// Python packages to include
     pub python_packages: Vec<String>,
@@ -496,6 +498,26 @@ impl ProjectLayout {
                 })
             } else {
                 if custom_python_source {
+                    // `module-name = "_native"` with `python-packages = ["foo"]`: the extension
+                    // isn't inside any package, it goes to the root of the wheel next to them.
+                    if parts.len() == 1
+                        && python_packages
+                            .iter()
+                            .any(|package| python_root.join(package).exists())
+                    {
+                        eprintln!("🍹 Building a mixed python/rust project");
+
+                        return Ok(ProjectLayout {
+                            project_root: project_root.to_path_buf(),
+                            rust_module: python_root.clone(),
+                            python_dir: python_root,
+                            python_packages,
+                            python_module: Some(python_module),
+                            extension_name,
+                            data,
+                        });
+                    }
+
                     bail!(
                         "python-source is set to `{}`, but the python module at `{}` \
                         does not exist. Either create the Python module or remove the \

@@ -1178,6 +1178,29 @@ fn pyo3_mixed_src_layout_sdist() {
 }
 
 #[test]
+fn pyo3_mixed_top_level_sdist() {
+    run_sdist_case(
+        SdistCase {
+            id: "sdist-pyo3-mixed-top-level",
+            package: "test-crates/pyo3-mixed-top-level/rust",
+            generator: SdistGenerator::Cargo,
+        },
+        expect![[r#"
+            {
+                "pyo3_mixed_top_level-2.1.3/PKG-INFO",
+                "pyo3_mixed_top_level-2.1.3/README.md",
+                "pyo3_mixed_top_level-2.1.3/pyproject.toml",
+                "pyo3_mixed_top_level-2.1.3/rust/Cargo.lock",
+                "pyo3_mixed_top_level-2.1.3/rust/Cargo.toml",
+                "pyo3_mixed_top_level-2.1.3/rust/src/lib.rs",
+                "pyo3_mixed_top_level-2.1.3/src/pyo3_mixed_top_level/__init__.py",
+            }
+        "#]],
+        None,
+    )
+}
+
+#[test]
 fn target_dir_in_python_package_sdist() {
     handle_result(other::test_target_dir_in_python_package_sdist())
 }

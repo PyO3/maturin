@@ -63,6 +63,10 @@ fn integration_pyo3_bin() {
     "integration-pyo3-ffi-pure",
     "test-crates/pyo3-ffi-pure"
 ))]
+#[case::pyo3_mixed_top_level(IntegrationCase::new(
+    "integration-pyo3-mixed-top-level",
+    "test-crates/pyo3-mixed-top-level/rust",
+))]
 #[case::with_data(IntegrationCase::new("integration-with-data", "test-crates/with-data"))]
 #[case::readme_duplication(IntegrationCase::new(
     "integration-readme-duplication",

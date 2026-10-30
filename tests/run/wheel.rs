@@ -58,6 +58,24 @@ fn pyo3_mixed_py_subdir_include_wheel_files() {
 }
 
 #[test]
+fn pyo3_mixed_top_level_wheel_files() {
+    #[allow(unused_mut)]
+    let mut expected = vec![
+        "pyo3_mixed_top_level-2.1.3.dist-info/METADATA",
+        "pyo3_mixed_top_level-2.1.3.dist-info/RECORD",
+        "pyo3_mixed_top_level-2.1.3.dist-info/WHEEL",
+        "pyo3_mixed_top_level/__init__.py",
+    ];
+    #[cfg(feature = "sbom")]
+    expected.push("pyo3_mixed_top_level-2.1.3.dist-info/sboms/pyo3-mixed-top-level.cyclonedx.json");
+    handle_result(other::check_wheel_files(
+        "test-crates/pyo3-mixed-top-level/rust",
+        expected,
+        "wheel-files-pyo3-mixed-top-level",
+    ))
+}
+
+#[test]
 fn pyo3_wheel_record_has_normalized_paths() {
     handle_result(other::check_wheel_paths(
         "test-crates/pyo3-mixed-include-exclude",

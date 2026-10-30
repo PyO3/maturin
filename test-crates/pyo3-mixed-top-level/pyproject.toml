@@ -1,0 +1,15 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "pyo3-mixed-top-level"
+readme = "README.md"
+requires-python = ">=3.7"
+dynamic = ["version"]
+
+[tool.maturin]
+manifest-path = "rust/Cargo.toml"
+python-source = "src"
+python-packages = ["pyo3_mixed_top_level"]
+module-name = "_pyo3_mixed_top_level"

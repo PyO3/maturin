@@ -108,12 +108,25 @@ fn resolve_and_add_manifest_asset(
 }
 
 /// Run `cargo package --list --allow-dirty` and return the list of files.
-fn cargo_package_file_list(manifest_path: &Path, target_dir: &Path) -> Result<Vec<String>> {
+fn cargo_package_file_list(
+    manifest_path: &Path,
+    package_name: &str,
+    target_dir: &Path,
+) -> Result<Vec<String>> {
     debug!(
         "Getting cargo package file list for {}",
         manifest_path.display()
     );
-    let args = ["package", "--list", "--allow-dirty", "--manifest-path"];
+    // A workspace root manifest can select default-members instead of the root
+    // package, so select the crate whose files we are actually packaging.
+    let args = [
+        "package",
+        "--list",
+        "--allow-dirty",
+        "--package",
+        package_name,
+        "--manifest-path",
+    ];
     let output = Command::new("cargo")
         .args(args)
         .arg(manifest_path)
@@ -189,7 +202,8 @@ fn add_crate_to_source_distribution(
     opts: &AddCrateOptions<'_>,
     target_dir: &Path,
 ) -> Result<()> {
-    let file_list = cargo_package_file_list(manifest_path, target_dir)?;
+    let file_list =
+        cargo_package_file_list(manifest_path, &opts.package_metadata.name, target_dir)?;
 
     trace!("File list: {:?}", file_list);
 

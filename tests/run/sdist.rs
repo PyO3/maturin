@@ -336,6 +336,54 @@ fn write_workspace_bin_project(
     project_dir
 }
 
+#[test]
+fn sdist_root_dependency_outside_default_members() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let workspace = temp_dir.path();
+    let project = write_workspace_bin_project(workspace, "py", "");
+    fs_err::write(
+        workspace.join("Cargo.toml"),
+        indoc! {r#"
+            [workspace]
+            resolver = "2"
+            members = ["py"]
+            default-members = ["py"]
+
+            [package]
+            name = "root"
+            version = "0.1.0"
+            edition = "2021"
+        "#},
+    )
+    .unwrap();
+    fs_err::create_dir(workspace.join("src")).unwrap();
+    fs_err::write(workspace.join("src/lib.rs"), "mod factory;\n").unwrap();
+    fs_err::write(workspace.join("src/factory.rs"), "// Root crate source\n").unwrap();
+    let manifest = fs_err::read_to_string(project.join("Cargo.toml")).unwrap();
+    fs_err::write(
+        project.join("Cargo.toml"),
+        format!("{manifest}\n[dependencies]\nroot = {{ path = \"..\" }}\n"),
+    )
+    .unwrap();
+
+    let mut archive = other::build_source_distribution(
+        &project,
+        SdistGenerator::Cargo,
+        "sdist-root-dependency-outside-default-members",
+    )
+    .unwrap();
+    let extracted = tempfile::tempdir().unwrap();
+    archive.unpack(extracted.path()).unwrap();
+    let packaged = extracted.path().join("python_pkg-0.1.0");
+    for source in ["src/lib.rs", "src/factory.rs", "py/src/main.rs"] {
+        assert_eq!(
+            fs_err::read(packaged.join(source)).unwrap(),
+            fs_err::read(workspace.join(source)).unwrap(),
+            "missing or incorrect contents for {source}"
+        );
+    }
+}
+
 /// Regression test for https://github.com/PyO3/maturin/issues/3181 +
 /// follow-up: when `pyproject.toml` is in a workspace member subdirectory and
 /// references path metadata outside the member directory, those files must be

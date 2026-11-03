@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::collections::BTreeSet;
 use std::io;
 use std::io::Read;
 use std::io::Write as _;
@@ -36,6 +37,7 @@ pub struct SDistWriter {
     path: PathBuf,
     mtime: u64,
     pax_header_index: u64,
+    directories: BTreeSet<PathBuf>,
 }
 
 impl super::private::Sealed for SDistWriter {}
@@ -43,7 +45,12 @@ impl super::private::Sealed for SDistWriter {}
 impl ModuleWriterInternal for SDistWriter {
     fn add_entry(&mut self, target: impl AsRef<Path>, source: ArchiveSource) -> Result<()> {
         let target = target.as_ref();
-        let archive_path = portable_path(target)?;
+        if self.directories.contains(target) {
+            bail!(
+                "sdist path `{}` is required as a directory",
+                target.display()
+            );
+        }
 
         let mut header = tar::Header::new_ustar();
         header.set_entry_type(tar::EntryType::Regular);
@@ -67,23 +74,7 @@ impl ModuleWriterInternal for SDistWriter {
             }
         };
 
-        header.set_size(data.len() as u64);
-
-        if set_ustar_path_or_needs_pax(&mut header, &archive_path)? {
-            self.append_pax_path(&archive_path)?;
-            header.set_path(format!("PaxHeaders/{}", self.pax_header_index))?;
-            self.pax_header_index += 1;
-        }
-        header.set_cksum();
-
-        self.tar.append(&header, data.as_slice()).with_context(|| {
-            format!(
-                "Failed to add {} bytes to sdist as {}",
-                data.len(),
-                target.display()
-            )
-        })?;
-        Ok(())
+        self.append(&mut header, target, &data)
     }
 }
 
@@ -113,7 +104,39 @@ impl SDistWriter {
             path,
             mtime: mtime_override.unwrap_or(SDIST_DETERMINISTIC_TIMESTAMP),
             pax_header_index: 0,
+            directories: BTreeSet::new(),
         })
+    }
+
+    /// Record a directory needed to resolve an archived config reference,
+    /// including when no packaged file would otherwise create it.
+    pub(crate) fn add_directory(&mut self, target: &Path) -> Result<()> {
+        portable_path(target)?;
+        self.directories.insert(target.to_path_buf());
+        Ok(())
+    }
+
+    pub(crate) fn directories(&self) -> impl Iterator<Item = &Path> {
+        self.directories.iter().map(PathBuf::as_path)
+    }
+
+    fn append(&mut self, header: &mut tar::Header, target: &Path, data: &[u8]) -> Result<()> {
+        let archive_path = portable_path(target)?;
+        header.set_size(data.len() as u64);
+        if set_ustar_path_or_needs_pax(header, &archive_path)? {
+            self.append_pax_path(&archive_path)?;
+            header.set_path(format!("PaxHeaders/{}", self.pax_header_index))?;
+            self.pax_header_index += 1;
+        }
+        header.set_cksum();
+        self.tar.append(header, data).with_context(|| {
+            format!(
+                "Failed to add {} bytes to sdist as {}",
+                data.len(),
+                target.display()
+            )
+        })?;
+        Ok(())
     }
 
     fn append_pax_path(&mut self, archive_path: &str) -> Result<(), io::Error> {
@@ -150,7 +173,15 @@ impl SDistWriter {
     }
 
     /// Finished the .tar.gz archive
-    pub fn finish(self) -> Result<PathBuf, io::Error> {
+    pub fn finish(mut self) -> Result<PathBuf, io::Error> {
+        for directory in std::mem::take(&mut self.directories) {
+            let mut header = tar::Header::new_ustar();
+            header.set_entry_type(tar::EntryType::Directory);
+            header.set_mode(0o755);
+            set_sdist_header_metadata(&mut header, self.mtime);
+            self.append(&mut header, &directory, &[])
+                .map_err(io::Error::other)?;
+        }
         let archive = self.tar.into_inner()?;
         fs::write(&self.path, archive.finish()?)?;
         Ok(self.path)
@@ -186,7 +217,7 @@ fn set_ustar_path_or_needs_pax(
 }
 
 /// Convert the path to a UTF-8 string with forward slashes and no NUL bytes.
-fn portable_path(path: &Path) -> Result<String> {
+pub(super) fn portable_path(path: &Path) -> Result<String> {
     let components = path
         .components()
         .filter_map(|component| match component {

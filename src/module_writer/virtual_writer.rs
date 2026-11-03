@@ -6,8 +6,8 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-use anyhow::Result;
 use anyhow::bail;
+use anyhow::{Context as _, Result};
 use ignore::overrides::Override;
 #[cfg(test)]
 use indexmap::IndexMap;
@@ -339,6 +339,47 @@ impl VirtualWriter<PathWriter> {
 }
 
 impl VirtualWriter<SDistWriter> {
+    /// Retain directories traversed by config references even if they are empty.
+    pub(crate) fn add_directory(&mut self, target: &Path) -> Result<()> {
+        if self.contains_target(target) {
+            bail!(
+                "sdist path `{}` is required as a directory",
+                target.display()
+            );
+        }
+        self.inner.add_directory(target)
+    }
+
+    /// Materialize the tracked archive entries for tools that need a working tree.
+    pub(crate) fn write_to_directory(&mut self, path: &Path) -> Result<()> {
+        self.apply_pending_prepends()?;
+        for directory in self.inner.directories() {
+            fs_err::create_dir_all(path.join(directory))?;
+        }
+        let mut writer = PathWriter::from_path(path);
+        for (target, source) in &self.tracker {
+            super::sdist_writer::portable_path(target)?;
+            writer.add_entry(target, source.clone())?;
+        }
+        Ok(())
+    }
+
+    /// Replace an existing entry's contents, preserving its source and permissions.
+    pub(crate) fn replace_file_contents(&mut self, target: &Path, data: Vec<u8>) -> Result<()> {
+        let entry = self.tracker.get_mut(target).with_context(|| {
+            format!(
+                "File {} is not in the source distribution",
+                target.display()
+            )
+        })?;
+        *entry = ArchiveSource::Generated(GeneratedSourceData {
+            data,
+            path: entry.path().map(Path::to_path_buf),
+            executable: entry.executable(),
+        });
+        Ok(())
+    }
+
     /// Commit the tracked entries to the underlying [SDistWriter]
     pub fn finish(self, pkg_info_path: &Path) -> Result<PathBuf> {
         let mut comparator = self.inner.file_ordering(pkg_info_path);
@@ -389,6 +430,56 @@ mod tests {
     use crate::module_writer::mock_writer::MockWriter;
 
     use super::VirtualWriter;
+
+    #[test]
+    fn sdist_retains_required_empty_directories() -> Result<()> {
+        use crate::ModuleWriter;
+
+        let temp_dir = TempDir::new()?;
+        let metadata = crate::Metadata24::new("pkg".to_string(), pep440_rs::Version::new([1, 0]));
+        let sdist = super::SDistWriter::new(temp_dir.path(), &metadata, Some(42))?;
+        let mut writer = VirtualWriter::new(sdist, Override::empty());
+        let directory = Path::new("pkg-1.0/alias");
+        writer.add_directory(directory)?;
+        writer.add_directory(directory)?;
+        assert!(writer.add_directory(Path::new("../outside")).is_err());
+        let pkg_info = Path::new("pkg-1.0/PKG-INFO");
+        writer.add_bytes(pkg_info, None, b"metadata", false)?;
+        let staging = temp_dir.path().join("staging");
+        writer.write_to_directory(&staging)?;
+        assert!(staging.join(directory).is_dir());
+
+        let path = writer.finish(pkg_info)?;
+        let mut archive =
+            tar::Archive::new(flate2::read::GzDecoder::new(fs_err::File::open(path)?));
+        let mut entries = archive.entries()?;
+        assert_eq!(entries.next().unwrap()?.path()?, pkg_info);
+        let entry = entries.next().unwrap()?;
+        assert_eq!(entry.path()?, directory);
+        assert!(entry.header().entry_type().is_dir());
+        assert_eq!(entry.header().mode()?, 0o755);
+        assert_eq!(entry.header().mtime()?, 42);
+        assert_eq!(entry.header().size()?, 0);
+        assert!(entries.next().is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn sdist_working_directory_rejects_parent_paths() -> Result<()> {
+        let temp_dir = TempDir::new()?;
+        let metadata =
+            crate::Metadata24::new("test-pkg".to_string(), pep440_rs::Version::new([1, 0]));
+        let sdist = super::SDistWriter::new(temp_dir.path(), &metadata, None)?;
+        let mut writer = VirtualWriter::new(sdist, Override::empty());
+        writer.add_bytes("../outside", None, b"unexpected", false)?;
+
+        let err = writer
+            .write_to_directory(&temp_dir.path().join("staging"))
+            .unwrap_err();
+        assert!(err.to_string().contains("must not contain `..`"));
+        assert!(!temp_dir.path().join("outside").exists());
+        Ok(())
+    }
 
     #[test]
     fn virtual_writer_no_excludes() -> Result<()> {

@@ -1,4 +1,5 @@
 mod cargo_toml_rewrite;
+mod lockfile;
 mod path_deps;
 mod pyproject;
 mod unpack;
@@ -112,6 +113,7 @@ fn cargo_package_file_list(
     manifest_path: &Path,
     package_name: &str,
     target_dir: &Path,
+    cargo_options: &crate::CargoOptions,
 ) -> Result<Vec<String>> {
     debug!(
         "Getting cargo package file list for {}",
@@ -119,10 +121,14 @@ fn cargo_package_file_list(
     );
     // A workspace root manifest can select default-members instead of the root
     // package, so select the crate whose files we are actually packaging.
+    // Metadata has already resolved the source workspace. Keep its lockfile
+    // unchanged while listing files, including with Cargo before 1.87, which
+    // does not support `--exclude-lockfile`.
     let args = [
         "package",
         "--list",
         "--allow-dirty",
+        "--locked",
         "--package",
         package_name,
         "--manifest-path",
@@ -132,6 +138,7 @@ fn cargo_package_file_list(
         .arg(manifest_path)
         .arg("--target-dir")
         .arg(target_dir)
+        .args(cargo_options.cargo_config_args())
         .output()
         .with_context(|| {
             format!(
@@ -169,6 +176,8 @@ fn cargo_package_file_list(
 /// Options that vary between the root crate and path dependencies when
 /// adding crate files to the sdist.
 struct AddCrateOptions<'a> {
+    /// Cargo configuration to preserve when querying the crate's file list.
+    cargo_options: &'a crate::CargoOptions,
     /// When true, this is the root crate: rewrite workspace members in
     /// Cargo.toml and skip pyproject.toml (handled separately).
     is_root: bool,
@@ -202,8 +211,12 @@ fn add_crate_to_source_distribution(
     opts: &AddCrateOptions<'_>,
     target_dir: &Path,
 ) -> Result<()> {
-    let file_list =
-        cargo_package_file_list(manifest_path, &opts.package_metadata.name, target_dir)?;
+    let file_list = cargo_package_file_list(
+        manifest_path,
+        &opts.package_metadata.name,
+        target_dir,
+        opts.cargo_options,
+    )?;
 
     trace!("File list: {:?}", file_list);
 
@@ -219,8 +232,9 @@ fn add_crate_to_source_distribution(
                 // Skip generated files. See https://github.com/rust-lang/cargo/issues/7938#issuecomment-593280660
                 // and https://github.com/PyO3/maturin/issues/449
                 false
-            } else if *target == "Cargo.toml" {
-                // We rewrite Cargo.toml and add it separately
+            } else if *target == "Cargo.toml" || *target == "Cargo.lock" {
+                // Manifests and the authoritative workspace lockfile are added
+                // separately. Cargo ignores any leftover member lockfiles.
                 false
             } else if opts.is_root && *target == "pyproject.toml" {
                 // pyproject.toml is handled separately because it has to be put in the root dir
@@ -588,6 +602,7 @@ fn add_path_dep(
         readme.as_ref(),
         license_file.as_ref(),
         &AddCrateOptions {
+            cargo_options: &ctx.project.cargo_options,
             is_root: false,
             known_path_deps: None,
             skip_prefixes: Vec::new(),
@@ -706,6 +721,7 @@ fn add_main_crate(writer: &mut VirtualWriter<SDistWriter>, ctx: &SdistContext<'_
         readme.as_ref(),
         license_file.as_ref(),
         &AddCrateOptions {
+            cargo_options: &ctx.project.cargo_options,
             is_root: true,
             known_path_deps: Some(&ctx.known_path_deps),
             skip_prefixes,
@@ -719,37 +735,142 @@ fn add_main_crate(writer: &mut VirtualWriter<SDistWriter>, ctx: &SdistContext<'_
     Ok(())
 }
 
-/// Add Cargo.lock to the sdist.
-fn add_cargo_lock(writer: &mut VirtualWriter<SDistWriter>, ctx: &SdistContext<'_>) -> Result<()> {
-    // `abs_manifest_dir` is canonicalized (symlinks resolved). Use the
-    // logical absolute manifest dir from `project.manifest_path` so the
-    // resulting `Cargo.lock` path is consistent with `project_root` (also a
-    // logical path) when `Cargo.toml` is a symlink pointing outside the
-    // project root (#3177).
-    let manifest_dir = ctx
-        .project
-        .manifest_path
-        .parent()
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| ctx.abs_manifest_dir.clone());
-    let manifest_cargo_lock_path = manifest_dir.join("Cargo.lock");
-    let workspace_cargo_lock = ctx.workspace_root.join("Cargo.lock").into_std_path_buf();
-    let cargo_lock_path = if manifest_cargo_lock_path.exists() {
-        Some(manifest_cargo_lock_path)
-    } else if workspace_cargo_lock.exists() {
-        Some(workspace_cargo_lock)
-    } else {
-        None
-    };
+/// Archive-relative paths needed to reconcile a lockfile with a reduced workspace.
+struct SdistCargoLock {
+    path: PathBuf,
+    manifest_path: PathBuf,
+}
+
+impl SdistCargoLock {
+    fn update(
+        &self,
+        writer: &mut VirtualWriter<SDistWriter>,
+        cargo_options: &crate::CargoOptions,
+    ) -> Result<()> {
+        let temp_dir = tempfile::tempdir()?;
+        writer.write_to_directory(temp_dir.path())?;
+        let lockfile_path = temp_dir.path().join(&self.path);
+        let original_lockfile = lockfile::parse(&fs_err::read_to_string(&lockfile_path)?)
+            .context("Failed to read the source distribution lockfile")?;
+        let cargo_version = cargo_config2::Config::load_with_options(
+            env::current_dir()?,
+            cargo_config2::ResolveOptions::default().cargo("cargo"),
+        )?
+        .cargo_version()?;
+        if original_lockfile.version < cargo_lock::ResolveVersion::V4
+            && cargo_version.major_minor() >= (1, 78)
+        {
+            // Cargo can lose legacy Git pins when it must resolve a changed
+            // workspace. Give it unambiguous v4 sources in the staged copy.
+            // Prebuilt Maturin can run with Cargo older than Maturin's MSRV;
+            // leave the staged format alone if that Cargo cannot read v4.
+            let mut staged_lockfile = original_lockfile.clone();
+            staged_lockfile.version = cargo_lock::ResolveVersion::V4;
+            fs_err::write(&lockfile_path, staged_lockfile.to_string())?;
+        }
+
+        // Resolve the packaged manifests offline, never the source workspace,
+        // so removing workspace members only changes the lockfile in the sdist.
+        // Keep the caller's working directory for Cargo config discovery and
+        // relative `--config` paths, just like the initial metadata query.
+        let resolve_options = crate::CargoOptions {
+            // Only the staged lockfile may change. Retain the original feature
+            // and platform selection so metadata needs no additional downloads.
+            locked: false,
+            frozen: false,
+            offline: true,
+            ..cargo_options.clone()
+        };
+        let metadata_command = |directory: &Path| -> Result<Command> {
+            let mut command = Command::new("cargo");
+            command
+                .args(["metadata", "--format-version", "1", "--manifest-path"])
+                .arg(directory.join(&self.manifest_path))
+                .args(resolve_options.cargo_metadata_args()?)
+                .stdout(std::process::Stdio::null());
+            Ok(command)
+        };
+        let output = metadata_command(temp_dir.path())?
+            .output()
+            .context("Failed to run cargo to update the source distribution lockfile")?;
+        if !output.status.success() {
+            bail!(
+                "Failed to update the source distribution lockfile: {}\n{}",
+                output.status,
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        debug!("{}", String::from_utf8_lossy(&output.stderr));
+        let updated_contents = fs_err::read_to_string(&lockfile_path)?;
+        let mut updated_lockfile = lockfile::parse(&updated_contents)
+            .context("Failed to read the updated source distribution lockfile")?;
+        lockfile::validate_pins(&original_lockfile, &updated_lockfile)?;
+        let contents = if updated_lockfile.version != original_lockfile.version {
+            updated_lockfile.version = original_lockfile.version;
+            updated_lockfile.to_string()
+        } else {
+            updated_contents
+        };
+
+        writer.replace_file_contents(&self.path, contents.into_bytes())?;
+        // Validate a fresh copy of the final archive entries, including any
+        // conversion back from the temporary v4 representation. Files created
+        // by the first Cargo query must not hide an incomplete archive.
+        let validation_dir = tempfile::tempdir()?;
+        writer.write_to_directory(validation_dir.path())?;
+        let output = metadata_command(validation_dir.path())?
+            .arg("--locked")
+            .output()
+            .context("Failed to run cargo to validate the source distribution lockfile")?;
+        if !output.status.success() {
+            bail!(
+                "Failed to validate the source distribution lockfile: {}\n{}",
+                output.status,
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+        debug!("{}", String::from_utf8_lossy(&output.stderr));
+        Ok(())
+    }
+}
+
+/// Add Cargo.lock to the sdist and identify workspaces that need it updated.
+fn add_cargo_lock(
+    writer: &mut VirtualWriter<SDistWriter>,
+    ctx: &SdistContext<'_>,
+) -> Result<Option<SdistCargoLock>> {
+    // Cargo uses one lockfile at the workspace root, ignoring member lockfiles.
+    // Its metadata also reports the logical root for standalone crates and
+    // symlinked manifests, consistent with `project_root` (#3177).
+    let cargo_lock_path = ctx.workspace_root.join("Cargo.lock").into_std_path_buf();
     let cargo_lock_required = ctx.project.cargo_options.locked || ctx.project.cargo_options.frozen;
 
-    if let Some(cargo_lock_path) = cargo_lock_path {
+    if cargo_lock_path.is_file() {
         let relative_cargo_lock = cargo_lock_path.strip_prefix(&ctx.project_root).unwrap();
-        writer.add_file(
-            ctx.root_dir.join(relative_cargo_lock),
-            &cargo_lock_path,
-            false,
-        )?;
+        let path = ctx.root_dir.join(relative_cargo_lock);
+        writer.add_file(&path, &cargo_lock_path, false)?;
+
+        let metadata = &ctx.project.cargo_metadata;
+        let root_package = metadata.root_package().context("Missing root package")?;
+        // Keeping the original lockfile after pruning workspace members can
+        // invalidate version-qualified dependency references (issue #2609).
+        let removed_workspace_member = metadata.packages.iter().any(|package| {
+            metadata.workspace_members.contains(&package.id)
+                && package.id != root_package.id
+                && !ctx
+                    .known_path_deps
+                    .values()
+                    .any(|dep| dep.manifest_path.as_path() == package.manifest_path.as_std_path())
+        });
+        if removed_workspace_member && writer.contains_target(&path) {
+            return Ok(Some(SdistCargoLock {
+                path,
+                manifest_path: ctx
+                    .root_dir
+                    .join(&ctx.relative_main_crate_manifest_dir)
+                    .join("Cargo.toml"),
+            }));
+        }
     } else if cargo_lock_required {
         bail!("Cargo.lock is required by `--locked`/`--frozen` but it's not found.");
     } else {
@@ -758,7 +879,7 @@ fn add_cargo_lock(writer: &mut VirtualWriter<SDistWriter>, ctx: &SdistContext<'_
             to include it in the source distribution"
         );
     }
-    Ok(())
+    Ok(None)
 }
 
 /// Add the workspace Cargo.toml (when the crate is a workspace member).
@@ -862,7 +983,7 @@ fn add_cargo_package_files_to_sdist(
     pyproject_toml_path: &Path,
     writer: &mut VirtualWriter<SDistWriter>,
     root_dir: &Path,
-) -> Result<()> {
+) -> Result<Option<SdistCargoLock>> {
     let ctx = SdistContext::new(project, pyproject_toml_path, root_dir)?;
     let workspace_root = project.cargo_metadata.workspace_root.as_std_path();
     let normalized_pyproject_dir = ctx.pyproject_dir.normalize()?.into_path_buf();
@@ -883,7 +1004,7 @@ fn add_cargo_package_files_to_sdist(
     add_main_crate(writer, &ctx)?;
 
     // 3. Add Cargo.lock
-    add_cargo_lock(writer, &ctx)?;
+    let cargo_lock = add_cargo_lock(writer, &ctx)?;
 
     // 4. Add workspace Cargo.toml (if applicable)
     add_workspace_manifest(writer, &ctx)?;
@@ -898,7 +1019,7 @@ fn add_cargo_package_files_to_sdist(
     // 7. Add python source files
     add_python_sources(writer, &ctx)?;
 
-    Ok(())
+    Ok(cargo_lock)
 }
 
 /// Add every license file recorded in `PKG-INFO` at its `License-File` path.
@@ -991,19 +1112,18 @@ pub fn source_distribution(
     ));
 
     let pyproject_dir = pyproject_toml_path.parent().unwrap();
-    match pyproject.sdist_generator() {
-        SdistGenerator::Cargo => {
-            add_cargo_package_files_to_sdist(
-                project,
-                pyproject,
-                &pyproject_toml_path,
-                &mut writer,
-                &root_dir,
-            )?;
-        }
+    let cargo_lock = match pyproject.sdist_generator() {
+        SdistGenerator::Cargo => add_cargo_package_files_to_sdist(
+            project,
+            pyproject,
+            &pyproject_toml_path,
+            &mut writer,
+            &root_dir,
+        )?,
         SdistGenerator::Git => {
             reject_parent_relative_metadata_paths(pyproject)?;
             add_git_tracked_files_to_sdist(&pyproject_toml_path, &mut writer, &root_dir)?;
+            None
         }
     };
 
@@ -1015,6 +1135,10 @@ pub fn source_distribution(
         &project.project_layout.python_dir,
     )?;
     add_license_files(&mut writer, metadata24, pyproject_dir, &root_dir)?;
+
+    if let Some(cargo_lock) = cargo_lock {
+        cargo_lock.update(&mut writer, &project.cargo_options)?;
+    }
 
     let pkg_info = root_dir.join("PKG-INFO");
     writer.add_bytes(
@@ -1039,6 +1163,47 @@ mod tests {
     use super::*;
     use fs_err as fs;
     use tempfile::TempDir;
+
+    #[test]
+    fn sdist_lockfile_validation_rejects_untracked_workspace_lockfile() {
+        let temp_dir = TempDir::new().unwrap();
+        let metadata = Metadata24::new("py".to_string(), pep440_rs::Version::new([0, 1, 0]));
+        let sdist = SDistWriter::new(temp_dir.path(), &metadata, None).unwrap();
+        let mut writer = VirtualWriter::new(sdist, Override::empty());
+        for (path, contents) in [
+            (
+                "py-0.1.0/Cargo.toml",
+                "[workspace]\nresolver = \"2\"\nmembers = [\"py\"]\n",
+            ),
+            (
+                "py-0.1.0/py/Cargo.toml",
+                "[package]\nname = \"py\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+            ),
+            ("py-0.1.0/py/src/main.rs", "fn main() {}\n"),
+            (
+                "py-0.1.0/py/Cargo.lock",
+                "version = 3\n[[package]]\nname = \"py\"\nversion = \"0.1.0\"\n",
+            ),
+        ] {
+            writer
+                .add_bytes(path, None, contents.as_bytes(), false)
+                .unwrap();
+        }
+        // Reconciliation creates a root lockfile because the archived member
+        // lockfile is ignored. Validation must not see that untracked file.
+        let lockfile = SdistCargoLock {
+            path: PathBuf::from("py-0.1.0/py/Cargo.lock"),
+            manifest_path: PathBuf::from("py-0.1.0/py/Cargo.toml"),
+        };
+        let error = lockfile
+            .update(&mut writer, &crate::CargoOptions::default())
+            .unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("Failed to validate the source distribution lockfile")
+        );
+    }
 
     #[test]
     fn test_resolve_manifest_asset_rejects_license_outside_allowed_root() {

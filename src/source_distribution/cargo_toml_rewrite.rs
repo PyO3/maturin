@@ -118,6 +118,42 @@ pub(super) fn strip_non_workspace_tables(document: &mut DocumentMut, manifest_pa
         "Stripping [package] from workspace Cargo.toml at {} (source files not in sdist)",
         manifest_path.display()
     );
+
+    // A virtual workspace defaults to resolver 1, whereas a root package can
+    // select a resolver explicitly or through its (possibly inherited) edition.
+    // Preserve that choice before removing the package's configuration.
+    if let Some(package) = document.get("package").and_then(|item| item.as_table()) {
+        let resolver = package
+            .get("resolver")
+            .and_then(|item| item.as_str())
+            .or_else(|| {
+                let edition = if is_workspace_inherited(package, "edition") {
+                    document
+                        .get("workspace")?
+                        .get("package")?
+                        .get("edition")?
+                        .as_str()
+                } else {
+                    package.get("edition").and_then(|item| item.as_str())
+                };
+                match edition {
+                    Some("2024") => Some("3"),
+                    Some("2021") => Some("2"),
+                    // Earlier editions already use the virtual workspace default.
+                    _ => None,
+                }
+            })
+            .map(str::to_owned);
+        if let Some(resolver) = resolver
+            && let Some(workspace) = document
+                .get_mut("workspace")
+                .and_then(|item| item.as_table_mut())
+            && !workspace.contains_key("resolver")
+        {
+            workspace.insert("resolver", toml_edit::value(resolver));
+        }
+    }
+
     let package_level_keys: Vec<String> = document
         .as_table()
         .iter()
@@ -844,6 +880,34 @@ pub(super) fn rewrite_cargo_toml_package_field(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[rstest::rstest]
+    #[case::default("", "", None)]
+    #[case::edition_2018("edition = \"2018\"", "", None)]
+    #[case::edition_2021("edition = \"2021\"", "", Some("2"))]
+    #[case::edition_2024("edition = \"2024\"", "", Some("3"))]
+    #[case::inherited_edition("edition.workspace = true", "package.edition = \"2024\"", Some("3"))]
+    #[case::package_override("edition = \"2024\"\nresolver = \"1\"", "", Some("1"))]
+    #[case::workspace_override("edition = \"2024\"", "resolver = \"2\"", Some("2"))]
+    fn preserves_workspace_resolver(
+        #[case] package: &str,
+        #[case] workspace: &str,
+        #[case] expected: Option<&str>,
+    ) {
+        let mut document: DocumentMut = format!(
+            "[package]\nname = \"root\"\nversion = \"0.1.0\"\n{package}\n[workspace]\nmembers = [\"py\"]\n{workspace}\n"
+        )
+        .parse()
+        .unwrap();
+        strip_non_workspace_tables(&mut document, Path::new("Cargo.toml"));
+        assert!(!document.contains_key("package"));
+        assert_eq!(
+            document["workspace"]
+                .get("resolver")
+                .and_then(|item| item.as_str()),
+            expected
+        );
+    }
 
     #[test]
     fn test_resolved_dep_to_toml_path_dep() {

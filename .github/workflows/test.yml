@@ -137,6 +137,9 @@ jobs:
         run: echo "RUSTFLAGS=-C debuginfo=0" >> "${GITHUB_ENV}"
       - name: Install llvm-tools
         run: rustup component add llvm-tools-preview
+      - name: Install older Cargo toolchains for sdist tests
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.python-version == '3.9' }}
+        run: rustup toolchain install 1.74.0 1.86.0 --profile minimal --no-self-update
       - name: cargo test
         run: cargo nextest run --features password-storage,faster-tests,schemars
       # Zig cross compilation mainly exercises host-OS-specific plumbing, so one

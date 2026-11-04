@@ -6,8 +6,8 @@
 
 use super::abiflags::fun_with_abiflags;
 use super::{
-    FREE_THREADED_MINIMUM_PYTHON_MINOR, InterpreterConfig, InterpreterKind, MINIMUM_PYPY_MINOR,
-    MINIMUM_PYTHON_MINOR, PythonInterpreter,
+    FREE_THREADED_MINIMUM_PYTHON_MINOR, InterpreterConfig, InterpreterKind, MAXIMUM_PYPY_MINOR,
+    MAXIMUM_PYTHON_MINOR, MINIMUM_PYPY_MINOR, MINIMUM_PYTHON_MINOR, PythonInterpreter,
 };
 use crate::target::Arch;
 use crate::{BridgeModel, Target};
@@ -433,9 +433,15 @@ pub(super) fn lookup_target(
     let min_python_minor = bridge
         .map(|bridge| bridge.minimal_python_minor_version())
         .unwrap_or(MINIMUM_PYTHON_MINOR);
+    let max_python_minor = bridge
+        .map(|bridge| bridge.maximum_python_minor_version())
+        .unwrap_or(MAXIMUM_PYTHON_MINOR);
     let min_pypy_minor = bridge
         .map(|bridge| bridge.minimal_pypy_minor_version())
         .unwrap_or(MINIMUM_PYPY_MINOR);
+    let max_pypy_minor = bridge
+        .map(|bridge| bridge.maximum_pypy_minor_version())
+        .unwrap_or(MAXIMUM_PYPY_MINOR);
     let supports_free_threaded = bridge
         .map(|bridge| bridge.supports_free_threaded())
         .unwrap_or(false);
@@ -455,14 +461,14 @@ pub(super) fn lookup_target(
         })
         .filter_map(|config| match config.interpreter_kind {
             InterpreterKind::CPython => {
-                if config.minor >= min_python_minor {
+                if (min_python_minor..=max_python_minor).contains(&config.minor) {
                     Some(config)
                 } else {
                     None
                 }
             }
             InterpreterKind::PyPy => {
-                if config.minor >= min_pypy_minor {
+                if (min_pypy_minor..=max_pypy_minor).contains(&config.minor) {
                     Some(config)
                 } else {
                     None
@@ -718,10 +724,49 @@ fn from_metadata_message(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bridge::{PyO3, PyO3Crate};
+    use crate::bridge::{PyO3, PyO3Crate, PyO3Metadata, PyO3VersionMetadata};
     use expect_test::expect;
     use insta::assert_snapshot;
     use std::str::FromStr;
+
+    #[rstest::rstest]
+    #[case::pyo3_029(8, 15, 11, 11, &[
+        "CPython 3.8", "CPython 3.9", "CPython 3.10", "CPython 3.11",
+        "CPython 3.12", "CPython 3.13", "CPython 3.14", "CPython 3.15",
+        "CPython 3.14t", "CPython 3.15t", "PyPy 3.11",
+    ])]
+    #[case::limited_cpython(13, 14, 11, 12, &[
+        "CPython 3.13", "CPython 3.14", "CPython 3.14t", "PyPy 3.11", "PyPy 3.12",
+    ])]
+    fn test_lookup_target_respects_binding_version_ranges(
+        #[case] cpython_min: usize,
+        #[case] cpython_max: usize,
+        #[case] pypy_min: usize,
+        #[case] pypy_max: usize,
+        #[case] expected: &[&str],
+    ) {
+        let target = Target::from_resolved_target_triple("aarch64-unknown-linux-gnu").unwrap();
+        let bridge = BridgeModel::PyO3(PyO3 {
+            crate_name: PyO3Crate::PyO3,
+            version: semver::Version::new(0, 29, 0),
+            stable_abi: None,
+            metadata: Some(PyO3Metadata {
+                cpython: PyO3VersionMetadata {
+                    min_minor: cpython_min,
+                    max_minor: cpython_max,
+                },
+                pypy: PyO3VersionMetadata {
+                    min_minor: pypy_min,
+                    max_minor: pypy_max,
+                },
+            }),
+        });
+        let interpreters = lookup_target(&target, None, Some(&bridge))
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        assert_eq!(interpreters, expected);
+    }
 
     #[test]
     fn test_lookup_target() {

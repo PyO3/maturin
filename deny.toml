@@ -84,6 +84,7 @@ ignore = [
     { id = "RUSTSEC-2026-0367", reason = "xwin 0.10.0 requires zip ^8. It copies VSIX members with ZipArchive::by_index, not the affected ZipArchive::extract or ZipStreamReader::extract APIs" },
     { id = "RUSTSEC-2026-0368", reason = "xwin 0.10.0 requires zip ^8. It copies VSIX members with ZipArchive::by_index, not the affected ZipArchive::extract or ZipStreamReader::extract APIs" },
     { id = "RUSTSEC-2026-0369", reason = "xwin 0.10.0 requires zip ^8. It copies VSIX members with ZipArchive::by_index, not the affected ZipArchive::extract or ZipStreamReader::extract APIs" },
+    { id = "RUSTSEC-2026-0429", reason = "xwin 0.10.0 requires zip ^8. It streams VSIX members with ZipArchive::by_index and std::io::copy, never calling the affected ZipArchive::extract symlink allocation" },
     #{ id = "RUSTSEC-0000-0000", reason = "you can specify a reason the advisory is ignored" },
     #"a-crate-that-is-yanked@0.1.1", # you can also ignore yanked crate versions if you wish
     #{ crate = "a-crate-that-is-yanked@0.1.1", reason = "you can specify why you are ignoring the yanked crate" },

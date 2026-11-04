@@ -3,8 +3,9 @@ use expect_test::{Expect, expect};
 use indoc::indoc;
 use maturin::pyproject_toml::SdistGenerator;
 use maturin::{BuildOptions, BuildOrchestrator, CargoOptions, OutputOptions, unpack_sdist};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use url::Url;
@@ -334,6 +335,54 @@ fn write_workspace_bin_project(
     )
     .unwrap();
     project_dir
+}
+
+#[test]
+fn sdist_root_dependency_outside_default_members() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let workspace = temp_dir.path();
+    let project = write_workspace_bin_project(workspace, "py", "");
+    fs_err::write(
+        workspace.join("Cargo.toml"),
+        indoc! {r#"
+            [workspace]
+            resolver = "2"
+            members = ["py"]
+            default-members = ["py"]
+
+            [package]
+            name = "root"
+            version = "0.1.0"
+            edition = "2021"
+        "#},
+    )
+    .unwrap();
+    fs_err::create_dir(workspace.join("src")).unwrap();
+    fs_err::write(workspace.join("src/lib.rs"), "mod factory;\n").unwrap();
+    fs_err::write(workspace.join("src/factory.rs"), "// Root crate source\n").unwrap();
+    let manifest = fs_err::read_to_string(project.join("Cargo.toml")).unwrap();
+    fs_err::write(
+        project.join("Cargo.toml"),
+        format!("{manifest}\n[dependencies]\nroot = {{ path = \"..\" }}\n"),
+    )
+    .unwrap();
+
+    let mut archive = other::build_source_distribution(
+        &project,
+        SdistGenerator::Cargo,
+        "sdist-root-dependency-outside-default-members",
+    )
+    .unwrap();
+    let extracted = tempfile::tempdir().unwrap();
+    archive.unpack(extracted.path()).unwrap();
+    let packaged = extracted.path().join("python_pkg-0.1.0");
+    for source in ["src/lib.rs", "src/factory.rs", "py/src/main.rs"] {
+        assert_eq!(
+            fs_err::read(packaged.join(source)).unwrap(),
+            fs_err::read(workspace.join(source)).unwrap(),
+            "missing or incorrect contents for {source}"
+        );
+    }
 }
 
 /// Regression test for https://github.com/PyO3/maturin/issues/3181 +
@@ -1293,6 +1342,473 @@ fn workspace_with_path_dep_sdist() {
     )
 }
 
+#[rstest::rstest]
+#[case::virtual_workspace(false, false, false)]
+#[case::root_package(true, false, false)]
+#[case::root_path_dependency(true, true, false)]
+#[case::leftover_member_lockfile(false, false, true)]
+fn sdist_workspace_lockfile(
+    #[case] root_package: bool,
+    #[case] root_dependency: bool,
+    #[case] member_lockfile: bool,
+    #[values(None, Some("1.74.0"), Some("1.86.0"))] toolchain: Option<&str>,
+) {
+    // Exercise prebuilt Maturin with Cargo older than its build MSRV. CI
+    // installs these toolchains in one Linux job; other jobs test their default.
+    if let Some(toolchain) = toolchain
+        && !Command::new("rustup")
+            .args(["run", toolchain, "cargo", "--version"])
+            .output()
+            .is_ok_and(|output| output.status.success())
+    {
+        eprintln!("Skipping sdist_workspace_lockfile: {toolchain} is not installed");
+        return;
+    }
+    let temp_dir = tempfile::tempdir().unwrap();
+    let workspace = temp_dir.path().join("workspace");
+    let command = |program: &str| {
+        let mut command = Command::new(program);
+        command
+            .current_dir(workspace.join("py"))
+            // Cargo's test harness sets CARGO to its own executable. Let the
+            // runtime toolchain select both Cargo and rustc for wheel builds.
+            .env_remove("CARGO")
+            .env("CARGO_HOME", temp_dir.path().join("cargo-home"));
+        if let Some(toolchain) = toolchain {
+            command.env("RUSTUP_TOOLCHAIN", toolchain);
+        }
+        command
+    };
+    for name in ["py", "shared", "unused", "unused-dep"] {
+        let crate_dir = workspace.join(name);
+        fs_err::create_dir_all(crate_dir.join("src")).unwrap();
+        let dependencies = match name {
+            "py" if root_dependency => {
+                "shared = { path = \"../shared\" }\nroot = { path = \"..\" }"
+            }
+            "py" => "shared = { path = \"../shared\" }",
+            "unused" => "shared = { path = \"../unused-dep\" }",
+            _ => "",
+        };
+        // Two versions of the same dependency require version-qualified entries
+        // in Cargo.lock. Only one version is needed by the packaged workspace.
+        let (package_name, version, standalone) = match name {
+            "shared" => ("shared", "0.2.0", "\n[workspace]\n"),
+            "unused-dep" => ("shared", "0.1.0", "\n[workspace]\n"),
+            _ => (name, "0.1.0", ""),
+        };
+        fs_err::write(
+            crate_dir.join("Cargo.toml"),
+            format!(
+                "[package]\nname = \"{package_name}\"\nversion = \"{version}\"\nedition = \"2021\"\n\n[dependencies]\n{dependencies}\n{standalone}"
+            ),
+        )
+        .unwrap();
+        let (target, source) = if name == "py" {
+            ("main.rs", "fn main() {}\n")
+        } else {
+            ("lib.rs", "")
+        };
+        fs_err::write(crate_dir.join("src").join(target), source).unwrap();
+    }
+    let mut manifest = String::from(
+        "[workspace]\nresolver = \"2\"\nmembers = [\"py\", \"unused\"]\ndefault-members = [\"unused\"]\nexclude = [\"shared\", \"unused-dep\"]\n",
+    );
+    if root_package {
+        manifest.push_str("\n[package]\nname = \"root\"\nversion = \"0.1.0\"\n");
+        fs_err::create_dir(workspace.join("src")).unwrap();
+        fs_err::write(workspace.join("src/lib.rs"), "mod factory;\n").unwrap();
+        fs_err::write(workspace.join("src/factory.rs"), "").unwrap();
+    }
+    fs_err::write(workspace.join("Cargo.toml"), manifest).unwrap();
+    fs_err::write(
+        workspace.join("py/pyproject.toml"),
+        indoc! {r#"
+            [build-system]
+            requires = ["maturin>=1.0,<2.0"]
+            build-backend = "maturin"
+
+            [tool.maturin]
+            locked = true
+        "#},
+    )
+    .unwrap();
+    let status = command("cargo")
+        .args(["generate-lockfile", "--offline"])
+        .status()
+        .unwrap();
+    assert!(status.success());
+    let original_lockfile = fs_err::read(workspace.join("Cargo.lock")).unwrap();
+    if member_lockfile {
+        // Cargo ignores lockfiles left in workspace members, even invalid ones.
+        fs_err::write(workspace.join("py/Cargo.lock"), "not a lockfile\n").unwrap();
+    }
+
+    let dist = temp_dir.path().join("dist");
+    let output = command(env!("CARGO_BIN_EXE_maturin"))
+        .args(["sdist", "--out"])
+        .arg(&dist)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "sdist failed with {toolchain:?}: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let archive = fs_err::File::open(dist.join("py-0.1.0.tar.gz")).unwrap();
+    let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(archive));
+    let extracted = temp_dir.path().join("extracted");
+    archive.unpack(&extracted).unwrap();
+    let packaged = extracted.join("py-0.1.0");
+    assert!(packaged.join("pyproject.toml").is_file());
+    assert!(!packaged.join("py/Cargo.lock").exists());
+    assert!(!packaged.join("unused").exists());
+    assert!(!packaged.join("unused-dep").exists());
+    assert_eq!(packaged.join("src/factory.rs").exists(), root_dependency);
+    assert_eq!(
+        fs_err::read(workspace.join("Cargo.lock")).unwrap(),
+        original_lockfile,
+        "building an sdist must not change the repository lockfile"
+    );
+    let lockfile: toml::Value =
+        toml::from_str(&fs_err::read_to_string(packaged.join("Cargo.lock")).unwrap()).unwrap();
+    let original: toml::Value =
+        toml::from_str(std::str::from_utf8(&original_lockfile).unwrap()).unwrap();
+    assert_eq!(lockfile["version"], original["version"]);
+    let packages: Vec<_> = lockfile["package"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|package| {
+            (
+                package["name"].as_str().unwrap(),
+                package["version"].as_str().unwrap(),
+            )
+        })
+        .collect();
+    let mut expected_packages = vec![("py", "0.1.0")];
+    if root_dependency {
+        expected_packages.push(("root", "0.1.0"));
+    }
+    expected_packages.push(("shared", "0.2.0"));
+    assert_eq!(packages, expected_packages);
+
+    // Neither vendoring nor building the extracted sdist may rely on files
+    // left in the source workspace.
+    fs_err::remove_dir_all(&workspace).unwrap();
+    let output = command("cargo")
+        .args([
+            "vendor",
+            "--manifest-path",
+            "Cargo.toml",
+            "--locked",
+            "--offline",
+            "VENDOR",
+        ])
+        .current_dir(&packaged)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "locked vendoring failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let mut build = command(env!("CARGO_BIN_EXE_maturin"));
+    build
+        .current_dir(&packaged)
+        .args(["build", "--bindings", "bin", "--locked", "--offline"]);
+    if cfg!(target_os = "linux") {
+        build.args(["--compatibility", "linux"]);
+    }
+    let output = build.output().unwrap();
+    assert!(
+        output.status.success(),
+        "building the extracted sdist failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[rstest::rstest]
+#[case::relative(true, "config/overrides.toml", "py/config/overrides.toml", "registry")]
+#[case::equals_in_filename(
+    true,
+    "config/overrides=sdist.toml",
+    "py/config/overrides=sdist.toml",
+    "registry"
+)]
+#[case::parent_relative(
+    true,
+    "../config/overrides.toml",
+    "config/overrides.toml",
+    "py/registry"
+)]
+#[case::top_level(false, "config/overrides.toml", "config/overrides.toml", "registry")]
+fn sdist_cargo_config_file(
+    #[case] workspace_member: bool,
+    #[case] config_path: &str,
+    #[case] packaged_config_path: &str,
+    #[case] registry_path: &str,
+) {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let workspace = temp_dir.path().join("workspace");
+    let project_dir = if workspace_member {
+        workspace.join("py")
+    } else {
+        workspace.clone()
+    };
+    let mut crates = vec![(project_dir.clone(), "py")];
+    if workspace_member {
+        crates.push((workspace.join("unused"), "unused"));
+    }
+    for (path, member) in crates {
+        fs_err::create_dir_all(path.join("src")).unwrap();
+        fs_err::write(
+            path.join("Cargo.toml"),
+            format!(
+                "[package]\nname = \"{member}\"\nversion = \"0.1.0\"\nedition = \"2021\"\ninclude = [\"src/**\", \"pyproject.toml\", \"registry/**\"]\n"
+            ),
+        )
+        .unwrap();
+        fs_err::write(path.join("src/main.rs"), "fn main() {}\n").unwrap();
+    }
+    fs_err::OpenOptions::new()
+        .append(true)
+        .open(project_dir.join("Cargo.toml"))
+        .unwrap()
+        .write_all(b"[dependencies]\nregistry-dep = \"1\"\n")
+        .unwrap();
+    if workspace_member {
+        fs_err::write(
+            workspace.join("Cargo.toml"),
+            "[workspace]\nresolver = \"2\"\nmembers = [\"py\", \"unused\"]\n",
+        )
+        .unwrap();
+    }
+
+    // Package a real local registry so both the config reference and paths
+    // inside the config must remain valid after removing the source workspace.
+    let registry = project_dir.join("registry");
+    fs_err::create_dir_all(registry.join("index/re/gi")).unwrap();
+    let mut archive = tar::Builder::new(flate2::write::GzEncoder::new(
+        Vec::new(),
+        flate2::Compression::default(),
+    ));
+    for (path, data) in [
+        (
+            "Cargo.toml",
+            "[package]\nname = \"registry-dep\"\nversion = \"1.0.0\"\nedition = \"2021\"\n",
+        ),
+        ("src/lib.rs", "pub fn check() {}\n"),
+    ] {
+        let mut header = tar::Header::new_gnu();
+        header.set_size(data.len() as u64);
+        header.set_mode(0o644);
+        header.set_cksum();
+        archive
+            .append_data(
+                &mut header,
+                format!("registry-dep-1.0.0/{path}"),
+                data.as_bytes(),
+            )
+            .unwrap();
+    }
+    let archive = archive.into_inner().unwrap().finish().unwrap();
+    let checksum = cargo_lock::Checksum::Sha256(Sha256::digest(&archive).into()).to_string();
+    fs_err::write(registry.join("registry-dep-1.0.0.crate"), archive).unwrap();
+    fs_err::write(
+        registry.join("index/re/gi/registry-dep"),
+        format!(
+            "{}\n",
+            serde_json::json!({
+                "name": "registry-dep", "vers": "1.0.0", "deps": [],
+                "cksum": checksum, "features": {}, "yanked": false,
+            })
+        ),
+    )
+    .unwrap();
+
+    let config_file = project_dir.join(config_path);
+    fs_err::create_dir_all(config_file.parent().unwrap()).unwrap();
+    fs_err::write(
+        &config_file,
+        format!(
+            "[source.crates-io]\nreplace-with = \"test-registry\"\n[source.test-registry]\nlocal-registry = \"{registry_path}\"\n"
+        ),
+    )
+    .unwrap();
+    let inline_config = "env.MATURIN_SDIST_INLINE=\"enabled\"";
+    fs_err::write(
+        project_dir.join("pyproject.toml"),
+        format!(
+            "[build-system]\nrequires = [\"maturin>=1,<2\"]\nbuild-backend = \"maturin\"\n[tool.maturin]\nbindings = \"bin\"\nlocked = true\nconfig = {}\n",
+            serde_json::json!([config_path, inline_config]),
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        project_dir.join("src/main.rs"),
+        "fn main() { registry_dep::check(); assert_eq!(env!(\"MATURIN_SDIST_INLINE\"), \"enabled\"); }\n",
+    )
+    .unwrap();
+    let run = |command: &mut Command| {
+        let output = command.env("CARGO_NET_OFFLINE", "true").output().unwrap();
+        assert!(
+            output.status.success(),
+            "{command:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    };
+    let cargo_home = temp_dir.path().join("cargo-home");
+    run(Command::new("cargo")
+        .args(["generate-lockfile", "--config", config_path])
+        .current_dir(&project_dir)
+        .env("CARGO_HOME", &cargo_home));
+    let dist = temp_dir.path().join("dist");
+    run(Command::new(env!("CARGO_BIN_EXE_maturin"))
+        .args(["sdist", "--out"])
+        .arg(&dist)
+        .current_dir(&project_dir)
+        .env("CARGO_HOME", &cargo_home));
+    let archive = fs_err::File::open(dist.join("py-0.1.0.tar.gz")).unwrap();
+    let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(archive));
+    let extracted = temp_dir.path().join("extracted");
+    archive.unpack(&extracted).unwrap();
+    let packaged = extracted.join("py-0.1.0");
+    let pyproject: toml::Value =
+        toml::from_str(&fs_err::read_to_string(packaged.join("pyproject.toml")).unwrap()).unwrap();
+    assert_eq!(
+        pyproject["tool"]["maturin"]["config"][0].as_str(),
+        Some(packaged_config_path)
+    );
+    assert_eq!(
+        pyproject["tool"]["maturin"]["config"][1].as_str(),
+        Some(inline_config)
+    );
+    assert_eq!(
+        fs_err::read(packaged.join(packaged_config_path)).unwrap(),
+        fs_err::read(config_file).unwrap()
+    );
+    fs_err::remove_dir_all(&workspace).unwrap();
+    let mut build = Command::new(env!("CARGO_BIN_EXE_maturin"));
+    build
+        .args(["build", "--locked", "--offline"])
+        .current_dir(&packaged)
+        .env("CARGO_HOME", temp_dir.path().join("empty-cargo-home"));
+    if cfg!(target_os = "linux") {
+        build.args(["--compatibility", "linux"]);
+    }
+    run(&mut build);
+}
+
+#[cfg(unix)]
+#[rstest::rstest]
+fn sdist_cargo_config_symlink_parent(
+    #[values(false, true)] workspace_member: bool,
+    #[values(false, true)] relative_asset: bool,
+) {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let workspace = temp_dir.path().join("workspace");
+    let project_dir = if workspace_member {
+        workspace.join("py")
+    } else {
+        workspace.clone()
+    };
+    fs_err::create_dir_all(project_dir.join("src")).unwrap();
+    fs_err::write(
+        project_dir.join("Cargo.toml"),
+        "[package]\nname = \"py\"\nversion = \"0.1.0\"\nedition = \"2021\"\ninclude = [\"src/**\", \"pyproject.toml\", \"alias/marker\"]\n",
+    )
+    .unwrap();
+    if workspace_member {
+        fs_err::create_dir_all(workspace.join("unused/src")).unwrap();
+        fs_err::write(workspace.join("unused/src/lib.rs"), "").unwrap();
+        fs_err::write(
+            workspace.join("unused/Cargo.toml"),
+            "[package]\nname = \"unused\"\nversion = \"0.1.0\"\n",
+        )
+        .unwrap();
+        fs_err::write(
+            workspace.join("Cargo.toml"),
+            "[workspace]\nresolver = \"2\"\nmembers = [\"py\", \"unused\"]\n",
+        )
+        .unwrap();
+    }
+    let shared = temp_dir.path().join("shared");
+    fs_err::create_dir_all(shared.join("deep")).unwrap();
+    fs_err::os::unix::fs::symlink(shared.join("deep"), project_dir.join("alias")).unwrap();
+    let config = "[env]\nMATURIN_CONFIG_CONTENT = \"good\"\nMATURIN_CONFIG_MARKER = { value = \"marker\", relative = true }\n";
+    fs_err::write(shared.join("overrides.toml"), config).unwrap();
+    // Lexically collapsing alias/.. would copy this different file.
+    fs_err::write(
+        project_dir.join("overrides.toml"),
+        "[env]\nMATURIN_CONFIG_CONTENT = \"bad\"\n",
+    )
+    .unwrap();
+    let asset_check = if relative_asset {
+        fs_err::write(shared.join("deep/marker"), "good").unwrap();
+        "const _: [(); 4] = [(); include_str!(env!(\"MATURIN_CONFIG_MARKER\")).len()];\n"
+    } else {
+        ""
+    };
+    fs_err::write(
+        project_dir.join("src/main.rs"),
+        format!(
+            "const _: [(); 4] = [(); env!(\"MATURIN_CONFIG_CONTENT\").len()];\n{asset_check}fn main() {{}}\n"
+        ),
+    )
+    .unwrap();
+    fs_err::write(
+        project_dir.join("pyproject.toml"),
+        "[build-system]\nrequires = [\"maturin>=1,<2\"]\nbuild-backend = \"maturin\"\n[tool.maturin]\nbindings = \"bin\"\nlocked = true\nconfig = [\"alias/../overrides.toml\"]\n",
+    )
+    .unwrap();
+    let run = |command: &mut Command| {
+        let output = command
+            .env("CARGO_HOME", temp_dir.path().join("cargo-home"))
+            .env("CARGO_NET_OFFLINE", "true")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{command:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    };
+    run(Command::new("cargo")
+        .args(["build", "--config", "alias/../overrides.toml"])
+        .current_dir(&project_dir));
+    let dist = temp_dir.path().join("dist");
+    run(Command::new(env!("CARGO_BIN_EXE_maturin"))
+        .args(["sdist", "--out"])
+        .arg(&dist)
+        .current_dir(&project_dir));
+    let archive = fs_err::File::open(dist.join("py-0.1.0.tar.gz")).unwrap();
+    let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(archive));
+    let extracted = temp_dir.path().join("extracted");
+    archive.unpack(&extracted).unwrap();
+    let packaged = extracted.join("py-0.1.0");
+    let packaged_project = if workspace_member {
+        packaged.join("py")
+    } else {
+        packaged.clone()
+    };
+    assert_eq!(
+        fs_err::read_to_string(packaged_project.join("overrides.toml")).unwrap(),
+        config
+    );
+    assert!(packaged_project.join("alias").is_dir());
+    fs_err::remove_dir_all(&workspace).unwrap();
+    fs_err::remove_dir_all(&shared).unwrap();
+    let mut build = Command::new(env!("CARGO_BIN_EXE_maturin"));
+    build
+        .args(["build", "--locked", "--offline"])
+        .current_dir(&packaged);
+    if cfg!(target_os = "linux") {
+        build.args(["--compatibility", "linux"]);
+    }
+    run(&mut build);
+}
+
 #[test]
 fn workspace_with_path_dep_git_sdist_generator() {
     if !Path::new(".git").exists() {
@@ -1314,6 +1830,490 @@ fn workspace_with_path_dep_git_sdist_generator() {
         "#]],
         None,
     )
+}
+
+#[rstest::rstest]
+#[case::edition_2021("2021", false, "2")]
+#[case::edition_2024("2024", false, "3")]
+#[case::inherited_edition("2024", true, "3")]
+fn sdist_workspace_resolver(
+    #[case] edition: &str,
+    #[case] inherited: bool,
+    #[case] resolver: &str,
+) {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let workspace = temp_dir.path().join("workspace");
+    for member in ["", "py", "shared"] {
+        fs_err::create_dir_all(workspace.join(member).join("src")).unwrap();
+    }
+    let edition_field = if inherited {
+        "edition.workspace = true".to_string()
+    } else {
+        format!("edition = \"{edition}\"")
+    };
+    fs_err::write(
+        workspace.join("Cargo.toml"),
+        format!(
+            "[package]\nname = \"root\"\nversion = \"0.1.0\"\n{edition_field}\n[workspace]\nmembers = [\"py\", \"shared\"]\n[workspace.package]\nedition = \"{edition}\"\n"
+        ),
+    )
+    .unwrap();
+    fs_err::write(workspace.join("src/lib.rs"), "").unwrap();
+    fs_err::write(
+        workspace.join("shared/Cargo.toml"),
+        "[package]\nname = \"shared\"\nversion = \"0.1.0\"\nedition = \"2021\"\n[features]\nhost-only = []\n",
+    )
+    .unwrap();
+    fs_err::write(
+        workspace.join("shared/src/lib.rs"),
+        "#[cfg(not(feature = \"host-only\"))]\npub fn target_only() {}\n",
+    )
+    .unwrap();
+    fs_err::write(
+        workspace.join("py/Cargo.toml"),
+        "[package]\nname = \"py\"\nversion = \"0.1.0\"\nedition = \"2021\"\n[dependencies]\nshared = { path = \"../shared\" }\n[build-dependencies]\nshared = { path = \"../shared\", features = [\"host-only\"] }\n",
+    )
+    .unwrap();
+    fs_err::write(
+        workspace.join("py/src/main.rs"),
+        "fn main() { shared::target_only(); }\n",
+    )
+    .unwrap();
+    fs_err::write(workspace.join("py/build.rs"), "fn main() {}\n").unwrap();
+    fs_err::write(
+        workspace.join("py/pyproject.toml"),
+        "[build-system]\nrequires = [\"maturin>=1,<2\"]\nbuild-backend = \"maturin\"\n[tool.maturin]\nbindings = \"bin\"\nlocked = true\n",
+    )
+    .unwrap();
+    let run = |cwd: &Path, command: &mut Command| {
+        let output = command
+            .current_dir(cwd)
+            .env("CARGO_HOME", temp_dir.path().join("cargo-home"))
+            .env("CARGO_NET_OFFLINE", "true")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{command:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    };
+    run(&workspace, Command::new("cargo").arg("generate-lockfile"));
+    // Resolver 1 would unify host-only into the target dependency and remove
+    // target_only(), making this build fail despite an otherwise valid lockfile.
+    run(
+        &workspace.join("py"),
+        Command::new("cargo").args(["build", "--locked", "--offline"]),
+    );
+    let original_lockfile = fs_err::read(workspace.join("Cargo.lock")).unwrap();
+    let dist = temp_dir.path().join("dist");
+    run(
+        &workspace.join("py"),
+        Command::new(env!("CARGO_BIN_EXE_maturin"))
+            .args(["sdist", "--out"])
+            .arg(&dist),
+    );
+    assert_eq!(
+        fs_err::read(workspace.join("Cargo.lock")).unwrap(),
+        original_lockfile
+    );
+    let archive = fs_err::File::open(dist.join("py-0.1.0.tar.gz")).unwrap();
+    let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(archive));
+    let extracted = temp_dir.path().join("extracted");
+    archive.unpack(&extracted).unwrap();
+    let packaged = extracted.join("py-0.1.0");
+    let manifest: toml::Value =
+        toml::from_str(&fs_err::read_to_string(packaged.join("Cargo.toml")).unwrap()).unwrap();
+    assert!(manifest.get("package").is_none());
+    assert_eq!(manifest["workspace"]["resolver"].as_str(), Some(resolver));
+    run(
+        &packaged.join("py"),
+        Command::new("cargo").args(["build", "--locked", "--offline"]),
+    );
+}
+
+#[rstest::rstest]
+#[case::no_default_features(false)]
+#[case::target_filter(true)]
+fn sdist_workspace_lockfile_uncached_dependency(#[case] target_filter: bool) {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let workspace = temp_dir.path().join("workspace");
+    for name in ["py", "unused"] {
+        let path = workspace.join(name);
+        fs_err::create_dir_all(path.join("src")).unwrap();
+        let mut manifest =
+            format!("[package]\nname = \"{name}\"\nversion = \"0.1.0\"\nedition = \"2021\"\n");
+        if name == "py" {
+            if target_filter {
+                manifest.push_str(
+                    "[target.'cfg(target_os = \"none\")'.dependencies]\nuncached = \"=1.0.0\"\n",
+                );
+            } else {
+                manifest.push_str(
+                    "[dependencies]\nuncached = { version = \"=1.0.0\", optional = true }\n[features]\ndefault = [\"dep:uncached\"]\n",
+                );
+            }
+        }
+        fs_err::write(path.join("Cargo.toml"), manifest).unwrap();
+        fs_err::write(path.join("src/main.rs"), "fn main() {}\n").unwrap();
+    }
+    fs_err::write(
+        workspace.join("Cargo.toml"),
+        "[workspace]\nresolver = \"2\"\nmembers = [\"py\", \"unused\"]\n",
+    )
+    .unwrap();
+    let feature_options = if target_filter {
+        ""
+    } else {
+        "no-default-features = true\n"
+    };
+    fs_err::write(
+        workspace.join("py/pyproject.toml"),
+        format!(
+            "[build-system]\nrequires = [\"maturin>=1.0,<2.0\"]\nbuild-backend = \"maturin\"\n[tool.maturin]\nbindings = \"bin\"\nlocked = true\n{feature_options}"
+        ),
+    )
+    .unwrap();
+
+    // Supply only a local registry index. The disabled dependency can be
+    // resolved into Cargo.lock, but its crate archive is deliberately absent.
+    // Enabling default features or losing the target filter during staged
+    // metadata would require that download and fail, without using the network.
+    let index = temp_dir.path().join("registry/index/un/ca");
+    fs_err::create_dir_all(&index).unwrap();
+    fs_err::write(
+        index.join("uncached"),
+        format!(
+            "{}\n",
+            serde_json::json!({
+                "name": "uncached",
+                "vers": "1.0.0",
+                "deps": [],
+                "cksum": "0".repeat(64),
+                "features": {},
+                "yanked": false,
+            })
+        ),
+    )
+    .unwrap();
+    fs_err::create_dir_all(workspace.join(".cargo")).unwrap();
+    fs_err::write(
+        workspace.join(".cargo/config.toml"),
+        "[source.crates-io]\nreplace-with = \"test-registry\"\n[source.test-registry]\nlocal-registry = \"../registry\"\n",
+    )
+    .unwrap();
+    let run = |command: &mut Command| {
+        let output = command
+            .current_dir(workspace.join("py"))
+            .env("CARGO_HOME", temp_dir.path().join("cargo-home"))
+            .env("CARGO_NET_OFFLINE", "true")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{command:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    };
+    run(Command::new("cargo").arg("generate-lockfile"));
+    let original_contents = fs_err::read(workspace.join("Cargo.lock")).unwrap();
+    let mut maturin = Command::new(env!("CARGO_BIN_EXE_maturin"));
+    if target_filter {
+        // The build command exposes target selection and verifies that the
+        // generated archive also builds without the unavailable dependency.
+        maturin
+            .args(["build", "--sdist", "--target"])
+            .arg(rustc_version::version_meta().unwrap().host)
+            .args(["--compatibility", "linux"]);
+    } else {
+        maturin.arg("sdist");
+    }
+    let dist = temp_dir.path().join("dist");
+    run(maturin.arg("--out").arg(&dist));
+    assert_eq!(
+        fs_err::read(workspace.join("Cargo.lock")).unwrap(),
+        original_contents
+    );
+    let archive = fs_err::File::open(dist.join("py-0.1.0.tar.gz")).unwrap();
+    let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(archive));
+    let extracted = temp_dir.path().join("extracted");
+    archive.unpack(&extracted).unwrap();
+    let lockfile: toml::Value =
+        toml::from_str(&fs_err::read_to_string(extracted.join("py-0.1.0/Cargo.lock")).unwrap())
+            .unwrap();
+    let names: Vec<_> = lockfile["package"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|package| package["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(names, ["py", "uncached"]);
+}
+
+#[rstest::rstest]
+#[case::workspace_config_v3(false, 3)]
+#[case::relative_config_v3(true, 3)]
+#[case::workspace_config_v4(false, 4)]
+#[case::relative_config_v4(true, 4)]
+fn sdist_workspace_lockfile_pins(
+    #[case] relative_config: bool,
+    #[case] version: u32,
+    #[values(
+        "feature/sdist",
+        "feature+sdist",
+        "feature%2Fsdist",
+        "feature&sdist",
+        "master"
+    )]
+    branch: &str,
+) {
+    if which("git").is_err() {
+        eprintln!("Skipping sdist_workspace_lockfile_pins: git not found");
+        return;
+    }
+
+    fn run(command: &mut Command) -> std::process::Output {
+        let output = command.output().unwrap();
+        assert!(
+            output.status.success(),
+            "{command:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        output
+    }
+
+    fn write_crate(path: &Path, name: &str, version: &str, dependencies: &str) {
+        fs_err::create_dir_all(path.join("src")).unwrap();
+        fs_err::write(
+            path.join("Cargo.toml"),
+            format!(
+                "[package]\nname = \"{name}\"\nversion = \"{version}\"\nedition = \"2021\"\n\n[dependencies]\n{dependencies}\n"
+            ),
+        )
+        .unwrap();
+        let target = if name == "py" { "main.rs" } else { "lib.rs" };
+        fs_err::write(path.join("src").join(target), "pub fn main() {}\n").unwrap();
+    }
+
+    let temp_dir = tempfile::tempdir().unwrap();
+    let workspace = temp_dir.path().join("workspace");
+    let cargo_home = temp_dir.path().join("cargo-home");
+    let registry = temp_dir.path().join("registry");
+    let git_dep = temp_dir.path().join("gitdep");
+    write_crate(&git_dep, "gitdep", "0.1.0", "");
+    let git = || {
+        let mut command = Command::new("git");
+        command.current_dir(&git_dep).args([
+            "-c",
+            "user.name=maturin-tests",
+            "-c",
+            "user.email=maturin-tests@example.com",
+            "-c",
+            "commit.gpgsign=false",
+        ]);
+        command
+    };
+    run(git().args(["init", &format!("--initial-branch={branch}"), "-q"]));
+    run(git().args(["add", "."]));
+    run(git().args(["commit", "-qm", "Initial dependency"]));
+    // A second source for the same name/version exercises qualified source
+    // references in dependency lists as well as package entries.
+    run(git().args(["branch", "other"]));
+    let git_url = Url::from_directory_path(&git_dep).unwrap();
+
+    // A local registry exercises real archive checksums without network access.
+    // Cargo before 1.87 cannot re-vendor directory sources (cargo#15260).
+    let index = registry.join("index/re/gi");
+    fs_err::create_dir_all(&index).unwrap();
+    let add_registry_version = |version| {
+        let name = format!("registry-dep-{version}");
+        let path = temp_dir.path().join("registry-src").join(&name);
+        write_crate(&path, "registry-dep", version, "");
+        let mut archive = tar::Builder::new(flate2::write::GzEncoder::new(
+            Vec::new(),
+            flate2::Compression::default(),
+        ));
+        archive.append_dir_all(&name, &path).unwrap();
+        let archive = archive.into_inner().unwrap().finish().unwrap();
+        let checksum = cargo_lock::Checksum::Sha256(Sha256::digest(&archive).into()).to_string();
+        fs_err::write(registry.join(format!("{name}.crate")), archive).unwrap();
+        let mut index = fs_err::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(index.join("registry-dep"))
+            .unwrap();
+        writeln!(
+            index,
+            "{}",
+            serde_json::json!({
+                "name": "registry-dep", "vers": version, "deps": [],
+                "cksum": checksum, "features": {}, "yanked": false,
+            })
+        )
+        .unwrap();
+    };
+    add_registry_version("1.0.0");
+    add_registry_version("2.0.0");
+    write_crate(
+        &workspace.join("py"),
+        "py",
+        "0.1.0",
+        &format!("registry-dep = \"1\"\ngitdep = {{ git = \"{git_url}\", branch = \"{branch}\" }}"),
+    );
+    write_crate(
+        &workspace.join("unused"),
+        "unused",
+        "0.1.0",
+        &format!("registry-dep = \"2\"\ngitdep = {{ git = \"{git_url}\", branch = \"other\" }}"),
+    );
+    fs_err::write(
+        workspace.join("Cargo.toml"),
+        "[workspace]\nresolver = \"2\"\nmembers = [\"py\", \"unused\"]\n",
+    )
+    .unwrap();
+
+    let config_option = if relative_config {
+        // No automatically discovered config: every Cargo query must forward
+        // this override to find the registry and preserve its relative paths.
+        fs_err::create_dir_all(workspace.join("py/config")).unwrap();
+        fs_err::write(
+            workspace.join("py/config/overrides.toml"),
+            "[source.crates-io]\nreplace-with = \"test-registry\"\n\n[source.test-registry]\nlocal-registry = \"../../registry\"\n",
+        )
+        .unwrap();
+        "config = [\"config/overrides.toml\"]\n"
+    } else {
+        fs_err::create_dir_all(workspace.join(".cargo")).unwrap();
+        fs_err::write(
+            workspace.join(".cargo/config.toml"),
+            "[source.crates-io]\nreplace-with = \"test-registry\"\n\n[source.test-registry]\nlocal-registry = \"../registry\"\n",
+        )
+        .unwrap();
+        ""
+    };
+    let lock_option = if version == 3 { "frozen" } else { "locked" };
+    fs_err::write(
+        workspace.join("py/pyproject.toml"),
+        format!(
+            "[build-system]\nrequires = [\"maturin>=1.0,<2.0\"]\nbuild-backend = \"maturin\"\n\n[tool.maturin]\n{lock_option} = true\n{config_option}"
+        ),
+    )
+    .unwrap();
+    let cargo = || {
+        let mut command = Command::new("cargo");
+        command
+            .current_dir(workspace.join("py"))
+            .env("CARGO_HOME", &cargo_home);
+        if relative_config {
+            command.args(["--config", "config/overrides.toml"]);
+        }
+        command
+    };
+    run(cargo().arg("generate-lockfile"));
+    let lock_path = workspace.join("Cargo.lock");
+    let mut original = cargo_lock::Lockfile::load(&lock_path).unwrap();
+    original.version = match version {
+        3 => cargo_lock::ResolveVersion::V3,
+        4 => cargo_lock::ResolveVersion::V4,
+        _ => unreachable!(),
+    };
+    let original_contents = original.to_string();
+
+    // Make newer compatible registry and Git versions available in the cache.
+    // Re-resolving from scratch would silently lose the original pins.
+    add_registry_version("1.1.0");
+    fs_err::write(git_dep.join("src/lib.rs"), "pub fn newer() {}\n").unwrap();
+    run(git().args(["commit", "-am", "Newer dependency", "-q"]));
+    run(cargo().arg("update"));
+    let newer = cargo_lock::Lockfile::load(&lock_path).unwrap();
+    for name in ["registry-dep", "gitdep"] {
+        assert!(newer.packages.iter().any(|package| {
+            package.name.as_str() == name && !original.packages.contains(package)
+        }));
+    }
+    fs_err::write(&lock_path, &original_contents).unwrap();
+    run(cargo().args(["metadata", "--locked", "--offline", "--format-version", "1"]));
+
+    let dist = temp_dir.path().join("dist");
+    run(Command::new(env!("CARGO_BIN_EXE_maturin"))
+        .args(["sdist", "--out"])
+        .arg(&dist)
+        .current_dir(workspace.join("py"))
+        .env("CARGO_HOME", &cargo_home)
+        .env("CARGO_NET_OFFLINE", "true"));
+    assert_eq!(
+        fs_err::read_to_string(&lock_path).unwrap(),
+        original_contents,
+        "building an sdist must not change the repository lockfile"
+    );
+    let archive = fs_err::File::open(dist.join("py-0.1.0.tar.gz")).unwrap();
+    let mut archive = tar::Archive::new(flate2::read::GzDecoder::new(archive));
+    let extracted = temp_dir.path().join("extracted");
+    archive.unpack(&extracted).unwrap();
+    let packaged = extracted.join("py-0.1.0");
+    // Compare pins in the original format without decoding legacy Git URLs.
+    // cargo-lock's parser applies URL decoding even to v3's literal references.
+    let packaged_lock: toml::Value =
+        toml::from_str(&fs_err::read_to_string(packaged.join("Cargo.lock")).unwrap()).unwrap();
+    let mut original_lock: toml::Value = toml::from_str(&original_contents).unwrap();
+    assert_eq!(packaged_lock["version"], original_lock["version"]);
+    original_lock["package"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|package| {
+            package["name"].as_str() != Some("unused")
+                && !(package["name"].as_str() == Some("registry-dep")
+                    && package["version"].as_str() == Some("2.0.0"))
+                && !package
+                    .get("source")
+                    .and_then(toml::Value::as_str)
+                    .is_some_and(|source| source.contains("?branch=other#"))
+        });
+    let pins = |lockfile: &toml::Value| {
+        lockfile["package"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|package| {
+                ["name", "version", "source", "checksum"].map(|key| package.get(key).cloned())
+            })
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(pins(&packaged_lock), pins(&original_lock));
+    assert!(!packaged.join("unused").exists());
+
+    run(cargo()
+        .args([
+            "metadata",
+            "--locked",
+            "--offline",
+            "--format-version",
+            "1",
+            "--manifest-path",
+        ])
+        .arg(packaged.join("Cargo.toml")));
+    let vendor = run(cargo()
+        .args([
+            "vendor",
+            "--locked",
+            "--offline",
+            "--respect-source-config",
+            "--manifest-path",
+        ])
+        .arg(packaged.join("Cargo.toml"))
+        .arg(packaged.join("VENDOR")));
+    // Cargo itself cannot use vendored v3 Git sources with these characters,
+    // even in the unmodified workspace (rust-lang/cargo#14584). The original
+    // format, pins, locked metadata, and locked vendoring are checked above.
+    if version == 3 && branch.contains(['+', '%', '&']) {
+        return;
+    }
+    fs_err::create_dir_all(packaged.join(".cargo")).unwrap();
+    fs_err::write(packaged.join(".cargo/config.toml"), vendor.stdout).unwrap();
+    run(Command::new("cargo")
+        .args(["metadata", "--frozen", "--format-version", "1"])
+        .current_dir(&packaged)
+        .env("CARGO_HOME", temp_dir.path().join("empty-cargo-home")));
 }
 
 #[rustversion::since(1.64)]

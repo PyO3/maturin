@@ -12,7 +12,7 @@ use tracing::{debug, trace};
 
 use super::SdistContext;
 use super::cargo_toml_rewrite::parse_toml_file;
-use super::utils::is_compiled_artifact;
+use super::utils::{is_compiled_artifact, normalize_path};
 
 pub(super) type PyprojectPathRewrite = (&'static str, String);
 
@@ -144,6 +144,8 @@ pub(super) fn add_pyproject_toml(
     pyproject_toml_path: &Path,
     metadata_rewrites: &[PyprojectPathRewrite],
 ) -> Result<()> {
+    let mut data = parse_toml_file(pyproject_toml_path, "pyproject.toml")?;
+    rewrite_cargo_config_paths(writer, ctx, &mut data)?;
     if ctx.pyproject_dir != ctx.sdist_root {
         let relative_manifest_path = ctx.relative_main_crate_manifest_dir.join("Cargo.toml");
         let python_dir = &ctx.project.project_layout.python_dir;
@@ -159,6 +161,7 @@ pub(super) fn add_pyproject_toml(
             None
         };
         let rewritten = rewrite_pyproject_toml(
+            data,
             pyproject_toml_path,
             &relative_manifest_path,
             relative_python_source.as_deref(),
@@ -171,11 +174,95 @@ pub(super) fn add_pyproject_toml(
             false,
         )?;
     } else {
-        writer.add_file(
+        writer.add_bytes(
             ctx.root_dir.join("pyproject.toml"),
-            pyproject_toml_path,
+            Some(pyproject_toml_path),
+            data.to_string().as_bytes(),
             false,
         )?;
+    }
+    Ok(())
+}
+
+/// Preserve config files at their original archive locations, so paths inside
+/// them retain Cargo's config-relative semantics in both standalone and
+/// workspace sdists.
+fn rewrite_cargo_config_paths(
+    writer: &mut VirtualWriter<SDistWriter>,
+    ctx: &SdistContext<'_>,
+    data: &mut toml_edit::DocumentMut,
+) -> Result<()> {
+    let Some(configs) = data
+        .get_mut("tool")
+        .and_then(|tool| tool.get_mut("maturin"))
+        .and_then(|maturin| maturin.get_mut("config"))
+        .and_then(toml_edit::Item::as_array_mut)
+    else {
+        return Ok(());
+    };
+    for config in configs.iter_mut() {
+        let value = config
+            .as_str()
+            .context("`tool.maturin.config` must contain strings")?;
+        let source = ctx.pyproject_dir.join(value);
+        // Cargo accepts both file paths and inline TOML overrides. Check for
+        // a file rather than `=`, which is also valid in config filenames.
+        // Absolute paths refer to the caller's environment; leave them alone.
+        if Path::new(value).is_absolute() || !source.is_file() {
+            continue;
+        }
+        // Normalize only the archive destination. Resolving `..` lexically
+        // before opening a source path can select a different file if a
+        // preceding component is a symlink.
+        let destination = normalize_path(&source);
+        let relative = destination
+            .strip_prefix(&ctx.project_root)
+            .with_context(|| {
+                format!(
+                    "Relative Cargo config `{value}` is outside source distribution root `{}`",
+                    ctx.project_root.display()
+                )
+            })?;
+        let target = ctx.root_dir.join(relative);
+        writer.add_file(&target, &source, false)?;
+        if !writer.contains_target(&target) {
+            bail!("Cargo config `{value}` is excluded from the source distribution");
+        }
+
+        // Cargo bases paths in a config on the parent of its containing
+        // directory, before resolving `..`. For `alias/../config.toml`, that
+        // base is `alias`, so reducing the reference to `config.toml` changes
+        // its meaning. Retain the traversal and the directories it needs.
+        let reference = ctx
+            .pyproject_dir
+            .strip_prefix(&ctx.project_root)?
+            .join(value);
+        let config_base = reference.parent().and_then(Path::parent);
+        let archive_base = relative.parent().and_then(Path::parent);
+        let reference = if config_base.map(normalize_path) == archive_base.map(Path::to_path_buf) {
+            relative
+        } else {
+            let mut directory = PathBuf::new();
+            for component in reference.components() {
+                if component == Component::ParentDir {
+                    writer.add_directory(&ctx.root_dir.join(&directory))?;
+                    if !directory.pop() {
+                        bail!(
+                            "Cargo config `{value}` traverses outside the source distribution root"
+                        );
+                    }
+                } else {
+                    directory.push(component);
+                }
+            }
+            &reference
+        };
+        *config = toml_edit::Value::from(
+            reference
+                .to_slash()
+                .with_context(|| format!("Cargo config path `{value}` is not valid UTF-8"))?
+                .as_ref(),
+        );
     }
     Ok(())
 }
@@ -310,12 +397,12 @@ pub(super) fn add_pyproject_metadata(
 /// `metadata` provides additional rewrites for `[project.readme]` and
 /// `[project.license]` `file` paths that were elevated to the sdist root.
 fn rewrite_pyproject_toml(
+    mut data: toml_edit::DocumentMut,
     pyproject_toml_path: &Path,
     relative_manifest_path: &Path,
     relative_python_source: Option<&Path>,
     metadata_rewrites: &[PyprojectPathRewrite],
 ) -> Result<String> {
-    let mut data = parse_toml_file(pyproject_toml_path, "pyproject.toml")?;
     let tool = data
         .entry("tool")
         .or_insert_with(|| toml_edit::Item::Table(toml_edit::Table::new()))

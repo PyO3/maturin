@@ -126,6 +126,13 @@ pub struct CargoOptions {
 }
 
 impl CargoOptions {
+    /// Configuration overrides shared by Cargo queries and package file listing.
+    pub(crate) fn cargo_config_args(&self) -> impl Iterator<Item = &str> {
+        self.config
+            .iter()
+            .flat_map(|config| ["--config", config.as_str()])
+    }
+
     /// Extract `cargo metadata` extra arguments from the cargo options.
     pub fn cargo_metadata_args(&self) -> Result<Vec<String>> {
         let platform_args = match &self.target {
@@ -192,6 +199,7 @@ impl CargoOptions {
             args.push("-Z".to_string());
             args.push(opt.clone());
         }
+        args.extend(self.cargo_config_args().map(str::to_owned));
         args
     }
 
@@ -350,6 +358,10 @@ mod tests {
                 "x86_64-unknown-linux-musl".to_string(),
             )),
             unstable_flags: vec!["unstable-options".to_string()],
+            config: vec![
+                "config/overrides.toml".to_string(),
+                "net.offline=true".to_string(),
+            ],
             ..Default::default()
         };
 
@@ -363,6 +375,10 @@ mod tests {
             "x86_64-unknown-linux-musl",
             "-Z",
             "unstable-options",
+            "--config",
+            "config/overrides.toml",
+            "--config",
+            "net.offline=true",
         ];
 
         assert_eq!(args.cargo_metadata_args().unwrap(), expected);

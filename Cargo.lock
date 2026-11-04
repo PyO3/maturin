@@ -260,7 +260,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d162f67705f0f5038759d73bf546a083bf30e8677c2e944b416bca48d9d69a8"
 dependencies = [
  "anyhow",
- "cargo-lock",
+ "cargo-lock 10.1.0",
  "cargo_metadata 0.18.1",
  "clap",
  "cyclonedx-bom",
@@ -286,6 +286,18 @@ dependencies = [
  "semver",
  "serde",
  "toml 0.8.23",
+ "url",
+]
+
+[[package]]
+name = "cargo-lock"
+version = "11.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "50524592e6bfbb1bf6f94e8184a786f637faeaf1cf37bbe65502b9a2c5c48939"
+dependencies = [
+ "semver",
+ "serde",
+ "toml 1.1.2+spec-1.1.0",
  "url",
 ]
 
@@ -1750,6 +1762,7 @@ dependencies = [
  "bytesize",
  "cargo-config2",
  "cargo-cyclonedx",
+ "cargo-lock 11.1.0",
  "cargo-options",
  "cargo-xwin",
  "cargo-zigbuild",

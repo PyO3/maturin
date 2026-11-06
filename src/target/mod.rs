@@ -774,34 +774,23 @@ impl Target {
 
     /// Returns the directory where the binaries are stored inside a venv
     pub fn get_venv_bin_dir(&self, venv_base: impl AsRef<Path>) -> PathBuf {
-        let venv = venv_base.as_ref();
-        if self.is_windows() {
-            let bin_dir = venv.join("Scripts");
-            if bin_dir.join("python.exe").exists() {
-                return bin_dir;
-            }
-            // Python installed via msys2 on Windows might produce a POSIX-like venv
-            // See https://github.com/PyO3/maturin/issues/1108
-            let bin_dir = venv.join("bin");
-            if bin_dir.join("python.exe").exists() {
-                return bin_dir;
-            }
-            // for conda environment
-            venv.to_path_buf()
-        } else {
-            venv.join("bin")
-        }
+        venv_bin_dir(venv_base.as_ref(), self.is_windows())
     }
 
-    /// Returns the path to the python executable
+    /// Returns the path to the host Python executable, even when cross-compiling.
     ///
     /// Checks in order: `VIRTUAL_ENV`'s python, `pythonLocation` (GitHub Actions),
     /// and finally falls back to `python.exe` (Windows) or `python3` (Unix).
     pub fn get_python(&self) -> PathBuf {
+        let host_windows = cfg!(windows);
         if let Some(venv) = env::var_os("VIRTUAL_ENV") {
             // Use the full path to the venv's python to ensure we get the
             // correct version, rather than relying on PATH resolution (#2198)
-            let venv_python = self.get_venv_python(&venv);
+            let venv_python = venv_bin_dir(Path::new(&venv), host_windows).join(if host_windows {
+                "python.exe"
+            } else {
+                "python"
+            });
             if venv_python.exists() {
                 return venv_python;
             }
@@ -809,7 +798,7 @@ impl Target {
         // GitHub Actions setup-python sets pythonLocation to the install dir
         if let Some(python_location) = env::var_os("pythonLocation") {
             let python_location = Path::new(&python_location);
-            let python = if self.is_windows() {
+            let python = if host_windows {
                 python_location.join("python.exe")
             } else {
                 python_location.join("bin").join("python3")
@@ -818,11 +807,30 @@ impl Target {
                 return python;
             }
         }
-        if self.is_windows() {
+        if host_windows {
             PathBuf::from("python.exe")
         } else {
             PathBuf::from("python3")
         }
+    }
+}
+
+fn venv_bin_dir(venv: &Path, windows: bool) -> PathBuf {
+    if windows {
+        let bin_dir = venv.join("Scripts");
+        if bin_dir.join("python.exe").exists() {
+            return bin_dir;
+        }
+        // Python installed via msys2 on Windows might produce a POSIX-like venv
+        // See https://github.com/PyO3/maturin/issues/1108
+        let bin_dir = venv.join("bin");
+        if bin_dir.join("python.exe").exists() {
+            return bin_dir;
+        }
+        // for conda environment
+        venv.to_path_buf()
+    } else {
+        venv.join("bin")
     }
 }
 
@@ -907,6 +915,26 @@ mod tests {
         interpreter.soabi_platform = Some(soabi_platform.to_string());
         interpreter.runnable = runnable;
         interpreter
+    }
+
+    #[test]
+    fn test_get_python_uses_host_for_cross_target() {
+        let native = Target::from_target_triple(None).unwrap();
+        let cross = target(
+            if cfg!(windows) {
+                "aarch64-unknown-linux-gnu"
+            } else {
+                "x86_64-pc-windows-msvc"
+            },
+            true,
+        );
+        assert_eq!(native.get_python(), cross.get_python());
+        if let Some(venv) = env::var_os("VIRTUAL_ENV") {
+            let venv_python = native.get_venv_python(venv);
+            if venv_python.exists() {
+                assert_eq!(cross.get_python(), venv_python);
+            }
+        }
     }
 
     #[test]

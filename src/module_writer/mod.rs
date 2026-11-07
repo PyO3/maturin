@@ -631,22 +631,33 @@ pub(crate) fn default_permission(executable: bool) -> u32 {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(unix)]
     use std::io::Read as _;
     #[cfg(unix)]
     use std::os::unix::fs::{PermissionsExt as _, symlink};
 
     use anyhow::Result;
+    #[cfg(unix)]
     use fs_err as fs;
+    #[cfg(unix)]
     use ignore::overrides::Override;
+    #[cfg(unix)]
     use pep440_rs::Version;
+    #[cfg(unix)]
     use tempfile::TempDir;
+    #[cfg(unix)]
     use zip::ZipArchive;
+    #[cfg(unix)]
     use zip::write::SimpleFileOptions;
 
+    #[cfg(unix)]
     use super::VirtualWriter;
+    #[cfg(unix)]
     use super::WheelWriter;
+    #[cfg(unix)]
     use super::add_data;
     use super::wheel_file;
+    #[cfg(unix)]
     use crate::Metadata24;
     use crate::WheelTag;
 

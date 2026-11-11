@@ -276,6 +276,49 @@ fn sdist_excludes_explicit_build_script() {
 }
 
 #[test]
+fn sdist_includes_hidden_files_in_python_source() {
+    let temp_dir = tempfile::tempdir().unwrap();
+    let project_dir = temp_dir.path().join("pyo3-mixed");
+    other::copy_dir_recursive(Path::new("test-crates/pyo3-mixed"), &project_dir).unwrap();
+    // Dot-directories inside the python package (e.g. `.agents` agent
+    // skill bundles) are regular package content: wheels package them
+    // and git sdists list them, so cargo sdists must too.
+    fs_err::create_dir_all(project_dir.join("pyo3_mixed/.agents/skills")).unwrap();
+    fs_err::write(
+        project_dir.join("pyo3_mixed/.agents/skills/SKILL.md"),
+        "skill",
+    )
+    .unwrap();
+
+    handle_result(other::test_source_distribution(
+        &project_dir,
+        SdistGenerator::Cargo,
+        expect![[r#"
+            {
+                "pyo3_mixed-2.1.5/Cargo.lock",
+                "pyo3_mixed-2.1.5/Cargo.toml",
+                "pyo3_mixed-2.1.5/PKG-INFO",
+                "pyo3_mixed-2.1.5/README.md",
+                "pyo3_mixed-2.1.5/check_installed/check_installed.py",
+                "pyo3_mixed-2.1.5/pgo_check.py",
+                "pyo3_mixed-2.1.5/pyo3-config.txt",
+                "pyo3_mixed-2.1.5/pyo3_mixed/.agents/skills/SKILL.md",
+                "pyo3_mixed-2.1.5/pyo3_mixed/__init__.py",
+                "pyo3_mixed-2.1.5/pyo3_mixed/assets/asset.txt",
+                "pyo3_mixed-2.1.5/pyo3_mixed/python_module/__init__.py",
+                "pyo3_mixed-2.1.5/pyo3_mixed/python_module/double.py",
+                "pyo3_mixed-2.1.5/pyproject.toml",
+                "pyo3_mixed-2.1.5/src/lib.rs",
+                "pyo3_mixed-2.1.5/tests/test_pyo3_mixed.py",
+                "pyo3_mixed-2.1.5/tox.ini",
+            }
+        "#]],
+        None,
+        "sdist-pyo3-mixed-hidden-files",
+    ))
+}
+
+#[test]
 fn workspace_cargo_lock() {
     handle_result(other::test_workspace_cargo_lock())
 }

@@ -43,13 +43,7 @@ impl SbomData {
                 target: Some(cargo_cyclonedx::config::Target::AllTargets),
                 ..CyclonedxConfig::empty_config()
             };
-            // cargo-cyclonedx depends on cargo_metadata 0.18, while maturin uses
-            // cargo_metadata 0.23. The Metadata structs are incompatible at the
-            // type level but share the same JSON representation, so we bridge
-            // them via a serde round-trip.
-            let json = serde_json::to_value(context.project.cargo_metadata.as_ref())?;
-            let metadata = serde_json::from_value(json)
-                .context("Failed to convert cargo metadata for SBOM generation")?;
+            let metadata = context.project.cargo_metadata.as_ref().clone();
             let sboms = SbomGenerator::create_sboms(metadata, &config)
                 .map_err(|e| anyhow!("Failed to generate Rust SBOM: {}", e))?;
 

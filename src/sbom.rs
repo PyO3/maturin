@@ -11,6 +11,8 @@ use tracing::instrument;
 use cargo_cyclonedx::config::SbomConfig as CyclonedxConfig;
 #[cfg(feature = "sbom")]
 use cargo_cyclonedx::generator::SbomGenerator;
+#[cfg(feature = "sbom")]
+use cyclonedx_bom::models::bom::SpecVersion;
 
 /// Pre-generated SBOM data that can be reused across multiple wheel writes.
 ///
@@ -61,7 +63,7 @@ impl SbomData {
                 }
                 let mut buf = Vec::new();
                 sbom.bom
-                    .output_as_json_v1_5(&mut buf)
+                    .output_as_json(&mut buf, SpecVersion::V1_5)
                     .map_err(|e| anyhow!("Failed to serialize SBOM: {}", e))?;
                 rust_sboms.push((sbom.package_name, buf));
             }

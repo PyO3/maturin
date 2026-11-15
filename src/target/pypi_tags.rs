@@ -143,11 +143,7 @@ fn is_platform_tag_allowed_by_pypi(platform_tag: &str) -> bool {
     }
 
     // Emscripten / Pyodide, PEP 783
-    if PYEMSCRIPTEN_PLATFORM_RE.is_match(platform_tag) {
-        return true;
-    }
-
-    false
+    PYEMSCRIPTEN_PLATFORM_RE.is_match(platform_tag)
 }
 
 /// Validates a wheel filename against PyPI platform tag rules.

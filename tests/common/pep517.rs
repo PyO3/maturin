@@ -119,7 +119,9 @@ fn insert_path(env_var: &str, new_path: &Path) -> String {
 /// Whether cargo built for the specified cargo profile in the test target directory.
 pub fn target_has_profile(unique_name: &str, profile: &str) -> bool {
     let profile_dir = PathBuf::from(target_dir(unique_name)).join(profile);
-    // Check for cargo's .fingerprint directory which is always created for the
-    // profile that was used, and is not affected by maturin's artifact staging.
-    profile_dir.join(".fingerprint").is_dir()
+    // Check for cargo's intermediate artifact directories, which are always created
+    // for the profile that was used and are not affected by maturin's artifact
+    // staging. Cargo 1.100 moved `<profile>/.fingerprint` into
+    // `<profile>/build/<package>/<hash>/fingerprint`.
+    profile_dir.join(".fingerprint").is_dir() || profile_dir.join("build").is_dir()
 }

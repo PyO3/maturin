@@ -19,7 +19,6 @@ exclude = [
     "test-dockerfile.sh",
     "Code-of-Conduct.md",
 ]
-homepage = "https://github.com/pyo3/maturin"
 readme = "README.md"
 repository = "https://github.com/pyo3/maturin"
 license = "MIT OR Apache-2.0"

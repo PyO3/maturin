@@ -45,7 +45,7 @@ jobs:
           - windows-latest
           - windows-11-arm
         python-version:
-          - "3.9"
+          - "3.10"
           - "3.15-dev"
           - "3.15t-dev"
           - "pypy3.11"
@@ -55,9 +55,9 @@ jobs:
             python-version: pypy3.11
           # macOS and windows arm only have Python 3.11+
           - os: macos-latest
-            python-version: 3.9
+            python-version: "3.10"
           - os: windows-11-arm
-            python-version: 3.9
+            python-version: "3.10"
           # PyPy does not have ARM builds for linux or windows
           - os: ubuntu-22.04-arm
             python-version: pypy3.11
@@ -140,10 +140,10 @@ jobs:
       - name: cargo test
         run: cargo nextest run --features password-storage,faster-tests,schemars
       # Zig cross compilation mainly exercises host-OS-specific plumbing, so one
-      # python per OS is enough; macos-latest and windows-11-arm have no 3.9
+      # python per OS is enough; macos-latest and windows-11-arm have no 3.10
       # cell, so macos-latest falls back to pypy to keep coverage on arm macs.
       - name: test cross compiling with zig
-        if: ${{ matrix.python-version == '3.9' || (matrix.os == 'macos-latest' && matrix.python-version == 'pypy3.11') }}
+        if: ${{ matrix.python-version == '3.10' || (matrix.os == 'macos-latest' && matrix.python-version == 'pypy3.11') }}
         shell: bash
         run: |
           set -ex
@@ -398,12 +398,12 @@ jobs:
         platform:
           # CPython
           - target: aarch64-unknown-linux-gnu
-            abi: cp39-cp39
-            python: python3.9
+            abi: cp310-cp310
+            python: python3.10
             container: ghcr.io/rust-cross/manylinux2014-cross:aarch64
           - target: armv7-unknown-linux-gnueabihf
-            abi: cp39-cp39
-            python: python3.9
+            abi: cp310-cp310
+            python: python3.10
             container: ghcr.io/rust-cross/manylinux2014-cross:armv7
           - target: s390x-unknown-linux-gnu
             abi: cp310-cp310
@@ -443,7 +443,7 @@ jobs:
 
           # Use PYO3_CROSS_LIB_DIR
           export PYO3_CROSS_LIB_DIR=/opt/python/${{ matrix.platform.abi }}
-          bin/maturin build -i python3.9 --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml ${{ matrix.platform.extra-args }}
+          bin/maturin build -i python3.10 --release --out dist --target ${{ matrix.platform.target }} -m test-crates/pyo3-mixed/Cargo.toml ${{ matrix.platform.extra-args }}
           unset PYO3_CROSS_LIB_DIR
 
           # Test abi3

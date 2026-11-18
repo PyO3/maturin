@@ -1,0 +1,14 @@
+[package]
+authors = []
+name = "pyo3-mixed-top-level"
+version = "2.1.3"
+edition = "2021"
+
+[dependencies]
+pyo3 = { version = "0.29.0" }
+
+[lib]
+name = "_pyo3_mixed_top_level"
+crate-type = ["cdylib"]
+
+[workspace]

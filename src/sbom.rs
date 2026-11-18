@@ -11,6 +11,8 @@ use tracing::instrument;
 use cargo_cyclonedx::config::SbomConfig as CyclonedxConfig;
 #[cfg(feature = "sbom")]
 use cargo_cyclonedx::generator::SbomGenerator;
+#[cfg(feature = "sbom")]
+use cyclonedx_bom::models::bom::SpecVersion;
 
 /// Pre-generated SBOM data that can be reused across multiple wheel writes.
 ///
@@ -41,13 +43,7 @@ impl SbomData {
                 target: Some(cargo_cyclonedx::config::Target::AllTargets),
                 ..CyclonedxConfig::empty_config()
             };
-            // cargo-cyclonedx depends on cargo_metadata 0.18, while maturin uses
-            // cargo_metadata 0.23. The Metadata structs are incompatible at the
-            // type level but share the same JSON representation, so we bridge
-            // them via a serde round-trip.
-            let json = serde_json::to_value(context.project.cargo_metadata.as_ref())?;
-            let metadata = serde_json::from_value(json)
-                .context("Failed to convert cargo metadata for SBOM generation")?;
+            let metadata = context.project.cargo_metadata.as_ref().clone();
             let sboms = SbomGenerator::create_sboms(metadata, &config)
                 .map_err(|e| anyhow!("Failed to generate Rust SBOM: {}", e))?;
 
@@ -61,7 +57,7 @@ impl SbomData {
                 }
                 let mut buf = Vec::new();
                 sbom.bom
-                    .output_as_json_v1_5(&mut buf)
+                    .output_as_json(&mut buf, SpecVersion::V1_5)
                     .map_err(|e| anyhow!("Failed to serialize SBOM: {}", e))?;
                 rust_sboms.push((sbom.package_name, buf));
             }

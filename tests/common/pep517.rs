@@ -119,7 +119,12 @@ fn insert_path(env_var: &str, new_path: &Path) -> String {
 /// Whether cargo built for the specified cargo profile in the test target directory.
 pub fn target_has_profile(unique_name: &str, profile: &str) -> bool {
     let profile_dir = PathBuf::from(target_dir(unique_name)).join(profile);
-    // Check for cargo's .fingerprint directory which is always created for the
-    // profile that was used, and is not affected by maturin's artifact staging.
-    profile_dir.join(".fingerprint").is_dir()
+    // Cargo writes dep-info files alongside its final outputs. Unlike its internal
+    // fingerprint layout (changed in Cargo 1.100), these are stable across Cargo
+    // versions and are not created by maturin's artifact staging.
+    profile_dir.read_dir().is_ok_and(|entries| {
+        entries
+            .flatten()
+            .any(|entry| entry.path().extension().is_some_and(|ext| ext == "d"))
+    })
 }

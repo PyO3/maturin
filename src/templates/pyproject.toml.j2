@@ -35,3 +35,13 @@ exclude = [
     "**/*.pyo"
 ]
 {% endif -%}
+
+[tool.uv]
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "Cargo.toml" },
+    { file = "Cargo.lock" },
+    { file = "**/*.rs" },
+    { env = "MATURIN_PEP517_ARGS" },
+    { env = "RUSTFLAGS" }
+]

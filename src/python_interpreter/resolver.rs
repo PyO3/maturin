@@ -349,6 +349,7 @@ impl<'a> InterpreterResolver<'a> {
                 implementation_name,
                 soabi,
                 soabi_platform: None,
+                lib_dir: None,
             };
             Ok((
                 vec![Candidate {
@@ -892,6 +893,7 @@ impl<'a> InterpreterResolver<'a> {
             implementation_name: interpreter_kind.to_string().to_ascii_lowercase(),
             soabi: soabi.cloned(),
             soabi_platform,
+            lib_dir: None,
         })
     }
 

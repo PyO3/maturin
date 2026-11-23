@@ -109,6 +109,11 @@ pub struct PythonInterpreter {
     pub soabi: Option<String>,
     /// Comes from sysconfig var `SOABI_PLATFORM` (Python 3.15+)
     pub soabi_platform: Option<String>,
+    /// Comes from sysconfig var `LIBDIR`
+    ///
+    /// Only populated for runnable interpreters (including cross-compilation
+    /// venvs, such as the iOS cross-venvs used by cibuildwheel).
+    pub lib_dir: Option<String>,
 }
 
 impl Deref for PythonInterpreter {
@@ -186,6 +191,19 @@ impl PythonInterpreter {
             };
             content.push_str("\nlib_name=");
             content.push_str(lib_name);
+        }
+        // pyo3 always links libpython on iOS. When maturin writes a config file
+        // (e.g. for stable ABI builds) pyo3 no longer queries the interpreter,
+        // so pass along the interpreter's LIBDIR (which contains
+        // `libpython3.X.dylib` in an iOS cross-venv) as the search path, unless
+        // the user has supplied one explicitly via `PYO3_CROSS_LIB_DIR`.
+        if target.is_ios()
+            && self.interpreter_kind == InterpreterKind::CPython
+            && std::env::var_os("PYO3_CROSS_LIB_DIR").is_none()
+            && let Some(lib_dir) = self.lib_dir.as_deref()
+        {
+            content.push_str("\nlib_dir=");
+            content.push_str(lib_dir);
         }
         content
     }
@@ -353,6 +371,7 @@ impl PythonInterpreter {
             implementation_name,
             soabi: None,
             soabi_platform: None,
+            lib_dir: None,
         }
     }
 
@@ -382,6 +401,7 @@ impl PythonInterpreter {
             implementation_name: "cpython".to_string(),
             soabi: None,
             soabi_platform: None,
+            lib_dir: None,
         }
     }
 
@@ -588,6 +608,7 @@ mod tests {
             implementation_name: kind.to_string().to_ascii_lowercase(),
             soabi: None,
             soabi_platform: None,
+            lib_dir: None,
         }
     }
 
@@ -659,6 +680,53 @@ mod tests {
                 .lines()
                 .any(|line| line.starts_with("lib_name=")),
             "non-MinGW Windows config unexpectedly selected a library name:\n{config_file}"
+        );
+    }
+
+    #[test]
+    fn pyo3_config_file_ios_abi3_lib_dir() {
+        // Mirrors an iOS cross-venv created by cibuildwheel: the interpreter is
+        // runnable and reports a LIBDIR containing `libpython3.13.dylib`.
+        let target = Target::from_resolved_target_triple("aarch64-apple-ios-sim").unwrap();
+        let mut interpreter = interpreter(InterpreterKind::CPython, 13, "", false);
+        interpreter.runnable = true;
+        interpreter.lib_dir = Some("/path/to/Python.xcframework/ios-arm64-simulator/lib".into());
+
+        let config_file = interpreter.pyo3_config_file_with_platform(
+            &target,
+            Some(StableAbi::from_abi3_version(3, 9)),
+            true,
+        );
+
+        let lines: Vec<&str> = config_file.lines().collect();
+        assert!(
+            lines.contains(&"lib_name=python3.13"),
+            "iOS abi3 config did not link the interpreter's libpython:\n{config_file}"
+        );
+        assert!(
+            lines.contains(&"lib_dir=/path/to/Python.xcframework/ios-arm64-simulator/lib"),
+            "iOS abi3 config did not include the interpreter's LIBDIR:\n{config_file}"
+        );
+    }
+
+    #[test]
+    fn pyo3_config_file_non_ios_omits_interpreter_lib_dir() {
+        // Linux extension modules don't link libpython, so the interpreter's
+        // LIBDIR must not leak into the config file.
+        let target = Target::from_resolved_target_triple("x86_64-unknown-linux-gnu").unwrap();
+        let mut interpreter = interpreter(InterpreterKind::CPython, 13, "", false);
+        interpreter.runnable = true;
+        interpreter.lib_dir = Some("/usr/lib".into());
+
+        let config_file = interpreter.pyo3_config_file_with_platform(
+            &target,
+            Some(StableAbi::from_abi3_version(3, 9)),
+            true,
+        );
+
+        assert!(
+            !config_file.lines().any(|line| line.starts_with("lib_dir=")),
+            "non-iOS config unexpectedly included a lib_dir:\n{config_file}"
         );
     }
 

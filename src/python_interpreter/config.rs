@@ -554,6 +554,19 @@ suppress_build_script_link_lines=false"#,
             };
             write!(content, "\nlib_name={lib_name}").unwrap();
         }
+        // On iOS, pyo3 also forces linking libpython, and has the same problem
+        // with the abi3 minimum version. However, iOS only ships the
+        // version-specific `libpython3.X.dylib` (a symlink into
+        // `Python.framework`), with no unversioned stable ABI library, so we
+        // always link against the version of the target interpreter.
+        if target.is_ios() && self.interpreter_kind == InterpreterKind::CPython {
+            write!(
+                content,
+                "\nlib_name=python{}.{}{}",
+                self.major, self.minor, self.abiflags
+            )
+            .unwrap();
+        }
         if let Some(pointer_width) = self.pointer_width {
             write!(content, "\npointer_width={pointer_width}").unwrap();
         }
@@ -1249,6 +1262,60 @@ mod tests {
             build_flags=
             suppress_build_script_link_lines=false
             lib_name=python3
+            pointer_width=64"#]];
+        expected.assert_eq(&config_file);
+    }
+
+    #[test]
+    fn test_pyo3_config_file_ios() {
+        let target = Target::from_resolved_target_triple("aarch64-apple-ios-sim").unwrap();
+        let config = InterpreterConfig {
+            major: 3,
+            minor: 13,
+            interpreter_kind: InterpreterKind::CPython,
+            abiflags: String::new(),
+            ext_suffix: ".cpython-313-iphonesimulator.so".to_string(),
+            pointer_width: Some(64),
+            gil_disabled: false,
+        };
+        // Non-abi3: links against version-specific libpython3.13.dylib
+        let config_file = config.pyo3_config_file(&target, None, true);
+        let expected = expect![[r#"
+            implementation=CPython
+            version=3.13
+            target_abi=CPython-gil_enabled-3.13
+            shared=true
+            build_flags=
+            suppress_build_script_link_lines=false
+            lib_name=python3.13
+            pointer_width=64"#]];
+        expected.assert_eq(&config_file);
+
+        // Abi3: iOS only ships the version-specific libpython3.13.dylib (there
+        // is no libpython3.dylib), so the lib_name must not be derived from the
+        // abi3 minimum version (which would give `python3.9`).
+        let config_file =
+            config.pyo3_config_file(&target, Some(StableAbi::from_abi3_version(3, 9)), true);
+        let expected = expect![[r#"
+            implementation=CPython
+            version=3.9
+            target_abi=CPython-abi3-3.9
+            shared=true
+            build_flags=
+            suppress_build_script_link_lines=false
+            lib_name=python3.13
+            pointer_width=64"#]];
+        expected.assert_eq(&config_file);
+        let config_file =
+            config.pyo3_config_file(&target, Some(StableAbi::from_abi3_version(3, 9)), false);
+        let expected = expect![[r#"
+            implementation=CPython
+            version=3.9
+            shared=true
+            abi3=true
+            build_flags=
+            suppress_build_script_link_lines=false
+            lib_name=python3.13
             pointer_width=64"#]];
         expected.assert_eq(&config_file);
     }

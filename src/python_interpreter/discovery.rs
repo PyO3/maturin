@@ -44,6 +44,9 @@ pub(super) struct InterpreterMetadataMessage {
     pub system: String,
     pub soabi: Option<String>,
     pub soabi_platform: Option<String>,
+    // comes from sysconfig var `LIBDIR`
+    #[serde(default)]
+    pub libdir: Option<String>,
     pub gil_disabled: bool,
     pub debug: bool,
 }
@@ -712,6 +715,7 @@ fn from_metadata_message(
         implementation_name: message.implementation_name,
         soabi: message.soabi,
         soabi_platform: message.soabi_platform,
+        lib_dir: message.libdir,
     }))
 }
 
@@ -930,6 +934,7 @@ mod tests {
             executable: None,
             soabi: None,
             soabi_platform: None,
+            libdir: None,
             gil_disabled: false,
             system: "windows".to_string(),
         };
@@ -986,6 +991,7 @@ mod tests {
                     implementation_name: "CPython".to_string(),
                     soabi: None,
                     soabi_platform: None,
+                    lib_dir: None,
                 }
             );
         }
@@ -1032,6 +1038,7 @@ mod tests {
                 implementation_name: "CPython".to_string(),
                 soabi: None,
                 soabi_platform: None,
+                lib_dir: None,
             }
         );
     }
@@ -1061,6 +1068,7 @@ mod tests {
             executable: None,
             soabi: None,
             soabi_platform: None,
+            libdir: None,
             gil_disabled: false,
             system: "windows".to_string(),
         };
@@ -1084,6 +1092,7 @@ mod tests {
             executable: None,
             soabi: None,
             soabi_platform: None,
+            libdir: None,
             gil_disabled: true,
             system: "windows".to_string(),
         };
@@ -1116,6 +1125,7 @@ mod tests {
                 executable: None,
                 soabi: None,
                 soabi_platform: None,
+                libdir: None,
                 gil_disabled,
                 debug,
                 system: "windows".to_string(),
@@ -1168,6 +1178,7 @@ mod tests {
                 executable: None,
                 soabi: None,
                 soabi_platform: None,
+                libdir: None,
                 debug: expected.contains('d'),
                 gil_disabled: expected.contains('t'),
                 system: system.to_string(),

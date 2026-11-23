@@ -32,6 +32,8 @@ metadata = {
     "soabi": sysconfig.get_config_var("SOABI") or None,
     "soabi_platform": sysconfig.get_config_var("SOABI_PLATFORM") or None,
     "platform": sysconfig.get_platform(),
+    # Directory containing libpython, used when the target requires linking it (e.g. iOS)
+    "libdir": sysconfig.get_config_var("LIBDIR") or None,
     # This one isn't technically necessary, but still very useful for sanity checks
     "system": platform.system().lower(),
     # This one is for generating a config file for pyo3

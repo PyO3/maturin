@@ -525,7 +525,7 @@ fn configure_bin_lib_flags(
     }
 }
 
-/// Configure platform-specific linker arguments (macOS PyO3, Emscripten, Windows GNU + zig).
+/// Configure platform-specific linker arguments (macOS/iOS PyO3, Emscripten, Windows GNU + zig).
 #[allow(clippy::too_many_arguments)]
 fn configure_platform_linker_args(
     cargo_rustc: &mut cargo_options::Rustc,
@@ -537,11 +537,13 @@ fn configure_platform_linker_args(
     #[cfg(feature = "zig")] zig: bool,
     #[cfg(feature = "zig")] target_dir: &Path,
 ) {
-    if target.is_macos() {
+    if target.is_macos() || target.is_ios() {
         if let BridgeModel::PyO3 { .. } = bridge_model {
-            configure_macos_pyo3_linker_args(
+            if target.is_macos() {
+                configure_macos_pyo3_linker_args(rustflags);
+            }
+            configure_apple_pyo3_linker_args(
                 cargo_rustc,
-                rustflags,
                 target,
                 bridge_model,
                 module_name,
@@ -579,24 +581,16 @@ fn configure_platform_linker_args(
     }
 }
 
-/// Configure macOS-specific linker arguments for PyO3 builds.
+/// Allow unresolved Python symbols in macOS PyO3 extension modules; they are
+/// resolved against the host interpreter at load time.
 ///
-/// Changes LC_ID_DYLIB to the final .so name to avoid linking with
-/// non-existent library.
-/// See https://github.com/PyO3/pyo3/issues/88#issuecomment-337744403
-/// See https://github.com/PyO3/setuptools-rust/issues/106 for detail
-fn configure_macos_pyo3_linker_args(
-    cargo_rustc: &mut cargo_options::Rustc,
-    rustflags: &mut cargo_config2::Flags,
-    target: &Target,
-    bridge_model: &BridgeModel,
-    module_name: &str,
-    python_interpreter: Option<&PythonInterpreter>,
-) {
-    // Pass -undefined dynamic_lookup via CARGO_ENCODED_RUSTFLAGS so they apply
-    // to all crates in the dependency graph, not just the top-level crate.
-    // This fixes link errors when a dependency also uses pyo3 with a cdylib target.
-    // See https://github.com/PyO3/maturin/issues/1080
+/// Passed via `CARGO_ENCODED_RUSTFLAGS` so they apply to all crates in the
+/// dependency graph, not just the top-level crate. This fixes link errors when
+/// a dependency also uses pyo3 with a cdylib target.
+/// See https://github.com/PyO3/maturin/issues/1080
+///
+/// Not used on iOS, where extension modules link against `Python.framework`.
+fn configure_macos_pyo3_linker_args(rustflags: &mut cargo_config2::Flags) {
     let has_undefined = rustflags
         .flags
         .iter()
@@ -613,7 +607,23 @@ fn configure_macos_pyo3_linker_args(
         rustflags.push("-C");
         rustflags.push("link-arg=dynamic_lookup");
     }
+}
 
+/// Set the LC_ID_DYLIB (install name) of Apple (macOS, iOS) PyO3 extension
+/// modules to `@rpath/<final .so name>`.
+///
+/// Without this, the install name is rustc's default: an absolute path into
+/// the build machine's `target/` directory, which leaks build paths and
+/// refers to a non-existent library.
+/// See https://github.com/PyO3/pyo3/issues/88#issuecomment-337744403
+/// See https://github.com/PyO3/setuptools-rust/issues/106 for detail
+fn configure_apple_pyo3_linker_args(
+    cargo_rustc: &mut cargo_options::Rustc,
+    target: &Target,
+    bridge_model: &BridgeModel,
+    module_name: &str,
+    python_interpreter: Option<&PythonInterpreter>,
+) {
     // install_name is specific to the top-level output, so keep it in cargo_rustc.args
     let stable_abi_suffix = python_interpreter.and_then(|i| {
         bridge_model
@@ -634,10 +644,10 @@ fn configure_macos_pyo3_linker_args(
             .expect("missing python interpreter for non-abi3 wheel build")
             .get_library_name(module_name)
     };
-    let macos_dylib_install_name = format!("link-args=-Wl,-install_name,@rpath/{so_filename}");
-    let install_name_args = ["-C".to_string(), macos_dylib_install_name];
+    let dylib_install_name = format!("link-args=-Wl,-install_name,@rpath/{so_filename}");
+    let install_name_args = ["-C".to_string(), dylib_install_name];
     debug!(
-        "Setting macOS install_name via cargo rustc args: {:?}",
+        "Setting Apple install_name via cargo rustc args: {:?}",
         install_name_args
     );
     cargo_rustc.args.extend(install_name_args);
@@ -1267,7 +1277,120 @@ pub(crate) fn ensure_target_maturin_dir(target_dir: &Path) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use super::is_python_entrypoint_symbol;
+    use super::{configure_platform_linker_args, is_python_entrypoint_symbol};
+    use crate::bridge::{PyO3, PyO3Crate, StableAbi};
+    use crate::python_interpreter::{InterpreterConfig, InterpreterKind};
+    use crate::{BridgeModel, PythonInterpreter, Target};
+    use std::path::PathBuf;
+
+    fn pyo3_bridge(stable_abi: Option<StableAbi>) -> BridgeModel {
+        BridgeModel::PyO3(PyO3 {
+            crate_name: PyO3Crate::PyO3,
+            version: semver::Version::new(0, 28, 0),
+            stable_abi,
+            metadata: None,
+        })
+    }
+
+    fn interpreter(ext_suffix: &str) -> PythonInterpreter {
+        PythonInterpreter {
+            config: InterpreterConfig {
+                major: 3,
+                minor: 13,
+                interpreter_kind: InterpreterKind::CPython,
+                abiflags: String::new(),
+                ext_suffix: ext_suffix.to_string(),
+                pointer_width: Some(64),
+                gil_disabled: false,
+            },
+            executable: PathBuf::new(),
+            platform: None,
+            runnable: false,
+            implementation_name: "cpython".to_string(),
+            soabi: None,
+            soabi_platform: None,
+        }
+    }
+
+    /// Returns `(cargo rustc args, rustflags)` for a PyO3 module named `nh3`.
+    fn linker_args(
+        triple: &str,
+        bridge: &BridgeModel,
+        interpreter: &PythonInterpreter,
+    ) -> (Vec<String>, Vec<String>) {
+        let target = Target::from_resolved_target_triple(triple).unwrap();
+        let mut cargo_rustc = cargo_options::Rustc::default();
+        let mut rustflags = cargo_config2::Flags::default();
+        configure_platform_linker_args(
+            &mut cargo_rustc,
+            &mut rustflags,
+            &target,
+            bridge,
+            "nh3",
+            Some(interpreter),
+            #[cfg(feature = "zig")]
+            false,
+            #[cfg(feature = "zig")]
+            std::path::Path::new("target"),
+        );
+        (cargo_rustc.args, rustflags.flags)
+    }
+
+    #[test]
+    fn macos_pyo3_sets_install_name_and_dynamic_lookup() {
+        let (args, flags) = linker_args(
+            "aarch64-apple-darwin",
+            &pyo3_bridge(None),
+            &interpreter(".cpython-313-darwin.so"),
+        );
+        assert_eq!(
+            args,
+            [
+                "-C",
+                "link-args=-Wl,-install_name,@rpath/nh3.cpython-313-darwin.so"
+            ]
+        );
+        assert!(flags.iter().any(|f| f == "link-arg=dynamic_lookup"));
+    }
+
+    #[test]
+    fn ios_pyo3_sets_install_name() {
+        for triple in [
+            "aarch64-apple-ios",
+            "aarch64-apple-ios-sim",
+            "x86_64-apple-ios",
+        ] {
+            let (args, flags) = linker_args(
+                triple,
+                &pyo3_bridge(None),
+                &interpreter(".cpython-313-iphonesimulator.so"),
+            );
+            assert_eq!(
+                args,
+                [
+                    "-C",
+                    "link-args=-Wl,-install_name,@rpath/nh3.cpython-313-iphonesimulator.so"
+                ],
+                "{triple}"
+            );
+            // iOS extension modules link against Python.framework explicitly,
+            // so `-undefined dynamic_lookup` must not be added.
+            assert!(flags.is_empty(), "{triple}: {flags:?}");
+        }
+    }
+
+    #[test]
+    fn ios_pyo3_abi3_sets_install_name() {
+        let (args, _) = linker_args(
+            "aarch64-apple-ios-sim",
+            &pyo3_bridge(Some(StableAbi::from_abi3_version(3, 9))),
+            &interpreter(".cpython-313-iphonesimulator.so"),
+        );
+        assert_eq!(
+            args,
+            ["-C", "link-args=-Wl,-install_name,@rpath/nh3.abi3.so"]
+        );
+    }
 
     #[test]
     fn python_entrypoint_symbol_accepts_pymodexport() {

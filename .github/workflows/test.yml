@@ -70,7 +70,7 @@ jobs:
       SCCACHE_GHA_ENABLED: "true"
       # sccache expands Rust response files past Windows' command-line limit.
       # https://github.com/mozilla/sccache/issues/2397
-      RUSTC_WRAPPER: ${{ matrix.os != 'windows-11-arm' && 'sccache' || '' }}
+      RUSTC_WRAPPER: ${{ !startsWith(matrix.os, 'windows') && 'sccache' || '' }}
     steps:
       - name: Enable long paths
         if: startsWith(matrix.os, 'windows')
@@ -82,7 +82,7 @@ jobs:
           sudo rm -rf /usr/share/dotnet
           sudo rm -rf /opt/ghc
       - name: sccache setup
-        if: matrix.os != 'windows-11-arm'
+        if: ${{ !startsWith(matrix.os, 'windows') }}
         uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7
@@ -460,7 +460,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       SCCACHE_GHA_ENABLED: "true"
-      RUSTC_WRAPPER: "sccache"
+      # sccache expands Rust response files past Windows' command-line limit.
+      # https://github.com/mozilla/sccache/issues/2397
+      RUSTC_WRAPPER: ${{ !startsWith(matrix.os, 'windows') && 'sccache' || '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -481,7 +483,7 @@ jobs:
       - uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7
       # Caching
       - name: Sccache Setup
-        if: ${{ steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release') }}
+        if: ${{ !startsWith(matrix.os, 'windows') && (steps.changes.outputs.changed == 'true' || contains(github.event.pull_request.labels.*.name, 'release')) }}
         uses: mozilla-actions/sccache-action@7d986dd989559c6ecdb630a3fd2557667be217ad # v0.0.9
         with:
           version: "v0.10.0"

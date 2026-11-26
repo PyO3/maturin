@@ -1309,6 +1309,7 @@ mod tests {
             implementation_name: "cpython".to_string(),
             soabi: None,
             soabi_platform: None,
+            lib_dir: None,
         }
     }
 

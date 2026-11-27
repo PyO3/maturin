@@ -202,6 +202,7 @@ pub(super) fn add_python_sources(
 
     for package in &python_packages {
         for entry in WalkBuilder::new(package)
+            .hidden(false)
             .filter_entry(skip_build_dirs(&project.target_dir, &python_packages))
             .build()
         {

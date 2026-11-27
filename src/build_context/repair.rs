@@ -434,15 +434,29 @@ fn copy_back_cargo_outputs(audited: &mut [AuditedArtifact], will_patch: &[bool])
     // an inode match there.
     fn cargo_deps_output(staged: &Path, cargo_output: &Path) -> Option<PathBuf> {
         let deps_dir = cargo_output.parent()?.join("deps");
+        // Open the staged inode once: reopening it for every `deps/` entry is
+        // expensive on Windows, and on macOS cargo copies, so none match.
+        let staged_handle = same_file::Handle::from_path(staged).ok()?;
         let direct = deps_dir.join(cargo_output.file_name()?);
-        if same_file::is_same_file(staged, &direct).unwrap_or(false) {
+        if same_file::Handle::from_path(&direct).is_ok_and(|handle| handle == staged_handle) {
             return Some(direct);
         }
+        // Only hash-suffixed siblings of this artifact (`<stem>-<hash>[.exe]`)
+        // can be cargo's `deps/` twin.
+        let prefix = format!("{}-", cargo_output.file_stem()?.to_str()?);
         fs::read_dir(&deps_dir)
             .ok()?
             .filter_map(|entry| entry.ok())
+            .filter(|entry| {
+                entry
+                    .file_name()
+                    .to_str()
+                    .is_some_and(|name| name.starts_with(&prefix))
+            })
             .map(|entry| entry.path())
-            .find(|path| same_file::is_same_file(staged, path).unwrap_or(false))
+            .find(|path| {
+                same_file::Handle::from_path(path).is_ok_and(|handle| handle == staged_handle)
+            })
     }
 
     for (aa, &will_patch) in audited.iter_mut().zip(will_patch) {

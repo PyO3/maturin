@@ -747,6 +747,63 @@ fn add_cargo_lock(writer: &mut VirtualWriter<SDistWriter>, ctx: &SdistContext<'_
     Ok(())
 }
 
+/// Regenerate Cargo.lock when workspace members were removed from the sdist.
+///
+/// The caller is responsible for determining whether members were actually
+/// stripped — this function unconditionally regenerates the lockfile.
+fn regenerate_cargo_lock(
+    writer: &mut VirtualWriter<SDistWriter>,
+    ctx: &SdistContext<'_>,
+) -> Result<()> {
+    let cargo_lock_target = ctx.root_dir.join("Cargo.lock");
+    if !writer.contains_target(&cargo_lock_target) {
+        return Ok(());
+    }
+
+    debug!("Regenerating Cargo.lock for sdist to remove stale workspace member entries");
+
+    let tmp =
+        tempfile::tempdir().context("Failed to create temp dir for Cargo.lock regeneration")?;
+    writer.materialize_to(tmp.path())?;
+
+    let sdist_dir = tmp.path().join(ctx.root_dir);
+    // Use `cargo update --workspace` rather than `cargo generate-lockfile`:
+    // generate-lockfile re-resolves ALL dependencies to their latest versions,
+    // which silently floats third-party pins and breaks reproducibility.
+    // `update --workspace` conservatively preserves existing pins while
+    // pruning entries for packages no longer reachable from the workspace.
+    let manifest_path = sdist_dir.join("Cargo.toml");
+    let mut cmd = Command::new("cargo");
+    cmd.args(["update", "--workspace", "--manifest-path"])
+        .arg(&manifest_path);
+    if ctx.project.cargo_options.offline {
+        cmd.arg("--offline");
+    }
+    let output = cmd
+        .output()
+        .context("Failed to run `cargo update --workspace`")?;
+    if !output.status.success() {
+        // The temp dir has no `.cargo/config.toml`, so source replacement and
+        // private registries are invisible to the regeneration run. Degrade
+        // gracefully: keep the original lockfile (which may have stale entries
+        // for removed members) rather than failing the entire build.
+        warn!(
+            "`cargo update --workspace` failed in sdist temp dir \
+             (exit status: {}); keeping original Cargo.lock. \
+             The lockfile may contain stale entries for removed workspace members.\n{}",
+            output.status,
+            String::from_utf8_lossy(&output.stderr),
+        );
+        return Ok(());
+    }
+
+    let regenerated = fs_err::read(sdist_dir.join("Cargo.lock"))
+        .context("Failed to read regenerated Cargo.lock")?;
+    writer.replace_bytes(&cargo_lock_target, regenerated)?;
+
+    Ok(())
+}
+
 /// Add the workspace Cargo.toml (when the crate is a workspace member).
 fn add_workspace_manifest(
     writer: &mut VirtualWriter<SDistWriter>,
@@ -873,6 +930,19 @@ fn add_cargo_package_files_to_sdist(
 
     // 4. Add workspace Cargo.toml (if applicable)
     add_workspace_manifest(writer, &ctx)?;
+
+    // 4.5 Regenerate Cargo.lock if workspace members were actually removed.
+    // Count members kept in the sdist (main crate + path deps in same workspace)
+    // and compare against the original workspace member count.
+    let kept_member_count = 1 + ctx
+        .known_path_deps
+        .values()
+        .filter(|dep| dep.workspace_root.as_path() == ctx.workspace_root.as_std_path())
+        .count();
+    let original_member_count = project.cargo_metadata.workspace_members.len();
+    if original_member_count > kept_member_count {
+        regenerate_cargo_lock(writer, &ctx)?;
+    }
 
     // 5. Add pyproject.toml metadata files and collect path rewrites.
     let metadata_rewrites =

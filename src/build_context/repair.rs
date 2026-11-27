@@ -418,12 +418,47 @@ fn stage_file(artifact_path: &Path, staging_dir: &Path) -> Result<(PathBuf, Carg
 ///   reflink (O(1) on apfs/btrfs/xfs/refs, a real copy on ext4) per
 ///   patched artifact, scoped only to artifacts that genuinely need
 ///   patching — multi-bin projects where some bins are unpatched still
-///   pay only the rename-back for those bins.
+///   pay only the rename-back for those bins. Cargo hard-links a
+///   cdylib's `deps/` copy (and a binary's hash-suffixed `deps/` copy)
+///   to the uplifted artifact, so that twin is replaced with clean bytes
+///   too (see #3359).
 /// - **NotStaged** / **Patched**: no-op. `NotStaged` shouldn't happen on
 ///   an audited artifact (we always stage before auditing) but we
 ///   degrade gracefully; `Patched` means a previous call already did
 ///   the work.
 fn copy_back_cargo_outputs(audited: &mut [AuditedArtifact], will_patch: &[bool]) -> Result<()> {
+    // Cargo hard-links a cdylib's `deps/` copy to the uplifted artifact, so
+    // replacing only the uplifted path would leave the repairer's in-place
+    // patching visible through `deps/` (and the next cargo run re-uplifts it).
+    // Binaries are uplifted from a hash-suffixed `deps/` entry, so fall back to
+    // an inode match there.
+    fn cargo_deps_output(staged: &Path, cargo_output: &Path) -> Option<PathBuf> {
+        let deps_dir = cargo_output.parent()?.join("deps");
+        // Open the staged inode once: reopening it for every `deps/` entry is
+        // expensive on Windows, and on macOS cargo copies, so none match.
+        let staged_handle = same_file::Handle::from_path(staged).ok()?;
+        let direct = deps_dir.join(cargo_output.file_name()?);
+        if same_file::Handle::from_path(&direct).is_ok_and(|handle| handle == staged_handle) {
+            return Some(direct);
+        }
+        // Only hash-suffixed siblings of this artifact (`<stem>-<hash>[.exe]`)
+        // can be cargo's `deps/` twin.
+        let prefix = format!("{}-", cargo_output.file_stem()?.to_str()?);
+        fs::read_dir(&deps_dir)
+            .ok()?
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| {
+                entry
+                    .file_name()
+                    .to_str()
+                    .is_some_and(|name| name.starts_with(&prefix))
+            })
+            .map(|entry| entry.path())
+            .find(|path| {
+                same_file::Handle::from_path(path).is_ok_and(|handle| handle == staged_handle)
+            })
+    }
+
     for (aa, &will_patch) in audited.iter_mut().zip(will_patch) {
         if !will_patch {
             continue;
@@ -454,6 +489,27 @@ fn copy_back_cargo_outputs(audited: &mut [AuditedArtifact], will_patch: &[bool])
                     aa.artifact.path.display(),
                     cargo_output.display()
                 );
+                if let Some(deps_output) = cargo_deps_output(&aa.artifact.path, &cargo_output) {
+                    fs::remove_file(&deps_output).with_context(|| {
+                        format!(
+                            "Failed to unlink hardlinked cargo deps output {} before restoring it from {}",
+                            deps_output.display(),
+                            aa.artifact.path.display(),
+                        )
+                    })?;
+                    reflink_or_copy(&aa.artifact.path, &deps_output).with_context(|| {
+                        format!(
+                            "Failed to restore unpatched cargo deps output {} from staged artifact {}",
+                            deps_output.display(),
+                            aa.artifact.path.display(),
+                        )
+                    })?;
+                    tracing::debug!(
+                        "copy_back_cargo_outputs: copied unpatched {} -> {}",
+                        aa.artifact.path.display(),
+                        deps_output.display()
+                    );
+                }
                 aa.artifact.staging = CargoOutputState::Patched;
             }
             CargoOutputState::Mirrored { cargo_output } => {
@@ -663,5 +719,54 @@ mod tests {
             audited[0].artifact.staging,
             CargoOutputState::Patched
         ));
+    }
+
+    fn assert_deps_twin_restored(file_name: &str, deps_name: &str) {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let profile_dir = temp_dir.path().join("target/release");
+        let deps_dir = profile_dir.join("deps");
+        let staging_dir = temp_dir.path().join("target/maturin");
+        fs::create_dir_all(&deps_dir).unwrap();
+        fs::create_dir_all(&staging_dir).unwrap();
+
+        let cargo_output = profile_dir.join(file_name);
+        let deps_output = deps_dir.join(deps_name);
+        fs::write(&cargo_output, b"not empty").unwrap();
+        fs::hard_link(&cargo_output, &deps_output).unwrap();
+
+        let (staged_output, staging) = stage_file(&cargo_output, &staging_dir).unwrap();
+        assert!(same_file::is_same_file(&staged_output, &deps_output).unwrap());
+
+        let mut audited = [AuditedArtifact {
+            artifact: BuildArtifact {
+                path: staged_output.clone(),
+                import_lib_path: None,
+                debuginfo_path: None,
+                linked_paths: Vec::new(),
+                thin_artifacts: Vec::new(),
+                staging,
+            },
+            external_libs: Vec::new(),
+            arch_requirements: HashMap::new(),
+        }];
+
+        copy_back_cargo_outputs(&mut audited, &[true]).unwrap();
+
+        assert_eq!(fs::read(&staged_output).unwrap(), b"not empty");
+        assert_eq!(fs::read(&cargo_output).unwrap(), b"not empty");
+        assert_eq!(fs::read(&deps_output).unwrap(), b"not empty");
+        assert!(!same_file::is_same_file(&staged_output, &cargo_output).unwrap());
+        assert!(!same_file::is_same_file(&staged_output, &deps_output).unwrap());
+        assert!(!same_file::is_same_file(&cargo_output, &deps_output).unwrap());
+    }
+
+    #[test]
+    fn copy_back_cargo_outputs_restores_hardlinked_deps_twin() {
+        assert_deps_twin_restored("libdemo.so", "libdemo.so");
+    }
+
+    #[test]
+    fn copy_back_cargo_outputs_restores_hashed_deps_twin_for_binaries() {
+        assert_deps_twin_restored("mybin", "mybin-63f52015c8769f71");
     }
 }

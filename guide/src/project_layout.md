@@ -148,6 +148,22 @@ my-rust-and-python-project
     └── src
         └── lib.rs
 ```
+#### Import Rust as a top-level module
+
+The extension doesn't have to live inside a Python package. If `python-source` and `python-packages` are set and there is no `<python-source>/<module-name>` directory, the extension is placed at the root of the wheel, next to the listed packages:
+
+```toml
+[tool.maturin]
+python-source = "src"
+python-packages = ["my_project"]
+module-name = "_my_project"
+```
+
+```text
+my_project/__init__.py
+_my_project.cpython-312-x86_64-linux-gnu.so
+```
+
 #### Import Rust as a submodule of your project
 
 If the Python module created by Rust has the same name as the Python package in a mixed Rust/Python project, IDEs might get confused.
